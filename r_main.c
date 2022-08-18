@@ -1,5 +1,11 @@
 #include "r_main.h"
 
+byte framebuffer[RAYCAST_WIDTH][RAYCAST_HEIGHT];
+bool R_isopen;
+SDL_Window* window;
+SDL_Renderer* renderer;
+SDL_Event event;
+
 void R_Init()
 {
     window = SDL_CreateWindow(WINDOW_NAME, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
@@ -80,6 +86,7 @@ void R_Close()
 {
     SDL_DestroyWindow(window);
     SDL_DestroyRenderer(renderer);
+    R_DumpSprites();
     R_isopen = false;
 }
 

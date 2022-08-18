@@ -1,4 +1,9 @@
 #include "g_game.h"
+#include "g_textures.h"
+#include "m_obj.h"
+
+uint16_t R_PlayerFace;
+
 
 bool G_GameIsDone()
 {
@@ -6,7 +11,6 @@ bool G_GameIsDone()
 }
 void G_StartMainGame()
 {
-    R_PlayerFace = 822;
     G_LoadEpisode(1);
     R_LoadSprites(1);
     G_LoadLevel(0);
@@ -14,6 +18,7 @@ void G_StartMainGame()
 
 void G_UpdateMainGame()
 {
+    R_PlayerFace = TEXTURE_PLAYERFACE_START + p_player->health / 10;
     R_DrawSprite(3, 162, sprites[R_PlayerFace]);
     G_ShowWalls();
 }
@@ -27,32 +32,26 @@ void G_LoadEpisode(uint8_t episode)
 
 void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 {
-    bool player = false;
+    if(id > 0 && id <= MT_StartpositionW)
+    {
+        if(!p_player)
+        {
+            p_player = M_Spawn(id, x, y, id-1);
+            p_player->player = malloc(sizeof(player_t));
+            p_player->health = 100;
+        }
+
+        p_player->x = x;
+        p_player->y = y;
+        return;
+    }
+
     switch ((m_maptype)id)
     {
         case MT_Nothing:
             /* code */
             break;
-        case MT_StartpositionN:
-            // p_player->x = x;
-            // p_player->y = y;
-            player = true;
-            break;
-        case MT_StartpositionE:
-            // p_player->x = x;
-            // p_player->y = y;
-            player = true;
-            break;
-        case MT_StartpositionS:
-            // p_player->x = x;
-            // p_player->y = y;
-            player = true;
-            break;
-        case MT_StartpositionW:
-            // p_player->x = x;
-            // p_player->y = y;
-            player = true;
-            break;
+        
         
     default:
         break;

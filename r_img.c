@@ -1,12 +1,27 @@
 #include "r_img.h"
 
+byte* palette;
+r_sprite* sprites;
+uint16_t imgCount;
+#include <SDL2/SDL_image.h>
+
+SDL_Palette* sdlPal;
 void R_LoadPalette()
 {
-    FILE* file = fopen("GAME.PAL", "rb");
+    SDL_Surface* surface =  IMG_Load("GAME.PAL");
+    sdlPal = surface->format->palette;
+    
     palette = malloc(768);
-    fseek(file, 1156, SEEK_SET);
-    fread(palette, 768, 1, file);
-    fclose(file);
+
+    for(int i = 0; i < 256; i++)
+    {
+        SDL_Color color = sdlPal->colors[i];
+
+        int j = i * 3;
+        palette[j] = color.r;
+        palette[j+1] = color.g;
+        palette[j+2] = color.b;
+    }
 }
 
 bool R_IMGHasOffset(uint32_t offset, uint32_t* offsets, int count)
@@ -82,13 +97,16 @@ void R_LoadSprites(byte episode)
         //dump raw img entry to bin
         char* filename = (char*)malloc(256);
 
-        sprintf(filename, "imgbin/img%d.bin", i);
-        FILE* dump = fopen(filename, "wb");
-        fwrite(&w, 1,1,dump);
-        fwrite(&h, 1, 1, dump);
-        fwrite(useless, 8, 1, dump);
-        fwrite(data, w*h, 1, dump);
-        fclose(dump);
+
+        // SDL_CreateRGBSurfaceWithFormatFrom(data, w, h, 0, w*3, SDL_PIXELFORMAT_RGB24);
+
+        // sprintf(filename, "imgbin/img%d.bin", i);
+        // FILE* dump = fopen(filename, "wb");
+        // fwrite(&w, 1,1,dump);
+        // fwrite(&h, 1, 1, dump);
+        // fwrite(useless, 8, 1, dump);
+        // fwrite(data, w*h, 1, dump);
+        // fclose(dump);
         
         free(data);
         free(filename);

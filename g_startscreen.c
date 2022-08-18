@@ -1,4 +1,8 @@
 #include "g_startscreen.h"
+
+g_startscreen* startscreen;
+
+
 void G_UpdateStartScreen()
 {
 }

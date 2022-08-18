@@ -3,10 +3,10 @@
 #include "typedefs.h"
 #include "r_sprite.h"
 #include <stdio.h>
-byte* palette;
+extern byte* palette;
 
-r_sprite* sprites;
-uint16_t imgCount;
+extern r_sprite* sprites;
+extern uint16_t imgCount;
 void R_LoadPalette();
 void R_LoadSprites(byte episode);
 bool R_IMGHasOffset(uint32_t offset, uint32_t* offsets, int count);

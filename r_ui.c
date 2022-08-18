@@ -1,15 +1,26 @@
 #include "r_ui.h"
 
+byte uiframebuffer[320][200];
+byte uitexturebuffer[320*200*4];
+SDL_Texture* uitexture;
+
+pcx overlay;
+SDL_Texture* pcx_images[14];
+
+
+
 void R_LoadPCXFiles(SDL_Renderer* renderer)
 {
     for(int i = 0; i < 14; i++)
     {
-        SDL_RWops* data = SDL_RWFromMem(UIF.entries[i+3].data, UIF.entries[i+3].length);
+        dat_entry_t entry = UIF.entries[i+3];
+        SDL_RWops* data = SDL_RWFromMem(D_GetData(entry), entry.length);
         SDL_Surface* surface = IMG_LoadPCX_RW(data);
 
         uint32_t keyColor;
 		keyColor = SDL_MapRGB(surface->format, 0, 0, 0);
 		SDL_SetColorKey(surface, SDL_TRUE, keyColor);
+
 
         pcx_images[i] = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_RWclose(data);

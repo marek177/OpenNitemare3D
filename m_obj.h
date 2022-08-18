@@ -4,7 +4,6 @@
 #include "typedefs.h"
 #include "p_player.h"
 #define MAXOBJ 256
-int m_objcount;
 
 typedef enum objstate
 {
@@ -21,13 +20,16 @@ typedef struct obj_t
     float x,y, velx, vely;
     uint8_t id;
     angle_t angle;
+    int health;
     sprite_t sprite;
     m_type type;
     objstate state;
     player_t* player;
 }obj_t;
 
-obj_t* m_objects[MAXOBJ];
+extern obj_t* m_objects[MAXOBJ];
+extern int m_objcount;
+
 
 void M_Update();
 obj_t* M_Spawn(m_type type, int x, int y, angle_t angle);

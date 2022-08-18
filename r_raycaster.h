@@ -1,0 +1,2 @@
+#ifndef __R_RAYCASTER_H__
+#define __R_RAYCASTER_H__

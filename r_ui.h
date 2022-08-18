@@ -8,12 +8,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "pcx.h"
-byte uiframebuffer[320][200];
-byte uitexturebuffer[320*200*4];
-SDL_Texture* uitexture;
+extern byte uiframebuffer[320][200];
+extern byte uitexturebuffer[320*200*4];
+extern SDL_Texture* uitexture;
 
-pcx overlay;
-SDL_Texture* pcx_images[14];
+extern pcx overlay;
+extern SDL_Texture* pcx_images[14];
 void R_ClearUI();
 void R_DrawSprite(int x, int y, r_sprite sprite);
 void R_FreePCX(pcx tobefreed);

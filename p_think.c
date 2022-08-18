@@ -1,5 +1,7 @@
 #include "p_think.h"
 
+obj_t* p_player;
+
 void P_InitPlayer(obj_t* player)
 {
     player->player = malloc(sizeof(player));

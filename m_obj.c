@@ -1,5 +1,7 @@
 #include "m_obj.h"
 
+obj_t* m_objects[MAXOBJ];
+int m_objcount;
 
 void M_Update()
 {
@@ -13,7 +15,7 @@ void M_Update()
 
 obj_t* M_Spawn(m_type type, int x, int y, angle_t angle)
 {
-    obj_t* monster;
+    obj_t* monster = malloc(sizeof(*monster));
     monster->x = x;
     monster->y = y;
     monster->angle = angle;

@@ -8,8 +8,9 @@
 #include "i_keyboard.h"
 #include "g_info.h"
 #include "r_main.h"
+#include "p_think.h"
 #define MAP_OFFSET 514;
-uint16_t R_PlayerFace;
+extern uint16_t R_PlayerFace;
 
 
 bool G_GameIsDone();

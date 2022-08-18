@@ -2,6 +2,9 @@
 *.PAL
 *.png
 *.bin
+*.png
+*.DLL
+NITE3D.BSF
 IMG.*
 MAP.*
 DEMO.*

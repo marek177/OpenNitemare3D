@@ -14,7 +14,7 @@ typedef enum midi
     MIDI_E1M1 = 11
 }midi;
 
-Mix_Music* current_midi;
+extern Mix_Music* current_midi;
 void I_InitMusic();
 void I_PauseMusic();
 void I_PlayMusic();

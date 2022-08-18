@@ -1,4 +1,5 @@
 #include "i_keyboard.h"
+Uint8* keys;
 
 void I_HandleKeyboard()
 {

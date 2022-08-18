@@ -10,13 +10,13 @@
 #define WINDOW_HEIGHT 240
 #define WINDOW_NAME "Nitemare 3D"
 
-byte framebuffer[RAYCAST_WIDTH][RAYCAST_HEIGHT];
-bool R_isopen;
-r_sprite* sprites;
-SDL_Window* window;
-SDL_Renderer* renderer;
-SDL_Event event;
-uint tickcount;
+extern byte framebuffer[RAYCAST_WIDTH][RAYCAST_HEIGHT];
+extern bool R_isopen;
+extern r_sprite* sprites;
+extern SDL_Window* window;
+extern SDL_Renderer* renderer;
+extern SDL_Event event;
+// uint tickcount;
 
 void R_SaveTexture(const char* file_name, SDL_Renderer* renderer, SDL_Texture* texture);
 void R_DumpSprites();

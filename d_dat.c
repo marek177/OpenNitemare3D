@@ -1,6 +1,8 @@
 #include "d_dat.h"
 
 
+dat_file_t UIF, SND;
+
 void D_LoadDats()
 {
     SND = D_ReadDat("SND.DAT");
@@ -18,6 +20,21 @@ void D_FreeDat(dat_file_t* file)
     {
         free(file->entries[i].data);
     }
+}
+
+
+void* D_GetData(dat_entry_t entry)
+{
+    if(!entry.data)
+    {
+        FILE* file = fopen(entry.filename, "rb");
+        fseek(file, entry.offset, SEEK_SET);
+        byte* buffer = malloc(entry.length);
+        fread(buffer, entry.length, 1, file);
+        fclose(file);
+        entry.data = buffer;
+    }
+    return entry.data;
 }
 
 dat_file_t D_ReadDat(char filename[256])
@@ -62,10 +79,19 @@ dat_file_t D_ReadDat(char filename[256])
 
         dat_entry_t entry;
 
-        entry.data = buffer;
+        // entry.data = buffer;
         entry.length = length;
+        entry.filename = filename;
+        entry.offset = offset;
+        entry.data = NULL;
         entries[i] = entry;
+        
 
+        char strBuffer[64];
+        sprintf(strBuffer, "DAT/%s/%d.BIN", filename, i);
+
+        I_DumpBinary(buffer, entry.length, strBuffer);
+        free(buffer);
         // char* str = malloc(256);
         // sprintf(str, "dat/%s/%d.bin", filename, i);
         // puts(str);
