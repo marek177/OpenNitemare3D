@@ -18,12 +18,13 @@ typedef enum objstate
 typedef struct obj_t
 {
     float x,y, velx, vely;
-    uint8_t id;
+    int id;
     angle_t angle;
     int health;
     sprite_t sprite;
     m_type type;
     objstate state;
+    objstate nextState;
     player_t* player;
 }obj_t;
 

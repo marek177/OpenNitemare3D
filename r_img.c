@@ -8,6 +8,7 @@ uint16_t imgCount;
 SDL_Palette* sdlPal;
 void R_LoadPalette()
 {
+    #ifdef NEW_SPRITES
     SDL_Surface* surface =  IMG_Load("GAME.PAL");
     sdlPal = surface->format->palette;
     
@@ -22,6 +23,11 @@ void R_LoadPalette()
         palette[j+1] = color.g;
         palette[j+2] = color.b;
     }
+
+    #else
+    
+
+    #endif
 }
 
 bool R_IMGHasOffset(uint32_t offset, uint32_t* offsets, int count)

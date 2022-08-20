@@ -18,8 +18,9 @@ void G_StartMainGame()
 
 void G_UpdateMainGame()
 {
-    R_PlayerFace = TEXTURE_PLAYERFACE_START + p_player->health / 10;
-    R_DrawSprite(3, 162, sprites[R_PlayerFace]);
+    R_PlayerFace = UI_PLAYERFACE + p_player->health / 10;
+    R_DrawSprite(UI_PLAYERFACE_X, UI_PLAYERFACE_Y, sprites[R_PlayerFace]);
+    R_DrawSprite(UI_WEAPON_X, UI_WEAPON_Y, sprites[UI_PLASMAGUN]);
     G_ShowWalls();
 }
 
@@ -64,7 +65,7 @@ void G_ShowWalls()
     {
         for(byte y = 0; y < 36; y++)
         {
-            uiframebuffer[256 + x][162 + y] = gameinfo.mapdata[x+y*64];
+            // uiframebuffer[256 + x][162 + y] = gameinfo.mapdata[x+y*64];
         }
     }
 }

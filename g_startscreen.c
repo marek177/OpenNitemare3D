@@ -1,4 +1,5 @@
 #include "g_startscreen.h"
+#include "i_sound.h"
 
 g_startscreen* startscreen;
 
@@ -14,5 +15,6 @@ bool G_StartScreenDone()
 
 void G_InitStartScreen()
 {
+    I_ChangeSong(MIDI_HAUNTEDHOUSE_THEME);
     startscreen = malloc(sizeof(startscreen));
 }

@@ -10,7 +10,7 @@
 #define WINDOW_HEIGHT 240
 #define WINDOW_NAME "Nitemare 3D"
 
-extern byte framebuffer[RAYCAST_WIDTH][RAYCAST_HEIGHT];
+extern byte framebuffer[RAYCAST_WIDTH * RAYCAST_HEIGHT * 3];
 extern bool R_isopen;
 extern r_sprite* sprites;
 extern SDL_Window* window;

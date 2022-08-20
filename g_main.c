@@ -1,7 +1,11 @@
 #include "g_main.h"
+#include "g_mainmenu.h"
+#include "g_fonts.h"
+#include "r_raycaster.h"
 
 void G_Init()
 {
+
     gameinfo.gamestate = GAMESTATE_STARTSCREEN;
     
     D_LoadDats();
@@ -9,9 +13,9 @@ void G_Init()
     I_InitMusic();
     R_LoadPCXFiles(renderer);
     R_SetPCX(PCX_HUD);
+    G_LoadFonts();
     G_InitStartScreen();
-
-    I_ChangeSong(0);
+    
     I_PlayMusic();
     //R_DumpSprites();
 
@@ -39,13 +43,18 @@ void G_UpdateGame()
         overlay = PCX_START_SCREEN;
         if(G_StartScreenDone())
         {
-            gameinfo.gamestate = GAMESTATE_PLAYING;
-            G_StartMainGame();
+            gameinfo.gamestate = GAMESTATE_MAINMENU;
+            // G_StartMainGame();
+            G_InitMainMenu();
         }
         break;
     case GAMESTATE_PLAYING:
         G_UpdateMainGame();
         overlay = PCX_HUD;
+        break;
+    case GAMESTATE_MAINMENU:
+        overlay = PCX_MAIN_MENU;
+        G_UpdateMainMenu();
         break;
     case GAMESTATE_PLEASE_WAIT:
         break;
