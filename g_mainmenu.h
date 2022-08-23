@@ -1,5 +1,5 @@
-#ifndef G_STARTSCREEN
-#define G_STARTSCREEN
+#ifndef G_MAINMENU
+#define G_MAINMENU
 #include "typedefs.h"
 #include "pcx.h"
 #include "i_keyboard.h"

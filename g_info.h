@@ -14,6 +14,6 @@ typedef struct g_info
     g_gamestate gamestate;
 }g_info;
 
-static g_info gameinfo;
+extern g_info gameinfo;
 
 #endif

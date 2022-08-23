@@ -39,6 +39,11 @@ fluid_sfont_t* I_GetSoundFont()
     return fluid_synth_get_sfont_by_id(synth, _fontID);
 }
 
+fluid_synth_t* I_GetFluidSynth()
+{
+    return synth;
+}
+
 void I_InitMusic()
 {
     SDL_Init(SDL_INIT_AUDIO);
@@ -98,6 +103,8 @@ void I_UpdateSound()
         return;
     }
 
+    SDL_AudioStreamFlush(midiStream);
+
     static float converted[SFMIDI_LOADERFRAMES];
     // this is in bytes, not samples!
     int gotten = SDL_AudioStreamGet(midiStream, converted, sizeof (converted));
@@ -129,10 +136,6 @@ void I_ChangeSong(int id)
     midiLength = entry.length;
     SDL_AudioStreamFlush(midiStream);
     SDL_ClearQueuedAudio(audioDevice);
-    // Mix_FreeMusic(current_midi);
-    // SDL_RWops* data = SDL_RWFromMem(D_GetData(SND.entries[id+1]), SND.entries[+1].length);
-    // current_midi = Mix_LoadMUS_RW(data, 1);
-    // printf("midi:%d\n", current_midi);
     I_PlayMusic();
 }
 

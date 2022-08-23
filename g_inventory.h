@@ -1,0 +1,26 @@
+#ifndef G_INVENTORY
+#define G_INVENTORY
+#include "typedefs.h"
+typedef enum InventoryItem
+{
+    INVENTORYITEM_AMMO_PLASMA,
+    INVENTORYITEM_AMMO_BULLET,
+    INVENTORYITEM_AMMO_MAGIC,
+    INVENTORYITEM_WEAPON_PLASMAGUN,
+    INVENTORYITEM_WEAPON_AUTOPLASMA,
+    INVENTORYITEM_WEAPON_WAND,
+    INVENTORYITEM_WEAPON_GUN,
+    INVENTORYITEM_KEY_RED,
+    INVENTORYITEM_KEY_GREEN,
+    INVENTORYITEM_KEY_BLUE,
+    INVENTORYITEM_KEY_YELLOW,
+    INVENTORYITEM_CARD_RED,
+    INVENTORYITEM_CARD_YELLOW
+}InventoryItem;
+
+void G_PlayerAddInventoryItem(InventoryItem item, int count);
+bool G_PlayerHasInventoryItem(InventoryItem item);
+int G_PlayerGetItemCount(InventoryItem item);
+
+
+#endif

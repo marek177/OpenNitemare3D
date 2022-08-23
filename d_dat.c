@@ -25,14 +25,13 @@ void D_FreeDat(dat_file_t* file)
 
 void* D_GetData(dat_entry_t entry)
 {
-    if(!entry.data)
+    if(1)
     {
         FILE* file = fopen(entry.filename, "rb");
         fseek(file, entry.offset, SEEK_SET);
-        byte* buffer = malloc(entry.length);
-        fread(buffer, entry.length, 1, file);
+        fread(entry.data, entry.length, 1, file);
         fclose(file);
-        entry.data = buffer;
+        // entry.data = buffer;
     }
     return entry.data;
 }
@@ -83,7 +82,7 @@ dat_file_t D_ReadDat(char filename[256])
         entry.length = length;
         entry.filename = filename;
         entry.offset = offset;
-        entry.data = NULL;
+        entry.data = malloc(entry.length);
         entries[i] = entry;
         
 

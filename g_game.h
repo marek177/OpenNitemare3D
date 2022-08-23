@@ -10,8 +10,6 @@
 #include "r_main.h"
 #include "p_think.h"
 #define MAP_OFFSET 514;
-extern uint16_t R_PlayerFace;
-
 
 bool G_GameIsDone();
 void G_ShowWalls();

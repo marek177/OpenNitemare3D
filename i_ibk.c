@@ -49,7 +49,7 @@ void I_LoadIBK()
     }
 
     for(int i = 0; i < 128; i++)
+    {
         printf("instrument[%d]: %s\n", i, names[i]);
-
-    fluid_sfont_t* font =  I_GetSoundFont();
+    }
 }

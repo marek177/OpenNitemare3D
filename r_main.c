@@ -35,83 +35,80 @@ void reverseByte(byte *data) {
 
 void DumpMysteryImages()
 {
-    for(int k = 0; k < 3; k++)
-    {
 
-        byte* data = D_GetData(UIF.entries[k]);
+    // typedef struct header
+    // {
+    //     byte w,h;
+    //     byte unknown[7];
+    // }header;
 
-        int16_t offset = 257;                               // Start at fontdata[2] ([0],[1] used for height,width)
+    // for(int k = 0; k < 3; k++)
+    // {
+
+        byte* data = D_GetData(UIF.entries[2]);
+
+        int16_t offset = 2;
 
         // Setup the font array (127 characters)
 
 
         for (int i = 1; i < 128; i++) {
-            // // _font[_fnt][i] = _fontdata[_fnt] + offset;
-            // byte width = *(data+offset);
-            // byte height  = *(data+offset+1);
+            byte height = *(data + offset);
+            byte width = 8;//*(data + offset + 1);
 
-            // int16_t size = height * ((width + 7) >> 3);
-            int size = 7*6;
+            printf("character {w%d,h%d}\n", width, height);
+
+            int16_t size = height * ((width+7) >> 3);
             
-            byte* buffer = malloc((size)*4);
-            for (int j = 0; j < size; j++)
-            {
-                reverseByte(&data[offset+2+j]);
 
-                byte c = data[offset+2+j];
-                byte r, g, b;
-                R_GetColor(c, &r, &g, &b);
-                
-                int buffoff = j * 4;
-                buffer[buffoff] = r;
-                buffer[buffoff + 1] = g;
-                buffer[buffoff + 2] = b;
-                buffer[buffoff + 3] = 255;
+            byte* buffer = malloc((width*height)*4);
+
+            for(int j = 0; j < size; j++)
+                reverseByte(&data[offset + 2 + j]);
+
+
+            for(int y = 0; y < height; ++y)
+            {
+                for(int x = 0; x < width; ++x)
+                {
+                    int pixel = y * width + x;
+                    int bitpos = pixel % 8;
+                    int offset_ = pixel / 8;
+                    byte bitTest = (1 << bitpos);
+
+                    byte c = 10;
+                                 
+                    if((data[offset + 2 + offset_] & bitTest) == bitTest)
+                    {
+                        c = 213;
+                    }
+
+                    byte r,g,b;
+                    R_GetColor(c, &r,&g, &b);       
+
+                    int off = pixel * 4;
+                    buffer[off] = b;
+                    buffer[off+1] = g;
+                    buffer[off+2] = r;
+                    buffer[off+3] = 255;
+                }
             }
 
-            char* filename[256];
-            sprintf(filename, "font/dump_%d_%d.png", i, k);
-                //R_SaveTexture(filename, renderer, texture);
+            char name[64];
 
-            SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(buffer, 7, 6, 32, 7*4, 0, 0, 0, 0);
-            IMG_SavePNG(surface, filename);
+            sprintf(name, "font/%c.png", i);
+            printf("%s\n", name);
+
+            SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(buffer, width, height, 32, width*4, 0, 0, 0, 0);
+            IMG_SavePNG(surface, name);
+            offset += 2 + size;
+            
+        
+
+            free(buffer);
         }
-
-        // int offset = 0;
-        // int k = 0;
-        // while(1)
-        // {
-        //     byte w = data[offset];
-        //     byte h = data[offset+1];
-
-        //     byte* buffer = malloc((w*h)*4);
-        //     data++;
-
-        //     printf("w:%d h:%d\n", w, h);
-
-        //     for(int j = 0; j < w*h; j++)
-        //     {
-        //         byte pixel = data[j+2+offset];
-        //         byte r, g, b;
-        //         R_GetColor(pixel, &r, &g, &b);
-
-        //         int buffoff = j * 4;
-        //         buffer[buffoff] = r;
-        //         buffer[buffoff + 1] = g;
-        //         buffer[buffoff + 2] = b;
-        //         buffer[buffoff + 3] = 255;
-        //     }
-        //     char* filename[256];
-        //     sprintf(filename, "dump_%d_%d.png", i, k++);
-        //     offset += (w*h) + 2;
-        //     //R_SaveTexture(filename, renderer, texture);
-
-        //     SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(buffer, w, h, 32, w*4, 0, 0, 0, 0);
-        //     IMG_SavePNG(surface, filename);
-        // }
         
-        
-    }
+    // }
 }
 
 void R_DumpSprites()

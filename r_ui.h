@@ -9,13 +9,10 @@
 #include <SDL2/SDL_image.h>
 #include "pcx.h"
 #include "g_fonts.h"
-extern byte uiframebuffer[320*200];
-extern byte uitexturebuffer[320*200*4];
-extern SDL_Texture* uitexture;
 
 extern pcx overlay;
 extern SDL_Texture* pcx_images[14];
-void R_DrawText(const char* text, int x, int y, Font font, int color);
+// void R_DrawText(const char* text, int x, int y, Font font, int color);
 void R_ClearUI();
 void R_DrawSprite(int x, int y, r_sprite sprite);
 void R_FreePCX(pcx tobefreed);
@@ -26,5 +23,7 @@ void R_InitUI();
 void R_DrawUISprites(SDL_Renderer* renderer);
 void R_DrawUIText(SDL_Renderer* renderer);
 void R_DrawPCX(SDL_Renderer* renderer);
+void R_SetFont(int font);
+void R_DrawText(int x, int y, uint8_t color, const char* str);
 
 #endif

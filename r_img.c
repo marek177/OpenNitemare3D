@@ -25,8 +25,11 @@ void R_LoadPalette()
     }
 
     #else
-    
 
+    FILE* file = fopen("GAME.PAL", "rb");
+    palette = I_ReadBytes(file, 768);
+    fclose(file);
+   
     #endif
 }
 
@@ -82,7 +85,16 @@ void R_LoadSprites(byte episode)
         fread(&w, 1, 1, img);
         fread(&h, 1, 1, img);
         byte* useless = malloc(8);
+        
+        
         fread(useless, 8, 1, img);
+
+        printf("IMG[%d] {%d X %d}\n", i, w, h);
+        for(int j = 0; j < 8; j++)
+        {
+            printf("\tflag: %d\n", useless[j]);
+        }
+
         byte* data = malloc(w*h);
         byte* fixed = malloc(w*h);
         fread(data, w*h, 1, img);
@@ -103,17 +115,6 @@ void R_LoadSprites(byte episode)
         //dump raw img entry to bin
         char* filename = (char*)malloc(256);
 
-
-        // SDL_CreateRGBSurfaceWithFormatFrom(data, w, h, 0, w*3, SDL_PIXELFORMAT_RGB24);
-
-        // sprintf(filename, "imgbin/img%d.bin", i);
-        // FILE* dump = fopen(filename, "wb");
-        // fwrite(&w, 1,1,dump);
-        // fwrite(&h, 1, 1, dump);
-        // fwrite(useless, 8, 1, dump);
-        // fwrite(data, w*h, 1, dump);
-        // fclose(dump);
-        
         free(data);
         free(filename);
     }

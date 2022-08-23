@@ -20,6 +20,7 @@ extern Mix_Music* current_midi;
 void I_UpdateSound();
 void I_InitMusic();
 fluid_sfont_t* I_GetSoundFont();
+fluid_synth_t* I_GetFluidSynth();
 void I_PauseMusic();
 void I_PlayMusic();
 void I_ChangeSong(int id);

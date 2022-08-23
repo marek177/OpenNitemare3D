@@ -12,7 +12,8 @@
 #define LEVEL_SIZE 64
 
 
-
+void G_DrawCurrentWeapon();
+void G_DrawPlayerFace();
 void G_UpdateGame();
 void G_Init();
 

@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "r_main.h": "c"
+        "r_main.h": "c",
+        "g_mainmenu.h": "c"
     }
 }

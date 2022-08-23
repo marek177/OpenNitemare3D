@@ -1,17 +1,17 @@
 #include "g_main.h"
 #include "r_raycaster.h"
+#include "i_time.h"
 int main()
 {
     G_Init();
     while(R_IsOpen())
     {
+        I_UpdateTime();
         R_Clear();
         R_ProcessSDLInput();
-        R_DrawRaycaster();
         R_DrawFrameBuffer();
-        R_DrawPCX(renderer);
-        G_UpdateGame();
         R_DrawUI(renderer);
+        G_UpdateGame();
         R_Present();
         I_UpdateSound();
     }

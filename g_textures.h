@@ -19,12 +19,15 @@
 #define UI_MAGICWAND 701
 #define UI_REVOLVER 702
 #define UI_AUTOPLASMAGUN 703
+#define UI_KEY_START 806
 #else
 #define UI_FACE_START 699
 #define UI_PLASMAGUN 700
 #define UI_MAGICWAND 701
 #define UI_REVOLVER 702
 #define UI_AUTOPLASMAGUN 703
+#define UI_KEY_START 806
+
 #endif
 
 #define UI_WEAPON_X 146

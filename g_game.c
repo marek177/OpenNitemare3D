@@ -2,8 +2,6 @@
 #include "g_textures.h"
 #include "m_obj.h"
 
-uint16_t R_PlayerFace;
-
 
 bool G_GameIsDone()
 {
@@ -18,10 +16,9 @@ void G_StartMainGame()
 
 void G_UpdateMainGame()
 {
-    R_PlayerFace = UI_PLAYERFACE + p_player->health / 10;
-    R_DrawSprite(UI_PLAYERFACE_X, UI_PLAYERFACE_Y, sprites[R_PlayerFace]);
-    R_DrawSprite(UI_WEAPON_X, UI_WEAPON_Y, sprites[UI_PLASMAGUN]);
     G_ShowWalls();
+
+    R_DrawRaycaster();
 }
 
 void G_LoadEpisode(uint8_t episode)
@@ -31,6 +28,8 @@ void G_LoadEpisode(uint8_t episode)
     
 }
 
+
+//dear David P Gray, why?
 void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 {
     if(id > 0 && id <= MT_StartpositionW)
@@ -47,15 +46,24 @@ void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
         return;
     }
 
-    switch ((m_maptype)id)
+    if(id >= MT_BatN && id <= MT_BatW)
     {
-        case MT_Nothing:
-            /* code */
-            break;
-        
-        
-    default:
-        break;
+        SDL_Log("spawned Bat at {%d,%d}\n",x,y);
+    }
+
+    if(id >= MT_FrankensteinN && id <= MT_FrankensteinW)
+    {
+        SDL_Log("spawned Frankenstein at {%d,%d}\n",x,y);
+    }
+
+    if(id >= MT_MummyN && id <= MT_MummyW)
+    {
+        SDL_Log("spawned Mummy at {%d,%d}\n",x,y);
+    }
+
+    if(id >= MT_SkeletonN && id <= MT_SkeletonW)
+    {
+        SDL_Log("spawned Mummy at {%d,%d}\n",x,y);
     }
 }
 

@@ -20,4 +20,10 @@ typedef enum pcx
 
 }pcx;
 
+#define PCX_WIDTH 320
+#define PCX_HEIGHT 240
+
+void PCX_ReadImages();
+void* PCX_GetImage(pcx id);
+
 #endif

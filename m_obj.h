@@ -22,6 +22,7 @@ typedef struct obj_t
     angle_t angle;
     int health;
     sprite_t sprite;
+    
     m_type type;
     objstate state;
     objstate nextState;
