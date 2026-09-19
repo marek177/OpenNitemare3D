@@ -99,7 +99,7 @@ namespace Nitemare3D
 
         public static bool IsKeyDown(KeyboardKey key)
         {
-            return IsKeyPressed((Key)key) && GameWindow.sfWindow.HasFocus();
+            return Keyboard.IsKeyPressed((Key)key) && GameWindow.sfWindow.HasFocus();
         }
 
         /// <summary>
