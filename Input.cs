@@ -1,6 +1,7 @@
 using static SFML.Window.Keyboard;
 using SFML.Window;
 using System;
+using System.Collections.Generic;
 namespace Nitemare3D
 {
     //todo: implement more keys, should be easy to just automate at some point    
@@ -34,6 +35,7 @@ namespace Nitemare3D
 
 
         static int numberInput = -1;
+        static readonly Dictionary<KeyboardKey, bool> previousKeyState = new Dictionary<KeyboardKey, bool>();
 
         const float textInputTime = .1f;
         static float textInputTimer = 0;
@@ -77,6 +79,14 @@ namespace Nitemare3D
 
         public static void Update()
         {
+            // Program.cs calls Input.Update() at the end of each frame. Store the
+            // final level state here so IsKeyPressed() can reproduce the original
+            // rising-edge USE/ACTION behavior on the next frame.
+            foreach (KeyboardKey key in Enum.GetValues(typeof(KeyboardKey)))
+            {
+                previousKeyState[key] = IsKeyDown(key);
+            }
+
             textInputTimer += Time.dt;
             text = string.Empty;
             numberInput = -1;
@@ -86,10 +96,22 @@ namespace Nitemare3D
         {
             GameWindow.sfWindow.TextEntered += new EventHandler<TextEventArgs>(OnTextEnter);
         }
+
         public static bool IsKeyDown(KeyboardKey key)
         {
-
             return IsKeyPressed((Key)key) && GameWindow.sfWindow.HasFocus();
+        }
+
+        /// <summary>
+        /// True only on the transition from up to down. NITE3W.EXE uses this
+        /// rising-edge behavior for USE/ACTION (input mask 0x0200).
+        /// </summary>
+        public static bool IsKeyPressed(KeyboardKey key)
+        {
+            bool down = IsKeyDown(key);
+            bool wasDown;
+            previousKeyState.TryGetValue(key, out wasDown);
+            return down && !wasDown;
         }
 
     }
