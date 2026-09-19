@@ -24,6 +24,17 @@ I also need help labeling all the sound effects
 
 if you're David P Gray please consider open-sourcing Nitemare 3D
 
+## Reverse-engineering synchronization
+
+This fork is being synchronized with verified clean-room findings from
+[`marek177/Nitemare3d-reversed`](https://github.com/marek177/Nitemare3d-reversed).
+Only findings backed by original NITE3W.EXE/data evidence should be promoted to
+runtime behavior; partially identified values remain documented rather than guessed.
+
+The first synchronization pass adds recovered runtime constants, the original
+27-world-unit player collision half-extent, sub-tile axis-separated movement,
+rising-edge USE/ACTION targeting of one adjacent cardinal cell, and the verified
+fresh GUARD strength of 255.
 
 ## features:
 * Loading of original bitmap images
@@ -37,6 +48,7 @@ if you're David P Gray please consider open-sourcing Nitemare 3D
 * sprites
 * implementing curtains, warps, hidden panels
 * tile editor that auto-generates code for me
+* continued runtime reconstruction from Nitemare3d-reversed
 
 ### file formats:
 
@@ -47,8 +59,9 @@ this consists of a header that contains offsets for every file stored in the con
 files in SND.DAT consist of MIDI files followed by either 16 bit VOC or 8 bit PCM audio files(depending on the version).
 UIF.DAT consists of 256 color 320x200 PCX images
 
-
 #### MAP:
-maps are stored as text files and are very easy to read, the first 514 bytes are still unknown by me(could be tile definitions?)
-after that every map is stored as a 8192 byte chunk, every even byte is a tile id and every odd byte is a item id.
-
+MAP.1, MAP.2 and MAP.3 are binary archives. The archive header is 514 bytes;
+after it, every level occupies exactly 8192 bytes (`64 * 64 * 2`). Each map cell
+is an interleaved two-byte pair `{wallByte, objectByte}`. MAP.1 contains 11 level
+payloads (E1M11 is the internal/demo map); MAP.2 and MAP.3 contain 10 each.
+Runtime world coordinates use 64 world units per map tile.
