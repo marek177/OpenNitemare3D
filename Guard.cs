@@ -45,7 +45,13 @@ namespace Nitemare3D
         AnimationHandler anim = new AnimationHandler();
         GuardType type;
         GuardState state = GuardState.idle;
-        byte health = 100;
+
+        // NITE3W.EXE initializes fresh GUARD+0x10 strength to 0xFF.
+        // Exact visible enemy/class mappings for the recovered damage matrix are
+        // still incomplete, so damage scaling is intentionally not guessed here.
+        byte health = RecoveredRuntime.GuardInitialStrength;
+        public byte Strength => health;
+
         const int SPRITE_FRANKENSTEIN_START = 322;
         const int SPRITE_BAT_START = 310;
         const int SPRITE_MUMMY_START = 338;
@@ -83,8 +89,6 @@ namespace Nitemare3D
             return anim.LoadAnimation(animations[(int)type * Enum.GetValues<GuardAnimation>().Length + (int)animation]);
         }
 
-
-
         public Guard(GuardType type)
         {
             this.type = type;
@@ -121,15 +125,12 @@ namespace Nitemare3D
             }
 
             attackTimer = attackTime;
-
         }
 
         float roarTimer = 0;
         float roarTime = .5f;
 
         float attackTime, attackTimer;
-
-
 
         int range = 3;
         int attackRange = 1;
@@ -144,7 +145,6 @@ namespace Nitemare3D
         }
         bool moving = false;
 
-
         Vec2 CalcNextPoint()
         {
             Vec2 current = new Vec2((int)MathF.Round(position.X), (int)MathF.Round(position.Y));
@@ -157,7 +157,6 @@ namespace Nitemare3D
             Vec2 closest = new Vec2(0,0);
             float closestDist = float.MaxValue;
 
-
             for(int i = 0; i < 4; i++)
             {
                 if(Level.IsWalkable((int)current.X + (int)points[i].X, (int)current.Y + (int)points[i].Y, this))
@@ -169,8 +168,6 @@ namespace Nitemare3D
                         closest = points[i];
                     }
                 }
-            
-
             }
 
             return closest;
@@ -194,11 +191,9 @@ namespace Nitemare3D
                 nextPosition = CalcNextPoint();
                 targetPos = position + nextPosition;
             }
-            
 
             position += nextPosition * Time.dt;
         }
-
 
         void PlayRoar()
         {
@@ -235,7 +230,6 @@ namespace Nitemare3D
             SoundEffect.PlaySound(snd);
         }
 
-
         public void ShootPlasma()
         {
             state = GuardState.dead;
@@ -251,7 +245,7 @@ namespace Nitemare3D
             }
 
             attackTimer += Time.dt;
-            
+
             if(attackTimer > attackTime)
             {
                 PlayAnim(GuardAnimation.attack);
@@ -262,7 +256,6 @@ namespace Nitemare3D
             }
 
         }
-
 
         void UpdateDead()
         {
@@ -311,8 +304,7 @@ namespace Nitemare3D
             anim.Update();
             spriteIndex = anim.index;
             spritePosition = position;
-            
-    
+
             if(type == GuardType.Bat && state != GuardState.idle)
             {
                 yOffset += (32 - yOffset) * Time.dt;
