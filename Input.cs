@@ -32,8 +32,6 @@ namespace Nitemare3D
 
     public static class Input
     {
-
-
         static int numberInput = -1;
         static readonly Dictionary<KeyboardKey, bool> previousKeyState = new Dictionary<KeyboardKey, bool>();
 
@@ -52,19 +50,13 @@ namespace Nitemare3D
                 numberInput = num;
             }
 
-
             if (e.Unicode == "\b" || e.Unicode == "\n")
             {
                 return;
             }
 
             text = e.Unicode;
-
-
-
         }
-
-
 
         //returns -1 if input is not a number
         public static int GetNumberInput()
@@ -99,7 +91,9 @@ namespace Nitemare3D
 
         public static bool IsKeyDown(KeyboardKey key)
         {
-            return Keyboard.IsKeyPressed((Key)key) && GameWindow.sfWindow.HasFocus();
+            // KeyboardKey mirrors SFML.Window.Keyboard.Key numerically, but C#
+            // requires an explicit conversion between the two enum types.
+            return Keyboard.IsKeyPressed((Key)(int)key) && GameWindow.sfWindow.HasFocus();
         }
 
         /// <summary>
@@ -113,6 +107,5 @@ namespace Nitemare3D
             previousKeyState.TryGetValue(key, out wasDown);
             return down && !wasDown;
         }
-
     }
 }
