@@ -28,7 +28,49 @@ namespace Nitemare3D
 {
     public class Player : Entity
     {
-        public int health = 100;
+        public int health = RecoveredRuntime.PlayerInitialHealth;
+        public byte playerState = RecoveredRuntime.PlayerAliveState;
+        public bool omnipotent;
+
+        /// <summary>
+        /// Applies the normal enemy/projectile damage receiver recovered at
+        /// NITE3W.EXE seg3:8C09..8C98. Enemy-class damage production remains
+        /// separate until the runtime classes can be bound without guessing.
+        /// </summary>
+        public bool ApplyVerifiedDamage(byte damage)
+        {
+            if(omnipotent || playerState == RecoveredRuntime.PlayerNormalDeathState)
+            {
+                return false;
+            }
+
+            if(damage >= health)
+            {
+                health = 0;
+                playerState = RecoveredRuntime.PlayerNormalDeathState;
+                return true;
+            }
+
+            health -= damage;
+            return false;
+        }
+
+        /// <summary>
+        /// Restores health while preserving the original observable 100-point
+        /// ceiling. Pickup identity and pickup-specific amounts are intentionally
+        /// left to their separately verified dispatch paths.
+        /// </summary>
+        public void RestoreVerifiedHealth(int amount)
+        {
+            if(amount <= 0 || health >= RecoveredRuntime.PlayerMaximumHealth)
+            {
+                return;
+            }
+
+            health = Math.Min(
+                RecoveredRuntime.PlayerMaximumHealth,
+                health + amount);
+        }
 
         public Vec2 plane = new Vec2(0, .8f);
 
