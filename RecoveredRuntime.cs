@@ -18,6 +18,12 @@ namespace Nitemare3D
         public const int Episode3Levels = 10;
         public const int WorldUnitsPerTile = 64;
 
+        // Player health/damage semantics recovered from the normal enemy receiver.
+        public const byte PlayerInitialHealth = 100;
+        public const byte PlayerMaximumHealth = 100;
+        public const byte PlayerAliveState = 0;
+        public const byte PlayerNormalDeathState = 2;
+
         // Player movement/collision. The original uses a 54x54-unit AABB.
         public const int PlayerCollisionHalfExtentWorld = 27;
         public const float PlayerCollisionHalfExtentTiles =
