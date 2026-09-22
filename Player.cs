@@ -28,8 +28,49 @@ namespace Nitemare3D
 {
     public class Player : Entity
     {
-        public int health = 100;
+        public int health = RecoveredRuntime.PlayerInitialHealth;
+        public byte playerState = RecoveredRuntime.PlayerAliveState;
+        public bool omnipotent;
 
+        /// <summary>
+        /// Applies the normal enemy/projectile damage receiver recovered at
+        /// NITE3W.EXE seg3:8C09..8C98. Enemy-class damage production remains
+        /// separate until the runtime classes can be bound without guessing.
+        /// </summary>
+        public bool ApplyVerifiedDamage(byte damage)
+        {
+            if(omnipotent || playerState == RecoveredRuntime.PlayerNormalDeathState)
+            {
+                return false;
+            }
+
+            if(damage >= health)
+            {
+                health = 0;
+                playerState = RecoveredRuntime.PlayerNormalDeathState;
+                return true;
+            }
+
+            health -= damage;
+            return false;
+        }
+
+        /// <summary>
+        /// Restores health while preserving the original observable 100-point
+        /// ceiling. Pickup identity and pickup-specific amounts are intentionally
+        /// left to their separately verified dispatch paths.
+        /// </summary>
+        public void RestoreVerifiedHealth(int amount)
+        {
+            if(amount <= 0 || health >= RecoveredRuntime.PlayerMaximumHealth)
+            {
+                return;
+            }
+
+            health = Math.Min(
+                RecoveredRuntime.PlayerMaximumHealth,
+                health + amount);
+        }
 
         public Vec2 plane = new Vec2(0, .8f);
 
@@ -70,20 +111,19 @@ namespace Nitemare3D
         {
             weapons[0].hasWeapon = true;
 
-            RayWidth  = (int)(RayWidth * GameWindow.scale);
-            RayHeight  = (int)(RayHeight * GameWindow.scale);
-            
+            RayWidth = (int)(RayWidth * GameWindow.scale);
+            RayHeight = (int)(RayHeight * GameWindow.scale);
+
             zBuffer = new float[RayWidth];
             hasCollision = false;
         }
 
-        ISprite[] sprites = new ISprite[maxSprites];        
+        ISprite[] sprites = new ISprite[maxSprites];
         int[] spriteOrder = new int[maxSprites];
         float[] spriteDistance = new float[maxSprites];
         float[] zBuffer;
 
-
-        class DecendingComparer<TKey>: IComparer<float>
+        class DecendingComparer<TKey> : IComparer<float>
         {
             public int Compare(float x, float y)
             {
@@ -91,19 +131,17 @@ namespace Nitemare3D
             }
         }
 
-        void SortSprites() //this function was a pain in the ass
+        void SortSprites()
         {
             SortedList<float, int> values = new SortedList<float, int>(new DecendingComparer<float>());
 
-            
             int cnt = 0;
-            for(int i = 0; i < spriteCount; i++) {
-                //prevents sprites that have the same distance from crashing the game
-                //this issue should be rare unless the player is in the starting position
-                if(values.ContainsKey(spriteDistance[i])){continue;} 
+            for(int i = 0; i < spriteCount; i++)
+            {
+                // Prevent sprites at exactly the same distance from colliding in SortedList.
+                if(values.ContainsKey(spriteDistance[i])) { continue; }
                 cnt++;
                 values.Add(spriteDistance[i], spriteOrder[i]);
-                
             }
 
             for(int i = 0; i < cnt; i++)
@@ -111,45 +149,143 @@ namespace Nitemare3D
                 spriteDistance[i] = values.Keys[i];
                 spriteOrder[i] = values.Values[i];
             }
-
-                        
         }
-        
+
         public Vec2 direction = new Vec2();
 
-        bool lineLine(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4) {
-
-            // calculate the direction of the lines
+        bool lineLine(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4)
+        {
             float uA = ((x4-x3)*(y1-y3) - (y4-y3)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1));
             float uB = ((x2-x1)*(y1-y3) - (y2-y1)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1));
 
-            // if uA and uB are between 0-1, lines are colliding
-            if (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) {
-                return true;
+            return uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1;
+        }
+
+        bool CellHasBlockingEntity(int tileX, int tileY)
+        {
+            foreach(var entity in Entity.entities)
+            {
+                if(entity.id == id || !entity.hasCollision) { continue; }
+
+                int entityX = (int)MathF.Floor(entity.position.X);
+                int entityY = (int)MathF.Floor(entity.position.Y);
+                if(entityX == tileX && entityY == tileY)
+                {
+                    return true;
+                }
             }
+
             return false;
         }
+
+        bool CanOccupy(float x, float y)
+        {
+            float half = RecoveredRuntime.PlayerCollisionHalfExtentTiles;
+            int minX = (int)MathF.Floor(x - half);
+            int maxX = (int)MathF.Floor(x + half);
+            int minY = (int)MathF.Floor(y - half);
+            int maxY = (int)MathF.Floor(y + half);
+
+            for(int tx = minX; tx <= maxX; tx++)
+            {
+                for(int ty = minY; ty <= maxY; ty++)
+                {
+                    if(tx < 0 || tx >= RecoveredRuntime.MapWidth ||
+                       ty < 0 || ty >= RecoveredRuntime.MapHeight)
+                    {
+                        return false;
+                    }
+
+                    Tile tile = Level.tilemap[tx, ty];
+                    if(tile == null || tile.obstacle || CellHasBlockingEntity(tx, ty))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// The original executable advances movement in one-world-unit major-axis
+        /// steps and collision-tests X/Y separately. The C# port stores positions
+        /// in tile units, so subdividing to at most 1/64 tile reproduces that
+        /// granularity while preserving the port's floating-point movement model.
+        /// </summary>
+        void MoveWithRecoveredCollision(Vec2 delta)
+        {
+            float largestWorldDelta = MathF.Max(MathF.Abs(delta.X), MathF.Abs(delta.Y)) *
+                                      RecoveredRuntime.WorldUnitsPerTile;
+            int steps = Math.Max(1, (int)MathF.Ceiling(largestWorldDelta));
+            float stepX = delta.X / steps;
+            float stepY = delta.Y / steps;
+
+            for(int i = 0; i < steps; i++)
+            {
+                if(stepX != 0 && CanOccupy(position.X + stepX, position.Y))
+                {
+                    position.X += stepX;
+                }
+
+                if(stepY != 0 && CanOccupy(position.X, position.Y + stepY))
+                {
+                    position.Y += stepY;
+                }
+            }
+        }
+
+        void HandleUse()
+        {
+            // NITE3W.EXE input mask 0x0200 is edge-triggered, not repeated while held.
+            if(!Input.IsKeyPressed(KeyboardKey.Space)) { return; }
+
+            int tx = (int)MathF.Floor(position.X);
+            int ty = (int)MathF.Floor(position.Y);
+
+            // The original chooses exactly one adjacent cardinal MAP cell. Diagonal
+            // view octants are quantized to a cardinal neighbor.
+            if(MathF.Abs(direction.X) >= MathF.Abs(direction.Y))
+            {
+                tx += direction.X >= 0 ? 1 : -1;
+            }
+            else
+            {
+                ty += direction.Y >= 0 ? 1 : -1;
+            }
+
+            if(tx < 0 || tx >= RecoveredRuntime.MapWidth ||
+               ty < 0 || ty >= RecoveredRuntime.MapHeight)
+            {
+                return;
+            }
+
+            // USE classifies both the wall and object bytes in the selected MAP cell.
+            Level.tilemap[tx, ty]?.OnUse();
+
+            foreach(var entity in Entity.entities)
+            {
+                if((int)MathF.Floor(entity.position.X) == tx &&
+                   (int)MathF.Floor(entity.position.Y) == ty)
+                {
+                    entity.SendMessage("OnUse");
+                }
+            }
+        }
+
         public void RenderRaycaster()
         {
-            //var direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
-
-
-
-
-
-            bool flipped = false; 
+            bool flipped = false;
 
             for (int x = 0; x < RayWidth; x++)
             {
-                float cameraX = 2 * x / (float)RayWidth - 1; 
-
+                float cameraX = 2 * x / (float)RayWidth - 1;
 
                 float rayDirX = direction.X + plane.X * cameraX;
                 float rayDirY = direction.Y + plane.Y * cameraX;
 
                 int mapX = (int)position.X;
                 int mapY = (int)position.Y;
-
 
                 Vec2 sideDist = new Vec2();
 
@@ -158,24 +294,10 @@ namespace Nitemare3D
 
                 float perpWallDist;
 
-
                 Vec2i step = new Vec2i();
 
-                int hit = 0; 
+                int hit = 0;
                 int side = 0;
-
-
-                /*
-                    side 0:
-                                
-                        #-#
-
-                    side 1:
-
-                        #
-                        |
-                        #
-                */
 
                 if (rayDirX < 0)
                 {
@@ -198,9 +320,6 @@ namespace Nitemare3D
                     sideDist.Y = (mapY + 1.0f - position.Y) * deltaDistY;
                 }
 
-
-                //DDA algirtrhtn
-                float ThinCNT = 0;
                 while (hit == 0)
                 {
                     if (sideDist.X < sideDist.Y)
@@ -216,10 +335,6 @@ namespace Nitemare3D
                         side = 1;
                     }
 
-
-
-
-
                     if (mapX < 0 || mapY < 0) { hit = 1; break; }
                     if (mapX > 63 || mapY > 63) { hit = 1; break; }
 
@@ -229,49 +344,27 @@ namespace Nitemare3D
                     if (hit == 1)
                     {
                         flipped = Level.tilemap[mapX, mapY].flip;
-
-                        var hitWall = Level.tilemap[mapX, mapY];
-                        
-
-                        
-
                         this.wall = Img.current.entries[wall];
-                        
-
-                        
-
                     }
-
-
-
                 }
 
-
-
-                //Calculate distance projected on camera direction (Euclidean distance will give fisheye effect!)
                 if (side == 0) perpWallDist = (mapX - position.X + (1 - step.X) / 2) / rayDirX;
                 else perpWallDist = (mapY - position.Y + (1 - step.Y) / 2) / rayDirY;
 
-                //Calculate height of line to draw on screen
                 int lineHeight = (int)(RayHeight / perpWallDist);
 
-                //calculate lowest and highest pixel to fill in current stripe
                 int drawStart = -lineHeight / 2 + (int)RayHeight / 2;
                 if (drawStart < 0) drawStart = 0;
                 int drawEnd = lineHeight / 2 + (int)RayHeight / 2;
                 if (drawEnd >= (int)RayHeight) drawEnd = (int)RayHeight - 1;
 
-
                 var stepAmount = 1.0 * WallTextureSize / lineHeight;
                 var texPos = (drawStart - (int)RayHeight / 2 + lineHeight / 2) * stepAmount;
 
-
-                float wallX; 
+                float wallX;
                 if (side == 0) wallX = position.Y + perpWallDist * rayDirY;
                 else wallX = position.X + perpWallDist * rayDirX;
                 wallX -= (float)Math.Floor((wallX));
-
-
 
                 int texX = (int)(wallX * 64);
 
@@ -280,24 +373,19 @@ namespace Nitemare3D
                     texX += 64;
                 }
 
-
-                //draw ceiling
                 for (int y = 0; y < drawStart; y++)
                 {
                     GameWindow.frameBuffer[8 + x, 4 + y] = ImageConsts.PALETTE_CEILING;
                 }
 
-
                 if (drawEnd < RayHeight && drawEnd > 0)
                 {
-                    //draw floor
                     for (int y = drawEnd; y < RayHeight; y++)
                     {
                         GameWindow.frameBuffer[8 + x, 4 + y] = ImageConsts.PALETTE_FLOOR;
                     }
                 }
 
-                var tile = Level.tilemap[mapX,mapY];
                 for (int y = drawStart; y < drawEnd; y++)
                 {
                     int texY = (int)texPos & (WallTextureSize - 1);
@@ -305,17 +393,11 @@ namespace Nitemare3D
 
                     byte color = wall.data[texX, texY];
                     GameWindow.frameBuffer[8 + x, 4 + y] = color;
-
-
-
-
                 }
 
                 zBuffer[x] = perpWallDist;
-
-
             }
-            
+
             for(int i = 0; i < spriteCount; i++)
             {
                 spriteOrder[i] = i;
@@ -326,20 +408,18 @@ namespace Nitemare3D
 
             for(int i = 0; i < spriteCount; i++)
             {
-                //sprite position relative to camera
                 Vec2 spritePos = sprites[spriteOrder[i]].spritePosition - position;
 
                 var sprite = sprites[spriteOrder[i]];
-                if(!sprite.visible){continue;}
+                if(!sprite.visible) { continue; }
 
                 var spriteW = Img.current.entries[sprite.spriteIndex].width;
                 var spriteH = Img.current.entries[sprite.spriteIndex].height;
 
                 float invDet = 1.0f / (plane.X * direction.Y - direction.X * plane.Y);
 
-
                 float transformX = invDet * (direction.Y * spritePos.X - direction.X * spritePos.Y);
-                float transformY = invDet * (-plane.Y * spritePos.X + plane.X * spritePos.Y); 
+                float transformY = invDet * (-plane.Y * spritePos.X + plane.X * spritePos.Y);
 
                 int spriteScreenX = (int)((RayWidth / 2) * (1 + transformX / transformY));
                 float uDiv = (64f / spriteW);
@@ -355,69 +435,37 @@ namespace Nitemare3D
                 int drawEndY = spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
                 if(drawEndY >= RayHeight) drawEndY = RayHeight - 1;
 
-
                 int spriteWidth = (int)(MathF.Abs(RayHeight / transformY) / uDiv);
                 int drawStartX = -spriteWidth / 2 + spriteScreenX;
                 if(drawStartX < 0) drawStartX = 0;
                 int drawEndX = spriteWidth / 2 + spriteScreenX;
-                if(drawEndX >= RayWidth) drawEndX = RayWidth - 1; 
+                if(drawEndX >= RayWidth) drawEndX = RayWidth - 1;
 
-
-                
                 for(int stripe = drawStartX; stripe < drawEndX; stripe++)
                 {
                     int texX = (int)(256 * (stripe - (-spriteWidth / 2 + spriteScreenX)) * spriteW / spriteWidth) / 256;
 
-
                     if(transformY > 0 && stripe > 0 && stripe < RayWidth && transformY < zBuffer[stripe])
-                    for(int y = drawStartY; y < drawEndY; y++) //for every pixel of the current stripe
                     {
-                        int d = (y-vMoveScreen) * 256 - RayHeight * 128 + spriteHeight * 128;
-                        int texY = ((d * spriteH) / spriteHeight) / 256;
-                        var color = Img.current.entries[sprite.spriteIndex].data[texX, texY];
-
-                        if(color != 31)
+                        for(int y = drawStartY; y < drawEndY; y++)
                         {
-                            GameWindow.frameBuffer[8 + stripe, 4 + y] = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+                            int d = (y-vMoveScreen) * 256 - RayHeight * 128 + spriteHeight * 128;
+                            int texY = ((d * spriteH) / spriteHeight) / 256;
+                            var color = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+
+                            if(color != 31)
+                            {
+                                GameWindow.frameBuffer[8 + stripe, 4 + y] = color;
+                            }
                         }
-
-                        
-
                     }
                 }
-                
-
             }
-
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
-            {
-                var tileFacing = position + direction;
-                var tx = (int)tileFacing.X;
-                int ty = (int)tileFacing.Y;
-
-                foreach(var entity in Entity.entities)
-                {
-                    if((int)entity.position.X == tx && (int)entity.position.Y == ty)
-                    {
-                        entity.SendMessage("OnUse");
-                    }
-                }
-                
-
-            }
-
-
-
-
         }
-
-
-
 
         void RenderWeapon()
         {
-            if(weaponIndex == -1){return;} //empty hand
+            if(weaponIndex == -1) { return; }
             GameWindow.DrawImg(weapons[weaponIndex].texture, ImageConsts.UI_WEAPONPOSITION);
 
             GameWindow.DrawImg(ImageConsts.UI_FACE_START, ImageConsts.UI_FACEPOSITION);
@@ -444,24 +492,19 @@ namespace Nitemare3D
                     weapons[weaponIndex].Fire();
                     SoundEffect.PlaySound(weapons[weaponIndex].fireSound);
                 }
-
             }
         }
 
-
-
         public Player()
         {
-
-
         }
+
         float fireTimer = 0;
 
         public void SetRotation(float angle)
         {
             float oldRot = rotation;
             float oldPlaneX = plane.X;
-
 
             rotation = angle * (3.14f / 180);
             plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
@@ -470,8 +513,6 @@ namespace Nitemare3D
 
         public override void Update()
         {
-            direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
-            
             float oldRot = rotation;
 
             if (Input.IsKeyDown(KeyboardKey.Right))
@@ -484,51 +525,25 @@ namespace Nitemare3D
                 rotation -= 3 * Time.dt;
             }
 
+            float oldPlaneX = plane.X;
+            plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
+            plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
+
+            direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
+
             if (Input.IsKeyDown(KeyboardKey.Up))
             {
-                var x = (int)(position.X + direction.X);
-                var y = (int)position.Y;
-                if(Level.IsWalkable(x, y, this))
-                {
-                    position.X += direction.X * (Time.dt * walkSpeed);
-                }
-                
-                y = (int)(position.Y + direction.Y);
-                x = (int)position.X;
-
-                if(Level.IsWalkable(x, y, this))
-                {
-                    position.Y += direction.Y * (Time.dt * walkSpeed);
-                }
-
-            
+                MoveWithRecoveredCollision(direction * (Time.dt * walkSpeed));
             }
 
             if (Input.IsKeyDown(KeyboardKey.Down))
             {
-                if(Level.tilemap[(int)(position.X - direction.X), (int)(position.Y)].textureID == -1)
-                {
-                    position.X -= direction.X * (Time.dt * walkSpeed);
-                }
-
-                if(Level.tilemap[(int)(position.X), (int)(position.Y - direction.Y)].textureID == -1)
-                {
-                    position.Y -= direction.Y * (Time.dt * walkSpeed);
-                }
-    
+                MoveWithRecoveredCollision(direction * (-Time.dt * walkSpeed));
             }
 
-            
-
-            float oldPlaneX = plane.X;
-
-            plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
-            plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
-
+            HandleUse();
             RenderRaycaster();
             RenderWeapon();
-
-
         }
     }
 }

@@ -24,6 +24,29 @@ I also need help labeling all the sound effects
 
 if you're David P Gray please consider open-sourcing Nitemare 3D
 
+## Reverse-engineering synchronization
+
+This fork is being synchronized with verified clean-room findings from
+[`marek177/Nitemare3d-reversed`](https://github.com/marek177/Nitemare3d-reversed).
+Only findings backed by original NITE3W.EXE/data/save evidence are promoted to
+runtime behavior; partially identified values remain documented rather than guessed.
+
+The current branch synchronization is documented in [`REVERSE_ENGINEERING_SYNC.md`](REVERSE_ENGINEERING_SYNC.md). The source-of-truth repository now has a consolidated cross-thread/session ledger at `docs/ALL_THREADS_CONSOLIDATION_2026-09-22.md` plus dedicated renderer, GUARD, combat, collision, save and audio reports.
+
+The synchronization now preserves much more than the original first pass:
+
+* 64x64 MAP geometry, 514-byte header and 8192-byte level payloads
+* 27-world-unit player collision half-extent and axis-separated sub-tile movement
+* rising-edge USE/ACTION targeting one adjacent cardinal cell
+* original OBJECT=28 B and GUARD=26 B record sizes
+* fresh GUARD strength 255 and 22-state dispatcher range
+* original GUARD score-switch values, including Dracula=0, Demon=250, Penelope=-1000 and Dr. Hamerstein=1000
+* original difficulty value ordering and key player/weapon globals
+* doors/panels/pushes/vector/span/sprite runtime capacities and strides
+* the original renderer's 320x200 framebuffer and 304x152 game viewport
+* VEC/VECLIST/owner/span/sprite-queue structural constants recovered from NITE3W.EXE
+
+The original renderer is not a Wolfenstein 3-D one-ray-per-screen-column DDA. The recovered Windows path converts MAP boundaries into 28-byte VEC records, indexes them through four 333-entry orientation lists, projects/near-clips wall segments, resolves a 320-column owner table, coalesces visible columns into wall spans and renders projected sprites through a separate 100-entry queue. `RecoveredRuntime.cs` records the verified constants without pretending that the current C# renderer already implements that complete original pipeline.
 
 ## features:
 * Loading of original bitmap images
@@ -37,6 +60,7 @@ if you're David P Gray please consider open-sourcing Nitemare 3D
 * sprites
 * implementing curtains, warps, hidden panels
 * tile editor that auto-generates code for me
+* continued runtime reconstruction from Nitemare3d-reversed
 
 ### file formats:
 
@@ -44,11 +68,16 @@ if you're David P Gray please consider open-sourcing Nitemare 3D
 Nitemare 3D uses the .DAT format(also used by David Gray in the Hugo series),
 this consists of a header that contains offsets for every file stored in the container, the offset consists of a unsigned 16 bit integer for the length followed by a unsiged 32 bit integer for the position.
 <br></br>
-files in SND.DAT consist of MIDI files followed by either 16 bit VOC or 8 bit PCM audio files(depending on the version).
-UIF.DAT consists of 256 color 320x200 PCX images
 
+For the audited Windows SND.DAT, the fixed directory is 160 records x 6 bytes. IDs 1..15 are MIDI. The logical SFX range is 34..110 and the original Windows playback format recovered from NITE3W.EXE is raw mono 8-bit PCM at 11025 Hz. This matters because treating the Windows samples as generic VOC data can produce incorrect playback.
+
+UIF.DAT consists of indexed UI resources; its complete per-ID semantics are still under reverse-engineering and should not be guessed from the current reimplementation alone.
 
 #### MAP:
-maps are stored as text files and are very easy to read, the first 514 bytes are still unknown by me(could be tile definitions?)
-after that every map is stored as a 8192 byte chunk, every even byte is a tile id and every odd byte is a item id.
+MAP.1, MAP.2 and MAP.3 are binary archives. The archive header is 514 bytes;
+after it, every level occupies exactly 8192 bytes (`64 * 64 * 2`). Each map cell
+is an interleaved two-byte pair `{wallByte, objectByte}`. MAP.1 contains 11 level
+payloads (E1M11 is the internal/demo map); MAP.2 and MAP.3 contain 10 each.
+Runtime world coordinates use 64 world units per map tile.
 
+The 11/10/10 counts describe the supplied original archives; they are not treated as a proven universal file-format ceiling. Historical MapEdit code supports a larger editor level count, while the exact original runtime archive ceiling remains a separate reverse-engineering question.
