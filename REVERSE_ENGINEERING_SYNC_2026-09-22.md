@@ -1,145 +1,259 @@
-# OpenNitemare3D reverse-engineering sync — 2026-09-22
+# OpenNitemare3D reverse-engineering synchronization
 
-This file records current implementation-relevant findings from `marek177/Nitemare3d-reversed` so OpenNitemare3D can converge toward the original game's behaviour without treating unverified guesses as facts.
+Date: 2026-09-22
 
-## Confidence labels
+This fork predates the current executable-level reverse-engineering work. The original C# code is useful as an experimental reimplementation, but many names, constants and behaviors were originally guessed from gameplay or hand-authored tables.
 
-- **CONFIRMED** — directly supported by original binary/data analysis or reproducible runtime observation.
-- **PARTIAL** — subsystem/function is supported but some constants/fields remain unresolved.
-- **INFERRED** — behaviourally plausible, not proven instruction-for-instruction.
-- **UNKNOWN** — intentionally unresolved.
+The current evidence-backed source of truth is `marek177/Nitemare3d-reversed`. This document records what should now guide future OpenNitemare3D corrections.
 
-## Implementation targets
+## Do not copy old assumptions forward
 
-### Player / collision
+The following old approximations are superseded for NITE3W.EXE V1.10:
 
-- Health behaves as a bounded 0..100 gameplay value. **CONFIRMED/PARTIAL**
-- Collision reconstruction should cover player radius/flags, wall collision, OBJECT/GUARD collision and sliding. **PARTIAL**
-- Current Windows reverse-engineering work observes player X/Y commit locations around `0x4BF6/0x4BF8`; these are evidence anchors only, not values to encode in the C# port. **PARTIAL**
+- OBJECT is 28 bytes, not ~80 bytes.
+- GUARD is 26 bytes, not ~98 bytes.
+- visible wall span is 20 bytes, not ~52 bytes.
+- the renderer is not Wolf3D-style one-grid-ray-per-column DDA.
+- normal GUARD strength is initialized to 255; no class-specific post-spawn HP table has been found in the original Win16 executable.
+- `WARP_L1..L4` are colored-key locked wall/passage classes, not generic teleport classes.
+- `LEVEL_UP2` is a level-skip gateway.
+- original definition spelling is `ONE_SHOT`.
 
-### OBJECT runtime
+## Verified map/world model
 
-- Do not use an old 28-byte assumption for runtime objects. **CONFIRMED**
-- Current iteration evidence indicates an approximately `0x50` / 80-byte runtime stride. **PARTIAL**
-- Movement-related fields are observed around `+0x10/+0x12`. **PARTIAL**
-- `+0x14/+0x18` remain unresolved high-value fields. **UNKNOWN/PARTIAL**
+- map dimensions: 64x64;
+- two bytes per cell: wall byte then object byte;
+- level payload: 8192 bytes;
+- supplied archive header: 514 bytes;
+- world scale: 64 world units per tile;
+- player spawn: tile center `x*64+32, y*64+32`;
+- player start object IDs 1..4 encode four cardinal orientations;
+- E1M11 is the internal/demo map;
+- E1M3/E1M11 are a positive-control pair for demo matching.
 
-### GUARD runtime / AI
+The current `Level.LoadMap` implementation already relies on the 514-byte header and 8192-byte payload, but README text previously described MAP as a text format and called the header unknown. That documentation is obsolete.
 
-- Current runtime analysis indicates an approximately 98-byte guard structure. **PARTIAL**
-- Behaviour still needing parity work: type/state transitions, HP, movement, attack, pain/death, timers and sound mapping. **PARTIAL**
-- Keep runtime guard state distinct from static map/entity records. **IMPLEMENTATION RULE**
+## Verified runtime capacities from NITE3W.EXE V1.10
 
-### Dracula -> Bat
+| Family | Capacity | Record size |
+|---|---:|---:|
+| doors | 64 | 22 B |
+| panels | 32 | 22 B |
+| pushes | 12 | 6 B |
+| objects | 350 | 28 B |
+| guards | 100 | 26 B |
+| vectors | 1000 | 28 B |
+| VECLIST/orientation | 333 | 4-byte far pointer |
+| visible wall spans | 50 | 20 B |
+| projected sprite commands | 100 | 18 B |
 
-A strong code-level finding indicates a distinct Dracula transformation path:
+These are original-runtime facts, not arbitrary port limits.
 
-- Dracula transforms into internal `GUARD13 / type 0x14`. **STRONG PARTIAL**
-- Normal Bat is type `0x08`. **PARTIAL**
-- Transformation sets/restores 255 HP for the transformed form. **PARTIAL**
-- The transformed form should therefore remain a separate runtime state/class until disproved. **IMPLEMENTATION TARGET**
+## Player
 
-### Combat / difficulty
+Verified original Windows behavior:
 
-- Enemy HP is per-guard. **CONFIRMED/PARTIAL**
-- Exact HP tables and shots-to-kill tables remain incomplete. **UNKNOWN/PARTIAL**
-- Damage parity needs weapon, range, difficulty, guard type and special/immunity correlations. **PARTIAL**
-- Dr. Hammerstein should be audited as a boss-specific case rather than extrapolated from ordinary enemies. **PARTIAL**
+- player health runtime byte is clamped to a normal 0..100 range;
+- new game/reset uses 100 health;
+- lethal damage writes exactly zero before the death transition;
+- player collision half extent is 27 world units;
+- movement collision handles X/Y separately and therefore slides along walls;
+- difficulty numeric ordering is easier / baseline / harder.
 
-### USE / interaction
+Recovered input bits:
 
-- `0x0200` is an important USE/interaction-related value in the current reverse reconstruction. **PARTIAL**
-- Original USE behaviour spans doors, switches, warp/teleport walls, push/special interactions, keyed interactions and special walls. **PARTIAL**
-- The port should avoid reducing USE to a generic door-open command. **IMPLEMENTATION TARGET**
+- `0x0002` forward;
+- `0x0004` backward;
+- `0x0008` / `0x0010` turn directions;
+- `0x0020` double movement/turn increment;
+- `0x0040` force movement/turn increment to 1;
+- `0x0080` fire;
+- `0x0100` strafe modifier;
+- `0x0200` edge-triggered use/action.
 
-### Warp / doors / special walls
+## Renderer architecture
 
-Known wall-function/name families include:
+The original Win16 renderer builds wall vectors from exposed MAP boundaries and projects those segments. High-level recovered pipeline:
 
-- `WARP`
-- `WARP_L1`
-- `WARP_L2`
-- episode-specific `WARP_1..n`
-- elevator/level warp variants
-- `JAMB`
-- vertical/horizontal door variants
-- `SPECIAL1`
-- `ONE_SHOOT`
-- `REVWALL`
-- `CONTROL`
-- `LEVEL_UP`
+```text
+MAP 64x64
+ -> exposed boundary extraction + merging
+ -> VEC[1000], 28 B each
+ -> four orientation-specific VECLIST[333]
+ -> transform / clip / project
+ -> 320-column wall owner table
+ -> <=50 visible wall spans
+ -> wall rasterization + per-column occlusion
+ -> <=100 projected sprite commands
+ -> 320x200 indexed framebuffer
+```
 
-`WARP_L1/WARP_L2` show evidence of key-dependent behaviour. Exact state/script semantics remain under XREF/runtime investigation. **PARTIAL**
+Normal 3-D viewport is 304x152 at x=8..311, y=4..155 with center `(160,80)`.
 
-Animated walls may use two or more animation ticks/frames. **PARTIAL**
+A fidelity-oriented rewrite of OpenNitemare3D should eventually replace tile/raycast assumptions with this recovered vector/span model rather than attempting to tune a Wolf3D-style renderer until it merely looks similar.
 
-### Renderer
+## USE / doors / wall semantics
 
-- Studied Windows build uses a 320-pixel-wide framebuffer-oriented path. **CONFIRMED for that build**
-- Current renderer work indicates a runtime record stride of about 52 bytes. **PARTIAL**
-- Relevant code evidence under study includes locations around `0x5E7E`, `3:62F8`, and vectors at `4:34E1`, `4:3919`, `4:4073`. These are reverse-engineering anchors, not source-port constants. **PARTIAL**
+USE is an edge-triggered interaction that resolves an adjacent cardinal cell. It is a dispatcher entry point for more than ordinary doors.
 
-### Data formats
+Important original families:
 
-Episode resource families:
+- `WARP_L1..L4`: red/green/blue/yellow key-locked passages;
+- `WARP_1..8`: paired stair/dumbwaiter/vertical connections;
+- `WARP_E1/E2`: elevator groups;
+- `WARP_S1/S2`: mirror-related special warps;
+- normal/locked/remote/curtain door orientations;
+- `CONTROL`;
+- `LEVEL_UP`, `LEVEL_UP2`;
+- `WALL_EX1`, `WALL_EX2`;
+- `ONE_SHOT`;
+- `SPECIAL1`;
+- `ACTIONSPOT`, `TRIGGER1/2`;
+- `RETREAT`, `TURN`, `FLEE`;
+- `SAFESPOT`.
 
-- `MAP.1..3`
-- `IMG.1..3`
-- `WALLS.1..3`
-- `OBJECTS.1..3`
+Known safe-combination values in the original definition/data material include `333`, `01532`, `080993`, `372535`.
 
-Compatibility work should preserve IDs, object/guard placement, door and warp semantics, episode indexing, spawn/orientation, special walls and original EXE limits where known. **IMPLEMENTATION TARGET**
+## GUARD model
 
-`E1M11` is used by `DEMO.1`; current comparison material indicates `E1M11` and `E1M3` are effectively identical. **PARTIAL/strong evidence**
+Original Windows runtime:
 
-### DEMO
+- GUARD record size 26 bytes, max 100;
+- linked OBJECT record size 28 bytes;
+- OBJECT `+06` is class;
+- OBJECT `+10/+12` are world X/Y;
+- GUARD `+08` links to the OBJECT slot;
+- GUARD `+0A` strategy;
+- GUARD `+0B` state;
+- GUARD `+0C` nextstate;
+- GUARD `+06` timer;
+- GUARD `+10` strength;
+- GUARD `+11` octant;
+- GUARD `+12` result octant.
 
-- `DEMO.1` is associated with `E1M11`. **PARTIAL/strong evidence**
-- Target representation: compact input stream mapping values to forward/back, turn, fire and use. **PARTIAL**
-- Playback termination on key input and MIDI/music state changes are relevant to parity. **PARTIAL**
-- `DEMO.2`/`DEMO.3` map identity remains unresolved. **UNKNOWN**
+The dispatcher uses 22 states (`0x00..0x15`). State `0x15` is the confirmed pain/hit reaction. Do not force the current simplified `idle/chasing/attacking/dead/patrol/roar` enum onto the original state IDs; it is a port abstraction, not a recovered original enum.
 
-### SND.DAT
+Normal GUARD creation initializes strength to 255. The current C# `Guard` field initialized to 100 should therefore not be treated as an original-game fact.
 
-Audio parity requires comparison against actual in-game playback. Current reverse targets:
+## Enemy class / score findings
 
-- MIDI/music mapping,
-- SFX extraction,
-- incorrect/failing VOC entries,
-- `guard type -> attack/pain/death SND.DAT IDs`.
+Recovered score switch:
 
-A file being technically playable is not sufficient proof that its decoding matches the original game. **IMPLEMENTATION RULE**
+| Class | Role | Score |
+|---:|---|---:|
+| 0x08 | Bat | 25 |
+| 0x09 | Frankenstein | 75 |
+| 0x0A | Mummy | 50 |
+| 0x0B | Skeleton | 100 |
+| 0x0C | Mrs H. | 250 |
+| 0x0D | Zelda | 150 |
+| 0x0E | Vampira | 200 |
+| 0x0F | Baddie #1 | 100 |
+| 0x10 | Baddie #2 | 100 |
+| 0x11 | Dracula phase 1 | 0 |
+| 0x12 | Cemetery Gargoyle | 150 |
+| 0x13 | Garden Gargoyle | 150 |
+| 0x14 | Dracula-Bat phase 2 / GUARD13 | 200 |
+| 0x15 | Penelope | -1000 |
+| 0x16 | Dr. Hamerstein | 1000 |
+| 0x17 | Tall slim robot | 100 |
+| 0x18 | Trashcan robot | 200 |
+| 0x19 | Cannon | 0 |
+| 0x1A | Ghost | 25 |
+| 0x1B | Goldie | 100 |
+| 0x1C | Greenie | 100 |
+| 0x1D | Demon | 250 |
+| 0x1E | Alien #1 | 250 |
+| 0x1F | Alien #2 | 200 |
+| 0x20 | unresolved/cut/fallback GUARD25 | 50 |
 
-### ENDING.FLI
+Dancers/GUARD26 are outside this switch and use separate scripted behavior.
 
-- Analysed file contains 488 frames. **CONFIRMED for current file**
-- Relevant chunk types: `COLOR_64`, `BRUN`, `LC`, `BLACK`, `COPY`. **CONFIRMED/PARTIAL**
-- Palette state and delta-frame dependencies must be preserved for correct decoding/editing. **IMPLEMENTATION TARGET**
+### Dracula two-phase behavior
 
-### USER.SAV
+On lethal phase-1 damage, class `0x11` transforms in place to `0x14`, GUARD strength is restored to 255 and state/timer/sequence fields are reset. Therefore GUARD13 is the internal Dracula-Bat second phase, not another ordinary Bat.
 
-Still only partially reconstructed. OpenNitemare3D parity should eventually cover:
+## Combat / weapon model
 
-- player state,
-- map/episode state,
-- inventory/ammo,
-- serialized OBJECT/GUARD state,
-- timers/flags,
-- exact field offsets/sizes where established.
+Original weapon selector:
 
-## Recommended implementation order
+- 0 Single Shot Laser;
+- 1 Magic Wand;
+- 2 Silver Pistol;
+- 3 Continuous Laser;
+- 0xFF none/unset.
 
-1. Player collision/sliding parity.
-2. Runtime OBJECT model.
-3. GUARD movement/state machine.
-4. Player damage/death.
-5. Weapon cadence/damage.
-6. Enemy HP, pain/death and SFX mapping.
-7. USE chain and door/switch/warp/push interactions.
-8. DEMO command/value mapping.
-9. USER.SAV compatibility.
-10. Renderer parity and edge cases.
+Ammo pools:
 
-## Source-of-truth policy
+- silver byte `0x4C1F`;
+- laser byte `0x4C20` shared by single/continuous laser;
+- wand byte `0x4C44`.
 
-ZDoom/GZDoom recreations, Wolf3D-family code and visual gameplay comparisons are useful behavioural references, but should not be marked as confirmation. Confirmation should come from the original Nitemare 3D executable/data or reproducible runtime observation.
+Normal pickup/display cap is 100. Silver/laser use signed comparisons in audited paths, so manually edited 128..255 values have signed-byte quirks.
+
+Player->GUARD damage is not a fixed per-weapon integer. The recovered producer begins with projected/view geometry plus `random()%25`, then applies class/weapon resistance and difficulty. Consequently a universal fixed shots-to-kill table is incorrect unless distance/projection, RNG, weapon and difficulty are fixed.
+
+Important special cases:
+
+- Ghost: Wand reaches it in the audited damage path; other weapons return zero there.
+- Alien #1/#2: Wand returns zero there.
+- Penelope/Cannon: zero normal weapon damage in that producer.
+- Hamerstein: special gated damage branch.
+- weapon jam is scripted by E1M9 events, not a recovered random probability.
+
+## DEMO
+
+Recovered packed record:
+
+```text
+byte  eventByte
+word  inputMask
+byte  pad
+dword timestamp
+```
+
+The supplied files have a 6-byte header representing WORDs `(10,5,20)`.
+
+DEMO.1 is associated with attract-mode E1M11. DEMO.2/3 level origins remain unresolved and must not be hard-coded from filename suffixes.
+
+## Saves / config
+
+Win16 `CONFIG.SAV` is exactly 20 bytes and contains display/control/audio enable/volume values plus four cheat flags.
+
+Win16 `USER.SAV` uses fixed 55015-byte (`0xD6E7`) records and stores an 8192-byte mutable MAP snapshot plus runtime arrays/state. This format must be implemented from the recovered layout rather than guessed object serialization if save compatibility becomes a goal.
+
+## Audio / FLI
+
+SND.DAT extraction must be checked against actual original in-game playback. A VOC that merely opens is not proof that rate/chunk interpretation is correct.
+
+ENDING.FLI currently audits as 488 frames using `COLOR_64`, `BRUN`, `LC`, `BLACK`, `COPY`; palette and delta-frame dependencies must be preserved during editing.
+
+## Recommended OpenNitemare3D implementation order
+
+1. Centralize verified constants and distinguish them from port-only abstractions.
+2. Correct MAP/world documentation and map indexing assumptions.
+3. Rework interaction semantics around the recovered USE dispatcher.
+4. Expand wall metadata from texture-only cases to class/flags/handler semantics.
+5. Replace guessed GUARD HP/state assumptions with the recovered OBJECT/GUARD model.
+6. Add class/score mapping and Dracula two-phase behavior.
+7. Rebuild damage/difficulty behavior from the original transforms.
+8. Rework renderer architecture toward vector/span projection.
+9. Implement demo records exactly and use them as regression tests.
+10. Add save/audio compatibility only from verified layouts/formats.
+
+## Source documents
+
+See `marek177/Nitemare3d-reversed`:
+
+- `DISCOVERIES.md`
+- `docs/ALL_THREADS_CONSOLIDATION_2026-09-22.md`
+- `analysis/nite3w_renderer.md`
+- `docs/GUARD_AI_RE.md`
+- `docs/COMBAT_DAMAGE_RE.md`
+- `docs/PLAYER_HEALTH_RE.md`
+- `docs/PLAYER_COLLISION_RE.md`
+- `docs/USE_INTERACTION_RE.md`
+- `docs/DEMO_FORMAT_RE.md`
+- `docs/SAVE_LIBRARIES_IDA_REPORT.md`
+
+Only facts backed by the original executable/data/runtime should be labeled original behavior in this fork.
