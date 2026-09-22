@@ -45,7 +45,7 @@ namespace Nitemare3D
         AnimationHandler anim = new AnimationHandler();
         GuardType type;
         GuardState state = GuardState.idle;
-        byte health = 100;
+        byte health = (byte)OriginalRuntime.GuardInitialStrength;
         const int SPRITE_FRANKENSTEIN_START = 322;
         const int SPRITE_BAT_START = 310;
         const int SPRITE_MUMMY_START = 338;
