@@ -8,7 +8,7 @@ This repository is an older experimental implementation that is now being synchr
 
 Read [`REVERSE_ENGINEERING_SYNC_2026-09-22.md`](REVERSE_ENGINEERING_SYNC_2026-09-22.md) before changing original-game behavior.
 
-Verified original-runtime/data constants have also been collected in [`OriginalRuntimeFacts.cs`](OriginalRuntimeFacts.cs). This separates evidence-backed values from port-only gameplay abstractions.
+Verified original-runtime/data constants have also been collected in [`OriginalRuntime.cs`](OriginalRuntime.cs). This separates evidence-backed values from port-only gameplay abstractions.
 
 Important corrections to older assumptions:
 
