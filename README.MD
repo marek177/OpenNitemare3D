@@ -4,6 +4,12 @@ C# reimplementation of the 1994 FPS **Nitemare 3-D**.
 
 This repository is an older experimental implementation that is now being synchronized with the executable-level reverse-engineering work in `marek177/Nitemare3d-reversed`.
 
+## 2026-09-25 synchronization
+
+The newest executable-backed constants are now mirrored in [`OriginalRuntime.cs`](OriginalRuntime.cs): HUD/automap dispatchers and formulas, renderer globals/capacities, GUARD state/field corrections, IMG/UIF layout facts, and menu/save limits. The detailed evidence boundary lives in `marek177/Nitemare3d-reversed/docs/PROJECT_FINDINGS_DELTA_2026-09-25.md`.
+
+The original C# `Player.RenderRaycaster` remains a provisional DDA renderer. Do not treat it as original NITE3W behavior; the recovered renderer is still the vector/span pipeline documented in the reverse-engineering repository.
+
 ## 2026 reverse-engineering update
 
 Read [`REVERSE_ENGINEERING_SYNC_2026-09-22.md`](REVERSE_ENGINEERING_SYNC_2026-09-22.md) before changing original-game behavior.
