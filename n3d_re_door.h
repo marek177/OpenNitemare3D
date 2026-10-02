@@ -18,13 +18,33 @@ typedef struct n3d_door_record
     uint8_t raw[N3D_DOOR_RECORD_SIZE];
 } n3d_door_record;
 
+/*
+ * Modern bridge metadata. The original locates door records through a MAP-cell
+ * far pointer stored somewhere in the still-partial 22-byte layout. Do not
+ * invent that field: keep portable cell binding outside the opaque record.
+ */
+typedef struct n3d_door_binding
+{
+    uint8_t used;
+    uint8_t cell_x;
+    uint8_t cell_y;
+    uint8_t state_known;
+} n3d_door_binding;
+
 _Static_assert(sizeof(n3d_door_record) == N3D_DOOR_RECORD_SIZE,
                "door runtime record must remain 22 bytes");
 
 extern n3d_door_record n3d_doors[N3D_MAX_DOORS];
+extern n3d_door_binding n3d_door_bindings[N3D_MAX_DOORS];
 extern uint16_t n3d_door_count;
 
 void N3D_RE_ResetDoors(void);
+int N3D_RE_RegisterDoorCell(uint8_t x, uint8_t y);
+int N3D_RE_FindDoorSlotByCell(uint8_t x, uint8_t y);
+int N3D_RE_SetDoorCellState(uint8_t x, uint8_t y, uint8_t state);
+int N3D_RE_DoorCellStateKnown(uint8_t x, uint8_t y);
+int N3D_RE_DoorCellAllowsPassage(uint8_t x, uint8_t y);
+int N3D_RE_DoorCellPassableCallback(uint8_t x, uint8_t y, void* user);
 
 uint8_t N3D_RE_DoorStateValue(const n3d_door_record* door);
 void N3D_RE_SetDoorStateValue(n3d_door_record* door, uint8_t state);
