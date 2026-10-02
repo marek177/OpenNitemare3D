@@ -33,6 +33,90 @@ uint16_t N3D_RE_State13InitialTimer(uint16_t random_value)
     return (uint16_t)(random_value % N3D_STATE13_RANDOM_RANGE + N3D_STATE13_TIMER_MIN);
 }
 
+int N3D_RE_TickState01(n3d_guard_record* guard)
+{
+    if (!guard || guard->state != N3D_GUARD_STATE_01)
+        return 0;
+
+    if (guard->timer > 0)
+        --guard->timer;
+
+    if (guard->timer <= 0)
+    {
+        guard->timer = 0;
+        guard->state = N3D_GUARD_STATE_02;
+    }
+
+    return 1;
+}
+
+int N3D_RE_CompleteDeferredState(n3d_guard_record* guard)
+{
+    if (!guard ||
+        (guard->state != N3D_GUARD_STATE_00 &&
+         guard->state != N3D_GUARD_STATE_12))
+        return 0;
+
+    guard->state = guard->next_state;
+    return 1;
+}
+
+int N3D_RE_CompleteState06(n3d_guard_record* guard)
+{
+    if (!guard || guard->state != N3D_GUARD_STATE_06)
+        return 0;
+
+    guard->state = N3D_GUARD_STATE_03;
+    return 1;
+}
+
+int N3D_RE_CompleteState11(n3d_guard_record* guard)
+{
+    if (!guard || guard->state != N3D_GUARD_STATE_11)
+        return 0;
+
+    guard->strategy = 0;
+    guard->state = N3D_GUARD_STATE_07;
+    return 1;
+}
+
+int N3D_RE_CompletePainState15(n3d_guard_record* guard)
+{
+    if (!guard || guard->state != N3D_GUARD_STATE_PAIN)
+        return 0;
+
+    guard->state = guard->next_state;
+    return 1;
+}
+
+int N3D_RE_ResolveState07Perception(
+    n3d_guard_record* guard,
+    int processing_gate_set,
+    int perception_succeeded,
+    uint16_t random_value)
+{
+    if (!guard || guard->state != N3D_GUARD_STATE_07)
+        return 0;
+
+    if (processing_gate_set || !perception_succeeded)
+        return 1;
+
+    if (guard->strategy == 3)
+    {
+        n3d_guard_move_vector move =
+            N3D_RE_GuardDirectionalStep(guard->octant, 0);
+
+        guard->timer = (int16_t)N3D_RE_State13InitialTimer(random_value);
+        guard->state = N3D_GUARD_STATE_TIMED_DIRECTIONAL_MOVE;
+        guard->move_x = move.dx;
+        guard->move_y = move.dy;
+        return 1;
+    }
+
+    guard->state = N3D_GUARD_STATE_02;
+    return 1;
+}
+
 n3d_state13_step_result N3D_RE_StepState13(uint16_t current_timer, int target_cell_allows_move)
 {
     n3d_state13_step_result result = {0, 0, 0, 0, 0};
