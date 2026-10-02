@@ -869,6 +869,40 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Transitioned;
         }
 
+        public static bool TickVerticalBob(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (obj.ObjectClass != 0x08 &&
+                obj.ObjectClass != OriginalRuntime.DraculaBatPhase2Class &&
+                obj.ObjectClass != 0x1A)
+            {
+                return false;
+            }
+
+            if (guard.VerticalBobStep == 0)
+                guard.VerticalBobStep = 1;
+
+            int next = obj.Runtime1A + guard.VerticalBobStep;
+            obj.Runtime1A = unchecked((byte)next);
+
+            if ((sbyte)obj.Runtime1A <= 10)
+            {
+                obj.Runtime1A = 10;
+                guard.VerticalBobStep =
+                    unchecked((sbyte)-guard.VerticalBobStep);
+            }
+
+            if (obj.Runtime1A >= 0x23)
+            {
+                obj.Runtime1A = 0x23;
+                guard.VerticalBobStep =
+                    unchecked((sbyte)-guard.VerticalBobStep);
+            }
+
+            return true;
+        }
+
         public static bool MovementCandidateTouchesPlayer(
             short candidateX,
             short candidateY,
@@ -913,6 +947,8 @@ namespace Nitemare3D
         {
             if (isBlockedAt == null)
                 throw new ArgumentNullException(nameof(isBlockedAt));
+
+            TickVerticalBob(ref guard, ref obj);
 
             sbyte originalMoveX = guard.MoveX;
             sbyte originalMoveY = guard.MoveY;
