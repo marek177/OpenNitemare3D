@@ -43,6 +43,20 @@ namespace Nitemare3D
             RuntimeState == DoorRuntimeState.Opening ||
             RuntimeState == DoorRuntimeState.Closing;
 
+        public Automap.VecOrientation FacingOrientation(float rayDirX, float rayDirY)
+        {
+            if ((WallClass & 1) != 0)
+            {
+                return rayDirX > 0
+                    ? Automap.VecOrientation.Left
+                    : Automap.VecOrientation.Right;
+            }
+
+            return rayDirY > 0
+                ? Automap.VecOrientation.Top
+                : Automap.VecOrientation.Bottom;
+        }
+
         public bool TryIntersectRay(
             Vec2 origin,
             float rayDirX,
@@ -71,9 +85,7 @@ namespace Nitemare3D
 
                 float hitY = origin.Y + distance * rayDirY;
                 textureCoord = (hitY - y) * 64.0f;
-                orientation = rayDirX > 0
-                    ? Automap.VecOrientation.Left
-                    : Automap.VecOrientation.Right;
+                orientation = FacingOrientation(rayDirX, rayDirY);
             }
             else
             {
@@ -87,9 +99,7 @@ namespace Nitemare3D
 
                 float hitX = origin.X + distance * rayDirX;
                 textureCoord = (hitX - x) * 64.0f;
-                orientation = rayDirY > 0
-                    ? Automap.VecOrientation.Top
-                    : Automap.VecOrientation.Bottom;
+                orientation = FacingOrientation(rayDirX, rayDirY);
             }
 
             if (textureCoord < 0.0f || textureCoord > 64.0f)
