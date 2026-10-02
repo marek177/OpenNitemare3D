@@ -128,6 +128,8 @@ namespace Nitemare3D
         public const int GuardState13MoveYOffset = 0x14;
         public const byte DraculaPhase1Class = 0x11;
         public const byte DraculaBatPhase2Class = 0x14;
+        public const byte PenelopeClass = 0x15;
+        public const byte DrHamersteinClass = 0x16;
 
         // Renderer global arrays/counters recovered from NITE3W 1.10 DS.
         public const ushort WallOwnerTableGlobal = 0x53FE;
