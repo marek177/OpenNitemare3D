@@ -33,9 +33,22 @@ void G_LoadEpisode(uint8_t episode)
 
     if(N3D_RE_LoadEpisodeDefinitions(episode))
     {
+        const n3d_mapping_coverage wall_coverage =
+            N3D_RE_WallMappingCoverage();
+        const n3d_mapping_coverage object_coverage =
+            N3D_RE_ObjectMappingCoverage();
+
         printf("loaded definitions: %u WALLS, %u OBJECTS\n",
                n3d_wall_definitions.count,
                n3d_object_definitions.count);
+        printf("mapped definitions: WALLS %u/%u, OBJECTS %u/%u\n",
+               wall_coverage.known,
+               wall_coverage.total,
+               object_coverage.known,
+               object_coverage.total);
+
+        if(getenv("N3D_RE_DUMP_UNRESOLVED"))
+            N3D_RE_DumpUnresolvedMappings();
     }
     else
     {
