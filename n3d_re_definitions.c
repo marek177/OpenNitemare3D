@@ -157,6 +157,41 @@ int N3D_RE_KnownWallMappedTypeForClass(
     if(!class_name || !mapped_type)
         return 0;
 
+    /*
+     * Cross-bound by the 2026-09-28 class/map audit using the original
+     * WALLS definitions on both DOS and Windows distributions.
+     * 0x3D/0x3E remain intentionally unassigned until a named definition
+     * or executable binding is recovered.
+     */
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } door_classes[] = {
+        {"DOORV",   0x31},
+        {"DOORH",   0x32},
+        {"DOORVL",  0x33},
+        {"DOORHL",  0x34},
+        {"DOORVL2", 0x35},
+        {"DOORHL2", 0x36},
+        {"DOORVL3", 0x37},
+        {"DOORHL3", 0x38},
+        {"DOORVI",  0x39},
+        {"DOORHI",  0x3A},
+        {"DOORVR",  0x3B},
+        {"DOORHR",  0x3C},
+        {"DOORVC",  0x3F},
+        {"DOORHC",  0x40}
+    };
+
+    for(size_t i = 0; i < sizeof(door_classes) / sizeof(door_classes[0]); ++i)
+    {
+        if(strcmp(class_name, door_classes[i].name) == 0)
+        {
+            *mapped_type = door_classes[i].mapped_type;
+            return 1;
+        }
+    }
+
     if(strcmp(class_name, "LEVEL_UP") == 0)
     {
         *mapped_type = 0x09;
@@ -200,18 +235,6 @@ int N3D_RE_KnownWallMappedTypeForClass(
     if(strcmp(class_name, "TRIGGER1") == 0)
     {
         *mapped_type = 0x47;
-        return 1;
-    }
-
-    if(strcmp(class_name, "DOORVC") == 0)
-    {
-        *mapped_type = 0x3F;
-        return 1;
-    }
-
-    if(strcmp(class_name, "DOORHC") == 0)
-    {
-        *mapped_type = 0x40;
         return 1;
     }
 
