@@ -19,6 +19,7 @@ namespace Nitemare3D
             TestDamageMatrix();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
+            TestExactAnimationSchedulers();
             TestAttackGate();
             TestProjectileRuntime();
             TestDelayState();
@@ -340,6 +341,108 @@ namespace Nitemare3D
             OriginalGuardDispatcher.CompleteDeferredState(ref guard);
             Assert(guard.State == (byte)OriginalGuardState.Transition05,
                 "state 04 sequence must return through state 05.");
+        }
+
+        static void TestExactAnimationSchedulers()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                DefinitionValue = 0x0304,
+                Timer = 4,
+                State = (byte)OriginalGuardState.AnimationTimer,
+                NextState = (byte)OriginalGuardState.Detection03
+            };
+            var obj = new OriginalObjectRecord
+            {
+                Component03 = 4
+            };
+
+            Assert(OriginalGuardDispatcher.TickAnimationTimer(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   unchecked((byte)obj.Component03) == 5 &&
+                   guard.Timer == 3,
+                "state 00 first frame/timer tick mismatch.");
+
+            OriginalGuardDispatcher.TickAnimationTimer(ref guard, ref obj);
+            Assert(unchecked((byte)obj.Component03) == 6 &&
+                   guard.Timer == 2,
+                "state 00 second frame/timer tick mismatch.");
+
+            OriginalGuardDispatcher.TickAnimationTimer(ref guard, ref obj);
+            Assert(unchecked((byte)obj.Component03) == 4 &&
+                   guard.Timer == 1,
+                "state 00 sequence must loop to first frame.");
+
+            Assert(OriginalGuardDispatcher.TickAnimationTimer(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Detection03 &&
+                   guard.Timer == 0,
+                "state 00 must return through nextState when timer expires.");
+
+            guard = new OriginalGuardRecord
+            {
+                DefinitionValue = 0x0304,
+                Timer = 2,
+                State = (byte)OriginalGuardState.WaitAnimation12,
+                NextState = (byte)OriginalGuardState.Active07
+            };
+            obj = new OriginalObjectRecord
+            {
+                Component03 = 4,
+                Runtime1A = 11
+            };
+
+            Assert(OriginalGuardDispatcher.TickWaitAnimation12(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   unchecked((byte)obj.Component03) == 5 &&
+                   obj.Runtime1A == 6 &&
+                   guard.Timer == 1,
+                "state 12 first tick mismatch.");
+
+            Assert(OriginalGuardDispatcher.TickWaitAnimation12(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   unchecked((byte)obj.Component03) == 6 &&
+                   obj.Runtime1A == 1 &&
+                   guard.Timer == 0,
+                "state 12 must wait for OBJECT+1A after timer reaches zero.");
+
+            Assert(OriginalGuardDispatcher.TickWaitAnimation12(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   obj.Runtime1A == 0 &&
+                   guard.State == (byte)OriginalGuardState.Active07,
+                "state 12 completion gate mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                DefinitionValue = 0x0304,
+                State = (byte)OriginalGuardState.Pain15,
+                NextState = (byte)OriginalGuardState.Active07
+            };
+            obj = new OriginalObjectRecord
+            {
+                Component03 = 4
+            };
+
+            Assert(OriginalGuardDispatcher.TickPainReaction(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   unchecked((byte)obj.Component03) == 5,
+                "state 15 first frame mismatch.");
+            Assert(OriginalGuardDispatcher.TickPainReaction(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   unchecked((byte)obj.Component03) == 6,
+                "state 15 final-frame advance mismatch.");
+            Assert(OriginalGuardDispatcher.TickPainReaction(
+                       ref guard, ref obj) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Active07,
+                "state 15 must return through nextState at final frame.");
         }
 
         static void TestAttackGate()
