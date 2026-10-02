@@ -26,6 +26,9 @@ namespace Nitemare3D
         public static readonly OriginalGuardWakeCache GuardWakeCache =
             new OriginalGuardWakeCache();
 
+        public static readonly OriginalProjectilePool ProjectilePool =
+            new OriginalProjectilePool();
+
         static readonly Dictionary<Entity, Binding> bindings =
             new Dictionary<Entity, Binding>();
 
@@ -41,6 +44,7 @@ namespace Nitemare3D
             Array.Clear(Objects, 0, Objects.Length);
             Array.Clear(Guards, 0, Guards.Length);
             GuardWakeCache.Clear();
+            ProjectilePool.Clear();
             bindings.Clear();
             ObjectCount = 0;
             GuardCount = 0;
