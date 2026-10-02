@@ -1,0 +1,207 @@
+#include "n3d_re_definitions.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+n3d_definition_table n3d_wall_definitions;
+n3d_definition_table n3d_object_definitions;
+uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
+uint8_t n3d_object_mapped_type[N3D_DEFINITION_COUNT];
+
+void N3D_RE_ClearDefinitionTable(n3d_definition_table* table)
+{
+    if(!table)
+        return;
+
+    memset(table, 0, sizeof(*table));
+}
+
+static void N3D_RE_TrimLeft(char** text)
+{
+    if(!text || !*text)
+        return;
+
+    while(**text && isspace((unsigned char)**text))
+        ++(*text);
+}
+
+static void N3D_RE_TrimRight(char* text)
+{
+    if(!text)
+        return;
+
+    size_t len = strlen(text);
+    while(len > 0 && isspace((unsigned char)text[len - 1]))
+        text[--len] = '\0';
+}
+
+int N3D_RE_ParseDefinitionLine(
+    const char* line,
+    n3d_definition_record* out_record)
+{
+    if(!line || !out_record)
+        return 0;
+
+    char copy[512];
+    size_t len = strlen(line);
+    if(len >= sizeof(copy))
+        return 0;
+
+    memcpy(copy, line, len + 1);
+
+    char* cursor = copy;
+    N3D_RE_TrimLeft(&cursor);
+    N3D_RE_TrimRight(cursor);
+
+    if(*cursor == '\0' || *cursor == '#' || *cursor == ';')
+        return 0;
+
+    char id_text[32] = {0};
+    char visual[N3D_DEF_VISUAL_CODE_MAX] = {0};
+    char image[N3D_DEF_IMAGE_NAME_MAX] = {0};
+    char class_name[N3D_DEF_CLASS_NAME_MAX] = {0};
+    int consumed = 0;
+
+    const int fields = sscanf(
+        cursor,
+        "%31s %31s %63s %63s %n",
+        id_text,
+        visual,
+        image,
+        class_name,
+        &consumed);
+
+    if(fields < 4)
+        return 0;
+
+    char* end = NULL;
+    unsigned long id = strtoul(id_text, &end, 16);
+    if(!end || *end != '\0' || id > 0xFF)
+        return 0;
+
+    memset(out_record, 0, sizeof(*out_record));
+    out_record->present = 1;
+    out_record->id = (uint8_t)id;
+
+    snprintf(out_record->visual_code, sizeof(out_record->visual_code), "%s", visual);
+    snprintf(out_record->image_name, sizeof(out_record->image_name), "%s", image);
+    snprintf(out_record->class_name, sizeof(out_record->class_name), "%s", class_name);
+
+    char* description = cursor + consumed;
+    N3D_RE_TrimLeft(&description);
+    N3D_RE_TrimRight(description);
+    snprintf(
+        out_record->description,
+        sizeof(out_record->description),
+        "%s",
+        description);
+
+    return 1;
+}
+
+int N3D_RE_LoadDefinitionTable(
+    const char* path,
+    n3d_definition_table* table)
+{
+    if(!path || !table)
+        return 0;
+
+    FILE* file = fopen(path, "rb");
+    if(!file)
+        return 0;
+
+    N3D_RE_ClearDefinitionTable(table);
+
+    char line[512];
+    while(fgets(line, sizeof(line), file))
+    {
+        n3d_definition_record record;
+        if(!N3D_RE_ParseDefinitionLine(line, &record))
+            continue;
+
+        if(!table->record[record.id].present)
+            ++table->count;
+
+        table->record[record.id] = record;
+    }
+
+    fclose(file);
+    return 1;
+}
+
+const n3d_definition_record* N3D_RE_FindDefinition(
+    const n3d_definition_table* table,
+    uint8_t id)
+{
+    if(!table || !table->record[id].present)
+        return NULL;
+
+    return &table->record[id];
+}
+
+int N3D_RE_KnownObjectMappedTypeForClass(
+    const char* class_name,
+    uint8_t* mapped_type)
+{
+    if(!class_name || !mapped_type)
+        return 0;
+
+    /*
+     * Directly corroborated by the reconstructed LevelState and EXE audit:
+     * class PUSH is mapped object type 0x28.
+     *
+     * Do not assign other class strings here until their textual names are
+     * cross-bound to the executable's numeric 0x8296 mapping.
+     */
+    if(strcmp(class_name, "PUSH") == 0)
+    {
+        *mapped_type = 0x28;
+        return 1;
+    }
+
+    return 0;
+}
+
+void N3D_RE_RebuildKnownMappedTypes(void)
+{
+    memset(n3d_wall_mapped_type, N3D_MAPPED_TYPE_UNKNOWN,
+           sizeof(n3d_wall_mapped_type));
+    memset(n3d_object_mapped_type, N3D_MAPPED_TYPE_UNKNOWN,
+           sizeof(n3d_object_mapped_type));
+
+    for(int id = 0; id < N3D_DEFINITION_COUNT; ++id)
+    {
+        const n3d_definition_record* object =
+            N3D_RE_FindDefinition(&n3d_object_definitions, (uint8_t)id);
+
+        if(object)
+        {
+            uint8_t mapped = 0;
+            if(N3D_RE_KnownObjectMappedTypeForClass(
+                    object->class_name, &mapped))
+            {
+                n3d_object_mapped_type[id] = mapped;
+            }
+        }
+    }
+}
+
+int N3D_RE_LoadEpisodeDefinitions(uint8_t episode)
+{
+    char walls_path[32];
+    char objects_path[32];
+
+    snprintf(walls_path, sizeof(walls_path), "WALLS.%u", episode);
+    snprintf(objects_path, sizeof(objects_path), "OBJECTS.%u", episode);
+
+    const int walls_ok =
+        N3D_RE_LoadDefinitionTable(walls_path, &n3d_wall_definitions);
+    const int objects_ok =
+        N3D_RE_LoadDefinitionTable(objects_path, &n3d_object_definitions);
+
+    N3D_RE_RebuildKnownMappedTypes();
+
+    return walls_ok && objects_ok;
+}
