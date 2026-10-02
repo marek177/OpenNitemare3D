@@ -283,6 +283,37 @@ namespace Nitemare3D
                    OriginalGuardDispatchResult.Completed;
         }
 
+        public static bool TryFindGuardHit(
+            int projectileWorldX,
+            int projectileWorldY,
+            out Entity guardEntity)
+        {
+            foreach (var pair in bindings)
+            {
+                var binding = pair.Value;
+                if (binding.GuardSlot < 0 ||
+                    binding.ObjectSlot < 0 ||
+                    Guards[binding.GuardSlot].Strength == 0)
+                {
+                    continue;
+                }
+
+                ref var obj = ref Objects[binding.ObjectSlot];
+                if (OriginalProjectileRuntime.HitsGuard(
+                        projectileWorldX,
+                        projectileWorldY,
+                        obj.WorldX,
+                        obj.WorldY))
+                {
+                    guardEntity = pair.Key;
+                    return true;
+                }
+            }
+
+            guardEntity = null;
+            return false;
+        }
+
         public static bool TryGetGuardRecord(Entity entity, out OriginalGuardRecord guard)
         {
             if (bindings.TryGetValue(entity, out var binding) &&
