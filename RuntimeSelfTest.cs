@@ -25,6 +25,7 @@ namespace Nitemare3D
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
+            TestMovementPlanning();
             TestGuardMapClassMapping();
             TestGuardInitialProfiles();
             TestState07Decision();
@@ -884,6 +885,162 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "blocked state 13 must still terminate normally.");
+        }
+
+        static void TestMovementPlanning()
+        {
+            int[] dx = { 0, 8, 8, 8, 0, -8, -8, -8 };
+            int[] dy = { -8, -8, 0, 8, 8, 8, 0, -8 };
+            for (byte expected = 0; expected < 8; expected++)
+            {
+                var facing = new OriginalGuardRecord
+                {
+                    Octant = 6
+                };
+                OriginalGuardDispatcher.UpdateOctantFromMovement(
+                    ref facing,
+                    dx[expected],
+                    dy[expected]);
+                Assert(facing.Octant == expected,
+                    "FUN_6E66 octant mapping mismatch at " + expected);
+            }
+
+            var unchanged = new OriginalGuardRecord
+            {
+                Octant = 5
+            };
+            OriginalGuardDispatcher.UpdateOctantFromMovement(
+                ref unchanged, 0, 0);
+            Assert(unchanged.Octant == 5,
+                "zero movement must preserve the previous octant.");
+
+            ushort[] rngValues = { 2, 7 };
+            int rngIndex = 0;
+            Func<ushort> rng = () => rngValues[rngIndex++];
+
+            var guard = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                Unknown17 = 1,
+                Unknown18 = 0
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 64,
+                WorldY = 64
+            };
+
+            Assert(OriginalGuardDispatcher.PlanStrategy0Movement(
+                       ref guard,
+                       ref obj,
+                       192,
+                       128,
+                       1,
+                       rng) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == 8 &&
+                   guard.Timer == 15 &&
+                   guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.Octant == 3 &&
+                   rngIndex == 2,
+                "strategy-0 perceived movement plan mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                Unknown17 = 0,
+                Unknown18 = 0,
+                MoveX = -8,
+                MoveY = 8
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 128,
+                WorldY = 128
+            };
+            rngIndex = 0;
+            rngValues = new ushort[] { 0 };
+
+            Assert(OriginalGuardDispatcher.PlanStrategy0Movement(
+                       ref guard,
+                       ref obj,
+                       128,
+                       256,
+                       1,
+                       rng) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == 8 &&
+                   guard.Timer == 24 &&
+                   rngIndex == 1,
+                "strategy-0 no-perception timer/direction branch mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                Unknown17 = 1,
+                Unknown18 = 1
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 128,
+                WorldY = 128
+            };
+            rngIndex = 0;
+            rngValues = new ushort[] { 2 };
+
+            OriginalGuardDispatcher.PlanStrategy0Movement(
+                ref guard,
+                ref obj,
+                64,
+                64,
+                2,
+                rng);
+
+            Assert(guard.MoveX == -8 &&
+                   guard.MoveY == -8 &&
+                   guard.Timer == 8 &&
+                   guard.Octant == 7 &&
+                   rngIndex == 1,
+                "one-tile proximity must force timer 8 before difficulty scaling.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                Unknown17 = 1,
+                Unknown18 = 0
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 64,
+                WorldY = 64
+            };
+            rngIndex = 0;
+            rngValues = new ushort[] { 2, 7 };
+            OriginalGuardDispatcher.PlanStrategy0Movement(
+                ref guard,
+                ref obj,
+                192,
+                128,
+                2,
+                rng);
+            Assert(guard.Timer == 7,
+                "hard difficulty must halve 15-tick perceived movement timer.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 2,
+                MoveX = -8,
+                MoveY = 0
+            };
+            rngIndex = 0;
+            rngValues = new ushort[] { 7 };
+            Assert(OriginalGuardDispatcher.PlanStrategy2Movement(
+                       ref guard,
+                       rng) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.Timer == 15 &&
+                   guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.Octant == 6,
+                "strategy-2 movement plan mismatch.");
         }
 
         static void TestGuardMapClassMapping()
