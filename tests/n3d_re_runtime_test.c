@@ -3,6 +3,7 @@
 #include "../n3d_re_collision.h"
 #include "../n3d_re_player.h"
 #include "../n3d_re_projectile.h"
+#include "../n3d_re_combat.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -402,6 +403,81 @@ int main(void)
     for(int i = 0; i < N3D_MAX_PROJECTILES; ++i)
         n3d_projectiles[i].state = 1;
     assert(N3D_RE_FirstFreeProjectileSlot() == -1);
+
+    assert(N3D_RE_ScalePlayerDamageByDifficulty(20, 0) == 40);
+    assert(N3D_RE_ScalePlayerDamageByDifficulty(20, 1) == 20);
+    assert(N3D_RE_ScalePlayerDamageByDifficulty(20, 2) == 10);
+    assert(N3D_RE_ScaleEnemyDamageByDifficulty(20, 0) == 10);
+    assert(N3D_RE_ScaleEnemyDamageByDifficulty(20, 2) == 40);
+
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x0C, N3D_WEAPON_SINGLE_LASER, 0) == 10);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x0D, N3D_WEAPON_MAGIC_WAND, 0) == 40);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        512, 0x0F, N3D_WEAPON_SINGLE_LASER, 0) == 2);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x0F, N3D_WEAPON_MAGIC_WAND, 0) == 40);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x12, N3D_WEAPON_MAGIC_WAND, 0) == 20);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x1A, N3D_WEAPON_MAGIC_WAND, 0) == 40);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x1A, N3D_WEAPON_SILVER_PISTOL, 0) == 0);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x16, N3D_WEAPON_MAGIC_WAND, 2) == 0);
+    assert(N3D_RE_ApplyClassWeaponDamageTransform(
+        80, 0x16, N3D_WEAPON_MAGIC_WAND, 3) == 3);
+
+    n3d_damage_result damage_result = N3D_RE_ComputePlayerGuardDamage(
+        90, 80, 0x0C, N3D_WEAPON_SINGLE_LASER, 1, 0, 0);
+    assert(damage_result.raw_seed == 80);
+    assert(damage_result.class_transformed == 10);
+    assert(damage_result.difficulty_transformed == 10);
+    assert(damage_result.stored_byte == 10);
+
+    assert(N3D_RE_GuardScoreForClass(0x08) == 25);
+    assert(N3D_RE_GuardScoreForClass(0x11) == 0);
+    assert(N3D_RE_GuardScoreForClass(0x15) == -1000);
+    assert(N3D_RE_GuardScoreForClass(0x16) == 1000);
+    assert(N3D_RE_GuardScoreForClass(0x20) == 50);
+    assert(N3D_RE_GuardScoreForClass(0x21) == 0);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_RegisterGuardFromMap(128, 1, 1));
+    n3d_guards[0].state = N3D_GUARD_STATE_07;
+    assert(N3D_RE_ApplyGuardDamage(0, 10) == N3D_GUARD_HIT_PAIN);
+    assert(n3d_guards[0].strength == 245);
+    assert(n3d_guards[0].result_octant == 8);
+    assert(n3d_guards[0].next_state == N3D_GUARD_STATE_07);
+    assert(n3d_guards[0].state == N3D_GUARD_STATE_PAIN);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_RegisterGuardFromMap(180, 1, 1));
+    n3d_guards[0].state = N3D_GUARD_STATE_07;
+    n3d_guards[0].strategy = 3;
+    assert(N3D_RE_ApplyGuardDamage(0, 10) ==
+           N3D_GUARD_HIT_SPECIAL_REACTION_REQUIRED);
+    assert(n3d_guards[0].strength == 245);
+    assert(n3d_guards[0].result_octant == 8);
+    assert(n3d_guards[0].state == N3D_GUARD_STATE_07);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_RegisterGuardFromMap(128, 1, 1));
+    n3d_guards[0].strength = 10;
+    assert(N3D_RE_ApplyGuardDamage(0, 10) == N3D_GUARD_HIT_KILLED);
+    assert(n3d_guards[0].strength == 0);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_RegisterGuardFromMap(176, 1, 1));
+    assert(n3d_objects[0].object_class == 0x11);
+    assert(N3D_RE_ApplyGuardDamage(0, 255) ==
+           N3D_GUARD_HIT_DRACULA_TRANSFORMED);
+    assert(n3d_objects[0].object_class == 0x14);
+    assert(n3d_guards[0].strength == 0xFF);
+    assert(n3d_guards[0].state == N3D_GUARD_STATE_08);
+    assert(n3d_guards[0].next_state == N3D_GUARD_STATE_02);
+    assert(n3d_guards[0].timer == 1);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
