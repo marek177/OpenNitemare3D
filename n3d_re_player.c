@@ -9,6 +9,7 @@ void N3D_RE_ResetPlayer(void)
     memset(&n3d_player, 0, sizeof(n3d_player));
     n3d_player.health = N3D_PLAYER_MAX_HEALTH;
     n3d_player.active_weapon = N3D_WEAPON_NONE;
+    n3d_player.queued_weapon = N3D_WEAPON_NONE;
 }
 
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y)
@@ -31,6 +32,61 @@ uint8_t N3D_RE_ClampPlayerHealthForHud(void)
         n3d_player.health = N3D_PLAYER_MAX_HEALTH;
 
     return n3d_player.health;
+}
+
+void N3D_RE_ClampPlayerResourcesForHud(void)
+{
+    N3D_RE_ClampPlayerHealthForHud();
+
+    if(n3d_player.silver_ammo > N3D_NORMAL_AMMO_CAP)
+        n3d_player.silver_ammo = N3D_NORMAL_AMMO_CAP;
+    if(n3d_player.laser_ammo > N3D_NORMAL_AMMO_CAP)
+        n3d_player.laser_ammo = N3D_NORMAL_AMMO_CAP;
+    if(n3d_player.wand_ammo > N3D_NORMAL_AMMO_CAP)
+        n3d_player.wand_ammo = N3D_NORMAL_AMMO_CAP;
+    if(n3d_player.crystal_ball_charge > N3D_NORMAL_AMMO_CAP)
+        n3d_player.crystal_ball_charge = N3D_NORMAL_AMMO_CAP;
+    if(n3d_player.magic_eye_charge > N3D_NORMAL_AMMO_CAP)
+        n3d_player.magic_eye_charge = N3D_NORMAL_AMMO_CAP;
+}
+
+uint8_t* N3D_RE_AmmoPoolForWeapon(uint8_t weapon_selector)
+{
+    switch(weapon_selector)
+    {
+        case N3D_WEAPON_SINGLE_LASER:
+        case N3D_WEAPON_CONTINUOUS_LASER:
+            return &n3d_player.laser_ammo;
+
+        case N3D_WEAPON_MAGIC_WAND:
+            return &n3d_player.wand_ammo;
+
+        case N3D_WEAPON_SILVER_PISTOL:
+            return &n3d_player.silver_ammo;
+
+        default:
+            return NULL;
+    }
+}
+
+int N3D_RE_QueueOwnedWeapon(uint8_t weapon_selector)
+{
+    if(weapon_selector >= N3D_WEAPON_COUNT)
+        return 0;
+
+    N3D_RE_GrantInventoryBit(
+        &n3d_player.owned_weapons,
+        weapon_selector);
+
+    n3d_player.queued_weapon = weapon_selector;
+    n3d_player.weapon_ui_mode =
+        weapon_selector == N3D_WEAPON_SILVER_PISTOL ? 1 : 2;
+
+    uint8_t* ammo = N3D_RE_AmmoPoolForWeapon(weapon_selector);
+    if(ammo)
+        *ammo = N3D_WEAPON_START_AMMO;
+
+    return 1;
 }
 
 int N3D_RE_ApplyFixedHealthPickup(uint8_t amount)
