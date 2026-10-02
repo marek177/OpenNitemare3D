@@ -25,7 +25,9 @@ namespace Nitemare3D
         F2 = Key.F2,
         F3 = Key.F3,
         F4 = Key.F4,
-        F5 = Key.F5
+        F5 = Key.F5,
+        F9 = Key.F9,
+        F10 = Key.F10
     }
 
 

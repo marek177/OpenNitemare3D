@@ -37,8 +37,11 @@ namespace Nitemare3D
 		public const int GUARD_BAT_ALERT = 66;
 		public const int GUARD_BAT_DIE = 67;
 		public const int GUARD_SKELETON_ATTACK = 68;
-		public const int CURTAIN_OPEN = 69;
-		public const int CURTAIN_CLOSE = 70;
+		// Physical SND.DAT slots for original door events 0x25/0x26.
+		public const int DOOR_OPEN = 69;
+		public const int DOOR_CLOSE = 70;
+		public const int CURTAIN_OPEN = DOOR_OPEN;
+		public const int CURTAIN_CLOSE = DOOR_CLOSE;
 		public const int HIDDENPANEL_OPEN = 71;
 		public const int SND_72 = 72;
 		public const int SND_73 = 73;

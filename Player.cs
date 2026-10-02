@@ -30,6 +30,22 @@ namespace Nitemare3D
     {
         public int health = 100;
 
+        // Original DS:4C28 / DS:4C29 inventory masks.
+        // Key bits: 0 red, 1 green, 2 blue, 3 yellow.
+        // Card bits: 0 red, 1 yellow.
+        public byte keyMask;
+        public byte idCardMask;
+
+        public bool HasKeyGroup(int group)
+        {
+            return group >= 0 && group < 4 && (keyMask & (1 << group)) != 0;
+        }
+
+        public bool HasIdCardGroup(int group)
+        {
+            return group >= 0 && group < 2 && (idCardMask & (1 << group)) != 0;
+        }
+
 
         public Vec2 plane = new Vec2(0, .8f);
 
@@ -157,6 +173,9 @@ namespace Nitemare3D
                 float deltaDistY = Math.Abs(1 / rayDirY);
 
                 float perpWallDist;
+                bool hitSlidingDoor = false;
+                float slidingDoorDistance = 0;
+                float slidingDoorTextureCoord = 0;
 
 
                 Vec2i step = new Vec2i();
@@ -223,18 +242,65 @@ namespace Nitemare3D
                     if (mapX < 0 || mapY < 0) { hit = 1; break; }
                     if (mapX > 63 || mapY > 63) { hit = 1; break; }
 
-                    var wall = Level.tilemap[mapX, mapY].textureID;
-                    if (wall <= 149 && wall > -1) { hit = 1; }
+                    var hitWall = Level.tilemap[mapX, mapY];
+
+                    Automap.VecOrientation mapOrientation;
+                        if (side == 0)
+                        {
+                            mapOrientation = step.X > 0
+                                ? Automap.VecOrientation.Left
+                                : Automap.VecOrientation.Right;
+                        }
+                        else
+                        {
+                            mapOrientation = step.Y > 0
+                                ? Automap.VecOrientation.Top
+                                : Automap.VecOrientation.Bottom;
+                        }
+
+                    var wall = hitWall.textureID;
+                    bool hasRenderableWall =
+                        wall >= 0 &&
+                        Img.current != null &&
+                        wall < Img.current.entries.Count;
+
+                    if (hitWall is SlidingDoorTile slidingDoor)
+                    {
+                        if (!slidingDoor.IsFullyOpen)
+                        {
+                            bool intersectsDoor = slidingDoor.TryIntersectRay(
+                                position,
+                                rayDirX,
+                                rayDirY,
+                                out slidingDoorDistance,
+                                out slidingDoorTextureCoord);
+
+                            if (intersectsDoor)
+                            {
+                                Automap.DiscoverWallHit(
+                                    mapX,
+                                    mapY,
+                                    slidingDoor.FacingOrientation(rayDirX, rayDirY),
+                                    hitWall);
+
+                                if (hasRenderableWall)
+                                {
+                                    hit = 1;
+                                    hitSlidingDoor = true;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
+                        if (hasRenderableWall)
+                            hit = 1;
+                    }
 
                     if (hit == 1)
                     {
-                        flipped = Level.tilemap[mapX, mapY].flip;
-
-                        var hitWall = Level.tilemap[mapX, mapY];
-                        
-
-                        
-
+                        flipped = hitWall.flip;
                         this.wall = Img.current.entries[wall];
                         
 
@@ -248,9 +314,20 @@ namespace Nitemare3D
 
 
 
-                //Calculate distance projected on camera direction (Euclidean distance will give fisheye effect!)
-                if (side == 0) perpWallDist = (mapX - position.X + (1 - step.X) / 2) / rayDirX;
-                else perpWallDist = (mapY - position.Y + (1 - step.Y) / 2) / rayDirY;
+                // Calculate projected distance. Dynamic doors live on the recovered
+                // center plane instead of the tile boundary used by ordinary DDA walls.
+                if (hitSlidingDoor)
+                {
+                    perpWallDist = slidingDoorDistance;
+                }
+                else if (side == 0)
+                {
+                    perpWallDist = (mapX - position.X + (1 - step.X) / 2) / rayDirX;
+                }
+                else
+                {
+                    perpWallDist = (mapY - position.Y + (1 - step.Y) / 2) / rayDirY;
+                }
 
                 //Calculate height of line to draw on screen
                 int lineHeight = (int)(RayHeight / perpWallDist);
@@ -266,14 +343,21 @@ namespace Nitemare3D
                 var texPos = (drawStart - (int)RayHeight / 2 + lineHeight / 2) * stepAmount;
 
 
-                float wallX; 
-                if (side == 0) wallX = position.Y + perpWallDist * rayDirY;
-                else wallX = position.X + perpWallDist * rayDirX;
-                wallX -= (float)Math.Floor((wallX));
+                float wallX;
+                if (hitSlidingDoor)
+                {
+                    wallX = slidingDoorTextureCoord / 64.0f;
+                }
+                else
+                {
+                    if (side == 0) wallX = position.Y + perpWallDist * rayDirY;
+                    else wallX = position.X + perpWallDist * rayDirX;
+                    wallX -= (float)Math.Floor(wallX);
+                }
 
 
 
-                int texX = (int)(wallX * 64);
+                int texX = Math.Clamp((int)(wallX * 64), 0, 63);
 
                 if (flipped && wall.width > 64)
                 {
@@ -389,12 +473,19 @@ namespace Nitemare3D
 
             }
 
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
+            // Handle USE only on the rising edge. Repeating the original 0x0200
+            // action every render frame would make door state oscillate 2 <-> 3.
+            bool useDown = Input.IsKeyDown(KeyboardKey.Space);
+            if (useDown && !previousUse)
             {
                 var tileFacing = position + direction;
                 var tx = (int)tileFacing.X;
                 int ty = (int)tileFacing.Y;
+
+                if (tx >= 0 && ty >= 0 && tx < 64 && ty < 64)
+                {
+                    Level.tilemap[tx, ty]?.OnUse();
+                }
 
                 foreach(var entity in Entity.entities)
                 {
@@ -404,9 +495,8 @@ namespace Nitemare3D
                     }
                 }
                 
-
             }
-
+            previousUse = useDown;
 
 
 
@@ -456,6 +546,7 @@ namespace Nitemare3D
 
         }
         float fireTimer = 0;
+        bool previousUse;
 
         public void SetRotation(float angle)
         {
@@ -506,12 +597,16 @@ namespace Nitemare3D
 
             if (Input.IsKeyDown(KeyboardKey.Down))
             {
-                if(Level.tilemap[(int)(position.X - direction.X), (int)(position.Y)].textureID == -1)
+                int x = (int)(position.X - direction.X);
+                int y = (int)position.Y;
+                if(Level.IsWalkable(x, y, this))
                 {
                     position.X -= direction.X * (Time.dt * walkSpeed);
                 }
 
-                if(Level.tilemap[(int)(position.X), (int)(position.Y - direction.Y)].textureID == -1)
+                x = (int)position.X;
+                y = (int)(position.Y - direction.Y);
+                if(Level.IsWalkable(x, y, this))
                 {
                     position.Y -= direction.Y * (Time.dt * walkSpeed);
                 }

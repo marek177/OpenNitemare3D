@@ -107,21 +107,27 @@ namespace Nitemare3D
             switch (type)
             {
                 case PickupType.RedKey:
+                    Game.player.keyMask |= 0x01;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.GreenKey:
+                    Game.player.keyMask |= 0x02;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.BlueKey:
+                    Game.player.keyMask |= 0x04;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowKey:
+                    Game.player.keyMask |= 0x08;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedIDCard:
+                    Game.player.idCardMask |= 0x01;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowIDCard:
+                    Game.player.idCardMask |= 0x02;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedPotion:
@@ -129,9 +135,17 @@ namespace Nitemare3D
                 case PickupType.BluePotion:
                     break;
                 case PickupType.Eyeball:
+                    if (!Automap.TryAddMagicEye())
+                    {
+                        return;
+                    }
                     SoundEffect.PlaySound(SoundConsts.PICKUP_EYE);
                     break;
                 case PickupType.CrystallBall:
+                    if (!Automap.TryAddCrystalBall())
+                    {
+                        return;
+                    }
                     SoundEffect.PlaySound(SoundConsts.PICKUP_GLASSBALL);
                     break;
                 case PickupType.PlasmaPistol:
@@ -156,6 +170,13 @@ namespace Nitemare3D
                     break;
             }
             
+            int mapX = (int)position.X;
+            int mapY = (int)position.Y;
+            if (mapX >= 0 && mapY >= 0 && mapX < 64 && mapY < 64)
+            {
+                Level.tilemap[mapX, mapY].objectID = 0;
+            }
+
             Entity.Remove(this);
             visible = false;
 

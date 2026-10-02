@@ -12,6 +12,40 @@ namespace Nitemare3D
         public static int levelCount;
 
         public static Tile[,] tilemap = new Tile[64, 64];
+        public static byte[] wallClassById = new byte[256];
+
+        public static byte GetWallClass(byte wallID)
+        {
+            return wallClassById[wallID];
+        }
+
+        public static byte GetWallClass(Tile tile)
+        {
+            return tile == null ? (byte)0 : GetWallClass(tile.wallID);
+        }
+
+        public static int GetFirstWallIdForClass(byte wallClass)
+        {
+            for (int i = 0; i < wallClassById.Length; i++)
+            {
+                if (wallClassById[i] == wallClass)
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int GetWallClassVariant(Tile tile)
+        {
+            if (tile == null)
+                return 0;
+
+            int first = GetFirstWallIdForClass(GetWallClass(tile));
+            if (first < 0 || tile.wallID < first)
+                return 0;
+
+            // FUN_1018_3E82 stores VEC+1 as (wallID - first ID of class) >> 1.
+            return (tile.wallID - first) >> 1;
+        }
 
         static void SpawnMapObject(int id, int x, int y)
         {
@@ -1026,13 +1060,37 @@ namespace Nitemare3D
                 case WallType.Genericexplodingwall:
                     break;
             }
+            byte wallClass = GetWallClass((byte)id);
+            if (wallClass >= 0x31 && wallClass <= 0x40)
+            {
+                // Runtime behavior is selected by MAP header class, not WallType name.
+                tile = new SlidingDoorTile(wallClass);
+
+                // IMG wall directory entry is the original wall-ID -> first-frame map.
+                int mappedFrame = Img.current == null ? -1 : Img.current.GetWallFrameIndex(id);
+                if (mappedFrame >= 0)
+                    texture = mappedFrame;
+            }
+
             tile.x = (byte)x;
             tile.y = (byte)y;
+            tile.wallID = (byte)id;
             tile.type = type;
             tile.textureID = texture;
             tilemap[x,y] = tile;
             tilemap[x,y].Create();
-            if(tile.textureID == -1){tile.obstacle = false;}
+
+            // Original wall property bit 0x02 covers classes 0x01..0x40.
+            // Door collision is refined by SlidingDoorTile as its state changes.
+            if (wallClass >= 0x01 && wallClass <= 0x40)
+            {
+                tile.obstacle = true;
+            }
+            else if (tile.textureID == -1)
+            {
+                tile.obstacle = false;
+            }
+
             HandleFlip(x, y);
         }
 
@@ -1040,7 +1098,7 @@ namespace Nitemare3D
         //TODO: make entity collision detection less garbage
         public static bool IsWalkable(int x, int y, Entity ent)
         {
-            if(x < 0 || x > 63 || y < 0 || y > 64){return false;}
+            if(x < 0 || x > 63 || y < 0 || y > 63){return false;}
             bool isEntity = false;
             foreach(var entity in Entity.entities)
             {
@@ -1059,15 +1117,22 @@ namespace Nitemare3D
                 }
 
             }
-            return ((tilemap[x,y].textureID == -1)) && !isEntity;
+            return !tilemap[x,y].obstacle && !isEntity;
         }
 
         public static void LoadMap(int id, int episode)
         {
             var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
 
+            map.BaseStream.Position = 2;
+            wallClassById = map.ReadBytes(256);
+            if (wallClassById.Length != 256)
+            {
+                throw new InvalidDataException("MAP wall-class header is truncated.");
+            }
+
             map.BaseStream.Position = 514;
-            var data = map.ReadBytes((int)map.BaseStream.Length);
+            var data = map.ReadBytes((int)(map.BaseStream.Length - 514));
 
             int x = 0, y = 0;
             int j = 0;
@@ -1094,6 +1159,7 @@ namespace Nitemare3D
                 }
                 else
                 {
+                    tilemap[x, y].objectID = data[i];
                     SpawnMapObject(data[i], x, y);
 
                     x++;

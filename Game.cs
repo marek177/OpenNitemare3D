@@ -22,7 +22,14 @@ namespace Nitemare3D
 			songid = music[1];
 			pcx = hud;
 
+			// IMG directories are episode-specific; reload the matching archive before
+			// MAP wall IDs are resolved to their exact first-frame indices.
+			new Img("data/IMG." + episode);
+
 			player = Entity.Create<Player>();
+			OriginalRandom.Reset(1);
+			RemoteDoorRuntime.Reset();
+			Automap.Reset();
 
 			Level.LoadMap(level, episode);
 		}
