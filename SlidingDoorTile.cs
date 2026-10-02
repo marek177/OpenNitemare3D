@@ -226,6 +226,7 @@ namespace Nitemare3D
             {
                 soundLatch = true;
                 BeginOpening();
+                PropagateStateToAdjacentDoors();
             }
         }
 
@@ -237,6 +238,7 @@ namespace Nitemare3D
             {
                 soundLatch = true;
                 BeginClosing();
+                PropagateStateToAdjacentDoors();
             }
         }
 
