@@ -148,6 +148,68 @@ const n3d_definition_record* N3D_RE_FindDefinition(
     return &table->record[id];
 }
 
+int N3D_RE_KnownWallMappedTypeForClass(
+    const char* class_name,
+    uint8_t* mapped_type)
+{
+    if(!class_name || !mapped_type)
+        return 0;
+
+    if(strcmp(class_name, "LEVEL_UP") == 0)
+    {
+        *mapped_type = 0x09;
+        return 1;
+    }
+
+    if(strcmp(class_name, "LEVEL_UP2") == 0)
+    {
+        *mapped_type = 0x0A;
+        return 1;
+    }
+
+    if(strncmp(class_name, "WARP_", 5) == 0 &&
+       class_name[5] >= '1' && class_name[5] <= '8' &&
+       class_name[6] == '\0')
+    {
+        *mapped_type = (uint8_t)(0x0D + (class_name[5] - '1'));
+        return 1;
+    }
+
+    if(strcmp(class_name, "WARP_S1") == 0)
+    {
+        *mapped_type = 0x15;
+        return 1;
+    }
+
+    if(strcmp(class_name, "WARP_S2") == 0)
+    {
+        *mapped_type = 0x16;
+        return 1;
+    }
+
+    if(strncmp(class_name, "WARP_L", 6) == 0 &&
+       class_name[6] >= '1' && class_name[6] <= '4' &&
+       class_name[7] == '\0')
+    {
+        *mapped_type = (uint8_t)(0x19 + (class_name[6] - '1'));
+        return 1;
+    }
+
+    if(strcmp(class_name, "TRIGGER1") == 0)
+    {
+        *mapped_type = 0x47;
+        return 1;
+    }
+
+    if(strcmp(class_name, "TRIGGER2") == 0)
+    {
+        *mapped_type = 0x48;
+        return 1;
+    }
+
+    return 0;
+}
+
 int N3D_RE_KnownObjectMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type)
@@ -214,14 +276,25 @@ void N3D_RE_RebuildKnownMappedTypes(void)
     }
 
     /*
-     * Definition class PUSH is directly cross-bound to mapped object type 0x28.
-     * Unknown textual classes remain unresolved instead of receiving guessed IDs.
+     * Resolve only textual classes with direct EXE/data cross-binding.
+     * Unknown classes remain explicit instead of receiving sequential guesses.
      */
     for(int id = 0; id < N3D_DEFINITION_COUNT; ++id)
     {
+        const n3d_definition_record* wall =
+            N3D_RE_FindDefinition(&n3d_wall_definitions, (uint8_t)id);
+        if(wall)
+        {
+            uint8_t mapped = 0;
+            if(N3D_RE_KnownWallMappedTypeForClass(
+                    wall->class_name, &mapped))
+            {
+                N3D_RE_SetKnownWallMapping((uint8_t)id, mapped);
+            }
+        }
+
         const n3d_definition_record* object =
             N3D_RE_FindDefinition(&n3d_object_definitions, (uint8_t)id);
-
         if(object)
         {
             uint8_t mapped = 0;
