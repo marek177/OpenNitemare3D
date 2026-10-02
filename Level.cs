@@ -1073,6 +1073,8 @@ namespace Nitemare3D
 
         public static void LoadMap(int id, int episode)
         {
+            OriginalRuntimeState.Reset();
+
             var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
 
             map.BaseStream.Position = 514;
