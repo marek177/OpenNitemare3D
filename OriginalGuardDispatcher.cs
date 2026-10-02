@@ -618,6 +618,133 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Waiting;
         }
 
+        public static void UpdateOctantFromMovement(
+            ref OriginalGuardRecord guard,
+            int moveX,
+            int moveY)
+        {
+            if (moveX > 0)
+            {
+                guard.Octant = moveY < 0
+                    ? (byte)1
+                    : moveY > 0
+                        ? (byte)3
+                        : (byte)2;
+                return;
+            }
+
+            if (moveX < 0)
+            {
+                guard.Octant = moveY < 0
+                    ? (byte)7
+                    : moveY > 0
+                        ? (byte)5
+                        : (byte)6;
+                return;
+            }
+
+            if (moveY < 0)
+                guard.Octant = 0;
+            else if (moveY > 0)
+                guard.Octant = 4;
+        }
+
+        static sbyte SignedStepFromDelta(int delta)
+        {
+            if (delta < 0) return -8;
+            if (delta > 0) return 8;
+            return 0;
+        }
+
+        /// <summary>
+        /// Recovered strategy-0 slice of FUN_1010_76FC. This prepares the
+        /// state-0x06 movement segment. FUN_71DC performs the immediate first
+        /// collision/movement attempt separately.
+        /// </summary>
+        public static OriginalGuardDispatchResult PlanStrategy0Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            byte difficulty,
+            Func<ushort> nextRandom)
+        {
+            if (guard.Strategy != 0)
+                return OriginalGuardDispatchResult.NotHandled;
+            if (nextRandom == null)
+                throw new ArgumentNullException(nameof(nextRandom));
+
+            // The original signed divide-by-32 sequence truncates toward zero.
+            int deltaX32 = (playerWorldX - obj.WorldX) / 32;
+            int deltaY32 = (playerWorldY - obj.WorldY) / 32;
+
+            int directionChoice =
+                nextRandom() & (guard.Unknown17 == 0 ? 3 : 7);
+
+            if (directionChoice == 0)
+            {
+                if (deltaX32 == 0)
+                    guard.MoveX = 8;
+                if (deltaY32 == 0)
+                    guard.MoveY = 8;
+            }
+            else if (directionChoice == 1)
+            {
+                if (deltaX32 == 0)
+                    guard.MoveX = -8;
+                if (deltaY32 == 0)
+                    guard.MoveY = -8;
+            }
+            else
+            {
+                guard.MoveX = SignedStepFromDelta(deltaX32);
+                guard.MoveY = SignedStepFromDelta(deltaY32);
+            }
+
+            if (guard.Unknown18 != 0)
+            {
+                guard.Timer = 8;
+            }
+            else if (guard.Unknown17 == 0)
+            {
+                guard.Timer = 0x18;
+            }
+            else
+            {
+                guard.Timer = (short)(nextRandom() % 8 + 8);
+
+                if (difficulty == 2)
+                    guard.Timer = (short)(guard.Timer >> 1);
+                else if (difficulty == 0)
+                    guard.Timer = (short)(guard.Timer << 1);
+            }
+
+            guard.State = (byte)OriginalGuardState.MoveThen03;
+            UpdateOctantFromMovement(
+                ref guard,
+                guard.MoveX,
+                guard.MoveY);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        public static OriginalGuardDispatchResult PlanStrategy2Movement(
+            ref OriginalGuardRecord guard,
+            Func<ushort> nextRandom)
+        {
+            if (guard.Strategy != 2)
+                return OriginalGuardDispatchResult.NotHandled;
+            if (nextRandom == null)
+                throw new ArgumentNullException(nameof(nextRandom));
+
+            guard.Timer = (short)(nextRandom() % 8 + 8);
+            guard.State = (byte)OriginalGuardState.MoveThen03;
+            UpdateOctantFromMovement(
+                ref guard,
+                guard.MoveX,
+                guard.MoveY);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         /// <summary>
         /// Recovered normal directional movement step. Eight facings collapse
         /// into four cardinal vectors. Strategy 2 doubles 8 world units to 16.
