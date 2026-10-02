@@ -143,6 +143,16 @@ int N3D_RE_InstantiateMapObject(
     memset(obj, 0, sizeof(*obj));
 
     obj->map_object_id = map_object_id;
+
+    uint8_t variant_index = 0;
+    if(N3D_RE_DefinitionVariantIndex(
+            &n3d_object_definitions,
+            map_object_id,
+            &variant_index))
+    {
+        obj->variant = variant_index;
+    }
+
     obj->flags = flags;
     obj->object_class = object_class;
     obj->world_x =
