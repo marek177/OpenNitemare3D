@@ -14,6 +14,7 @@ namespace Nitemare3D
         public static void Run()
         {
             TestRecordSizes();
+            TestObjectDefinitionCatalog();
             TestDamageMatrix();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
@@ -39,6 +40,60 @@ namespace Nitemare3D
                 "GUARD record must be 26 bytes.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
+            Assert(Marshal.SizeOf<OriginalObjectDefinitionRecord>() ==
+                   OriginalRuntime.ObjectDefinitionBytes,
+                "object-definition record must be 0x5A bytes.");
+        }
+
+        static void TestObjectDefinitionCatalog()
+        {
+            byte[] blockA = new byte[OriginalRuntime.ObjectDefinitionBytes];
+            blockA[0x34] = 0x12;
+            blockA[0x35] = 0x04;
+            blockA[0x36] = 0x20;
+            blockA[0x37] = 0x03;
+            blockA[0x38] = 0x30;
+            blockA[0x39] = 0x02;
+
+            var parsed = OriginalObjectDefinitionCatalog.Parse(blockA, 0);
+            Assert(parsed.AlertSequence == 0x0412 &&
+                   parsed.AttackSequence == 0x0320 &&
+                   parsed.RecoverySequence == 0x0230,
+                "object-definition packed sequence offsets mismatch.");
+
+            var catalog = new OriginalObjectDefinitionCatalog();
+            Assert(catalog.TryGetOrAdd(0x12345678, blockA, out byte first) &&
+                   first == 0 &&
+                   catalog.Count == 1,
+                "first object-definition allocation mismatch.");
+
+            byte[] changedSameKey = (byte[])blockA.Clone();
+            changedSameKey[0x34] = 0xFF;
+            Assert(catalog.TryGetOrAdd(
+                       0x12345678, changedSameKey, out byte duplicate) &&
+                   duplicate == 0 &&
+                   catalog.Count == 1,
+                "equal source key must deduplicate to original definition id.");
+
+            byte[] blockB = (byte[])blockA.Clone();
+            blockB[0x34] = 0x44;
+            Assert(catalog.TryGetOrAdd(0x87654321, blockB, out byte second) &&
+                   second == 1 &&
+                   catalog.Count == 2,
+                "new source key must allocate the next definition id.");
+
+            Assert(catalog.TryGetSequence(
+                       first, OriginalGuardState.Active02, out ushort seq02) &&
+                   seq02 == 0x0412,
+                "state 02 object-definition sequence lookup mismatch.");
+            Assert(catalog.TryGetSequence(
+                       first, OriginalGuardState.Detection03, out ushort seq03) &&
+                   seq03 == 0x0320,
+                "state 03 object-definition sequence lookup mismatch.");
+            Assert(catalog.TryGetSequence(
+                       first, OriginalGuardState.DetectionAttack04, out ushort seq04) &&
+                   seq04 == 0x0230,
+                "state 04 object-definition sequence lookup mismatch.");
         }
 
         static void TestDamageMatrix()
