@@ -28,6 +28,7 @@ namespace Nitemare3D
 
 			player = Entity.Create<Player>();
 			OriginalRandom.Reset(1);
+			RemoteDoorRuntime.Reset();
 			Automap.Reset();
 
 			Level.LoadMap(level, episode);
