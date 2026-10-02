@@ -1,0 +1,19 @@
+name: C rewrite RE self-test
+
+on:
+  push:
+    branches:
+      - research-c-rewrite-2026-10-02
+
+jobs:
+  recovered-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build isolated recovered runtime test
+        run: gcc -std=c11 -Wall -Wextra -Werror tests/n3d_re_runtime_test.c n3d_re_runtime.c -o n3d_re_runtime_test
+
+      - name: Run recovered runtime test
+        run: ./n3d_re_runtime_test
