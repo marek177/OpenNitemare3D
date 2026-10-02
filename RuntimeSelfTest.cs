@@ -16,6 +16,7 @@ namespace Nitemare3D
             TestRecordSizes();
             TestDelayState();
             TestState13Movement();
+            TestGuardInitialProfiles();
             TestState07Decision();
             TestPainReturn();
             TestDoorSelector();
@@ -104,12 +105,39 @@ namespace Nitemare3D
                     moved++;
             }
 
-            Assert(moved == 7, "state 13 must perform seven movement updates.");
-            Assert(obj.WorldX == 156 && obj.WorldY == 100,
-                "state 13 total displacement must be 56 world units.");
+            Assert(moved == 8, "state 13 must perform eight movement attempts.");
+            Assert(obj.WorldX == 164 && obj.WorldY == 100,
+                "state 13 total displacement must be 64 world units.");
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "state 13 must clear strategy and return to state 02.");
+        }
+
+        static void TestGuardInitialProfiles()
+        {
+            var generic = OriginalGuardProfiles.ForObjectClass(0x0B);
+            Assert(generic.Strategy == 0 &&
+                   generic.State == (byte)OriginalGuardState.Active07 &&
+                   generic.NextState == (byte)OriginalGuardState.Active02 &&
+                   generic.PerceptionMode == 1,
+                "generic guard initial profile mismatch.");
+
+            var gargoyle = OriginalGuardProfiles.ForObjectClass(0x12);
+            Assert(gargoyle.Strategy == 3 &&
+                   gargoyle.State == (byte)OriginalGuardState.Active07 &&
+                   gargoyle.NextState == (byte)OriginalGuardState.Active02 &&
+                   gargoyle.PerceptionMode == 0,
+                "gargoyle guard initial profile mismatch.");
+
+            var cannon = OriginalGuardProfiles.ForObjectClass(0x19);
+            Assert(cannon.Strategy == 4 &&
+                   cannon.State == (byte)OriginalGuardState.Conditional0E,
+                "cannon guard initial profile mismatch.");
+
+            OriginalGuardDispatcher.GetDirectionalStep(
+                1, 2, out sbyte moveX, out sbyte moveY);
+            Assert(moveX == 16 && moveY == 0,
+                "strategy 2 must double normal directional movement to 16.");
         }
 
         static void TestState07Decision()
