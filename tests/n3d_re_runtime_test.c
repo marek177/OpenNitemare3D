@@ -503,6 +503,40 @@ int main(void)
         "WARP_L1", &known_mapped_type) && known_mapped_type == 0x19);
     assert(N3D_RE_KnownWallMappedTypeForClass(
         "TRIGGER1", &known_mapped_type) && known_mapped_type == 0x47);
+
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } expected_wall_classes[] = {
+        {"WALL",       0x01},
+        {"REVWALL",    0x02},
+        {"CONTROL",    0x03},
+        {"ONE_SHOT",   0x07},
+        {"SPECIAL1",   0x08},
+        {"LEVEL_UP",   0x09},
+        {"LEVEL_UP2",  0x0A},
+        {"WARP_E1",    0x1D},
+        {"WALL_EX",    0x2D},
+        {"WALL_EX1",   0x2E},
+        {"WALL_EX2",   0x2F},
+        {"TURN",       0x41},
+        {"RETREAT",    0x42},
+        {"FLOOR",      0x44},
+        {"SAFESPOT",   0x45},
+        {"ACTIONSPOT", 0x46},
+        {"TRIGGER1",   0x47},
+        {"TRIGGER2",   0x48}
+    };
+
+    for(size_t i = 0;
+        i < sizeof(expected_wall_classes) / sizeof(expected_wall_classes[0]);
+        ++i)
+    {
+        assert(N3D_RE_KnownWallMappedTypeForClass(
+            expected_wall_classes[i].name, &known_mapped_type));
+        assert(known_mapped_type == expected_wall_classes[i].mapped_type);
+    }
+
     static const struct {
         const char* name;
         uint8_t mapped_type;
@@ -545,15 +579,60 @@ int main(void)
     assert(!N3D_RE_KnownWallPropertyForClass(
         "UNRESOLVED_DOOR", &known_property_flags));
 
-    assert(N3D_RE_KnownObjectMappedTypeForClass(
-        "PUSH", &known_mapped_type));
-    assert(known_mapped_type == 0x28);
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } expected_object_classes[] = {
+        {"NULL",      0x00},
+        {"START",     0x02},
+        {"SECRET",    0x03},
+        {"CAUSTIC",   0x07},
+        {"SAFE",      0x26},
+        {"TRUNK",     0x27},
+        {"PUSH",      0x28},
+        {"ACTION",    0x29},
+        {"PERMEABLE", 0x2A},
+        {"DUMB",      0x2B},
+        {"ELEVATED",  0x2E},
+        {"KEY",       0x2F},
+        {"IDCARD",    0x30},
+        {"FOOD",      0x33},
+        {"WEAPON",    0x36},
+        {"AMMO",      0x39},
+        {"CRYSTALB",  0x3A},
+        {"MAGICEYE",  0x3B},
+        {"PENTAGRAM", 0x3C},
+        {"SCROLL",    0x3D},
+        {"GUARD1",    0x08},
+        {"GUARD10",   0x11},
+        {"GUARD14",   0x15},
+        {"GUARD26",   0x21}
+    };
+
+    for(size_t i = 0;
+        i < sizeof(expected_object_classes) / sizeof(expected_object_classes[0]);
+        ++i)
+    {
+        assert(N3D_RE_KnownObjectMappedTypeForClass(
+            expected_object_classes[i].name, &known_mapped_type));
+        assert(known_mapped_type == expected_object_classes[i].mapped_type);
+    }
+
+    assert(!N3D_RE_KnownObjectMappedTypeForClass(
+        "GUARD0", &known_mapped_type));
+    assert(!N3D_RE_KnownObjectMappedTypeForClass(
+        "GUARD27", &known_mapped_type));
     assert(!N3D_RE_KnownObjectMappedTypeForClass(
         "UNRESOLVED_CLASS", &known_mapped_type));
 
     FILE* walls_test = fopen("WALLS.1", "wb");
     assert(walls_test != NULL);
-    fputs("01 W WALLIMG SOLID Ordinary wall\n", walls_test);
+    fputs("01 W WALLIMG WALL Ordinary wall\n", walls_test);
+    fputs("02 W REVIMG REVWALL Reversible wall\n", walls_test);
+    fputs("12 W SPECIALIMG SPECIAL1 Scripted wall\n", walls_test);
+    fputs("4E W CONTROLIMG CONTROL Remote control\n", walls_test);
+    fputs("53 W EXIMG WALL_EX1 Explodable wall\n", walls_test);
+    fputs("54 W ONESHOTIMG ONE_SHOT One shot wall\n", walls_test);
     fputs("70 D DOORIMG DOORV Ordinary vertical door\n", walls_test);
     fputs("71 W UNKNOWNIMG UNKNOWN_WALL Unresolved wall\n", walls_test);
     fputs("72 D CURTAINIMG DOORVC Vertical curtain door\n", walls_test);
@@ -562,27 +641,51 @@ int main(void)
     fputs("92 W LEVELIMG LEVEL_UP Level exit\n", walls_test);
     fputs("93 W MIRRORIMG WARP_S2 Other Side mirror\n", walls_test);
     fputs("94 W TRIGIMG TRIGGER2 Trigger two\n", walls_test);
+    fputs("B7 W ACTIONIMG ACTIONSPOT Action spot\n", walls_test);
+    fputs("BA W FLOORIMG FLOOR Floor marker\n", walls_test);
+    fputs("E1 W RETREATIMG RETREAT Retreat marker\n", walls_test);
+    fputs("EA W TURNIMG TURN Turn marker\n", walls_test);
+    fputs("F3 W SAFEIMG SAFESPOT Safe spot\n", walls_test);
     fclose(walls_test);
 
     FILE* objects_test = fopen("OBJECTS.1", "wb");
     assert(objects_test != NULL);
+    fputs("00 O NONE NULL Nothing\n", objects_test);
+    fputs("01 O STARTIMG START Start north\n", objects_test);
+    fputs("05 O KEYIMG KEY Red key\n", objects_test);
+    fputs("0B O DESKIMG DUMB Office desk\n", objects_test);
+    fputs("0D O LAMPIMG ELEVATED Ceiling lamp\n", objects_test);
+    fputs("12 O FOODIMG FOOD Red potion\n", objects_test);
     fputs("18 O TOMB PUSH Tombstone pushable\n", objects_test);
-    fputs("80 O BATIMG UNRESOLVED_GUARD Bat north\n", objects_test);
+    fputs("19 O EYEIMG MAGICEYE Magic eye\n", objects_test);
+    fputs("1A O BALLIMG CRYSTALB Crystal ball\n", objects_test);
+    fputs("1F O PENTIMG PENTAGRAM Red pentagram\n", objects_test);
+    fputs("25 O WEAPONIMG WEAPON Plasma gun\n", objects_test);
+    fputs("29 O AMMOIMG AMMO Silver bullets\n", objects_test);
+    fputs("2C O SCROLLIMG SCROLL Code scroll\n", objects_test);
+    fputs("3B O FIREIMG CAUSTIC Fire\n", objects_test);
+    fputs("40 O TORCHIMG PERMEABLE Flaming torch\n", objects_test);
+    fputs("45 O RADIOIMG ACTION Radio\n", objects_test);
+    fputs("62 O SECRETIMG SECRET Secret panel\n", objects_test);
+    fputs("80 O BATIMG GUARD1 Bat north\n", objects_test);
+    fputs("8C O DANCERIMG GUARD26 Dancers\n", objects_test);
+    fputs("D2 O SAFEIMG SAFE Safe\n", objects_test);
+    fputs("D8 O TRUNKIMG TRUNK Trunk\n", objects_test);
     fclose(objects_test);
 
     assert(N3D_RE_LoadEpisodeDefinitions(1));
-    assert(n3d_wall_definitions.count == 9);
-    assert(n3d_object_definitions.count == 2);
+    assert(n3d_wall_definitions.count == 19);
+    assert(n3d_object_definitions.count == 21);
 
     n3d_mapping_coverage wall_mapping_coverage =
         N3D_RE_WallMappingCoverage();
     n3d_mapping_coverage object_mapping_coverage =
         N3D_RE_ObjectMappingCoverage();
-    assert(wall_mapping_coverage.total == 9);
-    assert(wall_mapping_coverage.known == 7);
-    assert(wall_mapping_coverage.unknown == 2);
-    assert(object_mapping_coverage.total == 2);
-    assert(object_mapping_coverage.known == 2);
+    assert(wall_mapping_coverage.total == 19);
+    assert(wall_mapping_coverage.known == 18);
+    assert(wall_mapping_coverage.unknown == 1);
+    assert(object_mapping_coverage.total == 21);
+    assert(object_mapping_coverage.known == 21);
     assert(object_mapping_coverage.unknown == 0);
 
     const n3d_definition_record* push_def =
@@ -597,9 +700,50 @@ int main(void)
     assert(n3d_object_mapped_type[0x80] == 0x08);
     assert(n3d_object_property_resolved[0x80] == 0x0B);
 
-    assert(!N3D_RE_WallMappingKnown(0x01));
-    assert(!N3D_RE_WallPropertyKnown(0x01));
-    assert(n3d_wall_mapped_type[0x01] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(N3D_RE_ObjectMappingKnown(0x62));
+    assert(n3d_object_mapped_type[0x62] == 0x03);
+    assert(n3d_object_property_resolved[0x62] == 0x00);
+
+    assert(N3D_RE_ObjectMappingKnown(0x05));
+    assert(n3d_object_mapped_type[0x05] == 0x2F);
+    assert(n3d_object_property_resolved[0x05] == 0x05);
+
+    assert(N3D_RE_ObjectMappingKnown(0x25));
+    assert(n3d_object_mapped_type[0x25] == 0x36);
+    assert(n3d_object_property_resolved[0x25] == 0x05);
+
+    assert(N3D_RE_ObjectMappingKnown(0x29));
+    assert(n3d_object_mapped_type[0x29] == 0x39);
+    assert(n3d_object_property_resolved[0x29] == 0x05);
+
+    assert(N3D_RE_ObjectMappingKnown(0x1F));
+    assert(n3d_object_mapped_type[0x1F] == 0x3C);
+    assert(n3d_object_property_resolved[0x1F] == 0x05);
+
+    assert(N3D_RE_ObjectMappingKnown(0x8C));
+    assert(n3d_object_mapped_type[0x8C] == 0x21);
+    assert(n3d_object_property_resolved[0x8C] == 0x0B);
+
+    assert(N3D_RE_WallMappingKnown(0x01));
+    assert(N3D_RE_WallPropertyKnown(0x01));
+    assert(n3d_wall_mapped_type[0x01] == 0x01);
+    assert(n3d_wall_property_resolved[0x01] == 0x07);
+
+    assert(N3D_RE_WallMappingKnown(0x02));
+    assert(n3d_wall_mapped_type[0x02] == 0x02);
+    assert(n3d_wall_property_resolved[0x02] == 0x07);
+
+    assert(N3D_RE_WallMappingKnown(0x12));
+    assert(n3d_wall_mapped_type[0x12] == 0x08);
+    assert(n3d_wall_property_resolved[0x12] == 0x07);
+
+    assert(N3D_RE_WallMappingKnown(0x4E));
+    assert(n3d_wall_mapped_type[0x4E] == 0x03);
+    assert(n3d_wall_property_resolved[0x4E] == 0x07);
+
+    assert(N3D_RE_WallMappingKnown(0x53));
+    assert(n3d_wall_mapped_type[0x53] == 0x2E);
+    assert(n3d_wall_property_resolved[0x53] == 0x17);
 
     assert(N3D_RE_WallMappingKnown(0x70));
     assert(N3D_RE_WallPropertyKnown(0x70));
