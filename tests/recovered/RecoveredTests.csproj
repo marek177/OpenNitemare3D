@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="../../OriginalRuntime.cs" />
+    <Compile Include="../../RecoveredUseRuntime.cs" />
     <Compile Include="../../RecoveredInventory.cs" />
     <Compile Include="../../RecoveredMapArchive.cs" />
     <Compile Include="../../RecoveredDemoFile.cs" />

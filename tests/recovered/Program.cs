@@ -12,6 +12,24 @@ static class Program
 
     static void Main()
     {
+        var use = new RecoveredUseRuntime();
+        Check(!use.Press(false));
+        Check(use.Press(true));
+        Check(!use.Press(true));
+        Check(!use.Press(false));
+        Check(use.Press(true));
+        int[] offsets = { -64, 1, 1, 64, 64, -1, -1, -64 };
+        for (int octant = 0; octant < 8; ++octant)
+        {
+            Check(RecoveredUseRuntime.TryTarget(20, 20, octant, out int tx, out int ty));
+            Check(ty * 64 + tx == 20 * 64 + 20 + offsets[octant]);
+        }
+        Check(!RecoveredUseRuntime.TryTarget(63, 20, 2, out _, out _));
+        Check(!RecoveredUseRuntime.TryTarget(0, 20, 6, out _, out _));
+        Check(!RecoveredUseRuntime.TryTarget(20, 0, 0, out _, out _));
+        Check(!RecoveredUseRuntime.TryTarget(20, 63, 4, out _, out _));
+        Reject<ArgumentOutOfRangeException>(() => RecoveredUseRuntime.TryTarget(20, 20, 8, out _, out _));
+
         byte mask = 0;
         for (int i = 0; i < 4; ++i) mask = RecoveredInventory.GrantBit(mask, i);
         Check(mask == 15 && RecoveredInventory.HasAllPentagrams(mask));
