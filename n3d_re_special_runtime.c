@@ -3,6 +3,7 @@
 #include <string.h>
 
 n3d_panel_record n3d_panels[N3D_MAX_PANELS];
+n3d_panel_binding n3d_panel_bindings[N3D_MAX_PANELS];
 n3d_push_record n3d_pushes[N3D_MAX_PUSHES];
 uint16_t n3d_panel_count;
 uint16_t n3d_push_count;
@@ -10,9 +11,66 @@ uint16_t n3d_push_count;
 void N3D_RE_ResetPanelsAndPushes(void)
 {
     memset(n3d_panels, 0, sizeof(n3d_panels));
+    memset(n3d_panel_bindings, 0, sizeof(n3d_panel_bindings));
     memset(n3d_pushes, 0, sizeof(n3d_pushes));
     n3d_panel_count = 0;
     n3d_push_count = 0;
+}
+
+int N3D_RE_FindPanelSlotByCell(uint8_t x, uint8_t y)
+{
+    for(uint16_t i = 0; i < n3d_panel_count; ++i)
+    {
+        const n3d_panel_binding* binding = &n3d_panel_bindings[i];
+        if(binding->used && binding->cell_x == x && binding->cell_y == y)
+            return (int)i;
+    }
+
+    return -1;
+}
+
+int N3D_RE_RegisterPanelCell(uint8_t x, uint8_t y)
+{
+    const int existing = N3D_RE_FindPanelSlotByCell(x, y);
+    if(existing >= 0)
+        return existing;
+
+    if(n3d_panel_count >= N3D_MAX_PANELS)
+        return -1;
+
+    const uint16_t slot = n3d_panel_count++;
+    memset(&n3d_panels[slot], 0, sizeof(n3d_panels[slot]));
+
+    n3d_panel_bindings[slot].used = 1;
+    n3d_panel_bindings[slot].cell_x = x;
+    n3d_panel_bindings[slot].cell_y = y;
+    return (int)slot;
+}
+
+int N3D_RE_FindPushSlotByObject(uint16_t object_index)
+{
+    for(uint16_t i = 0; i < n3d_push_count; ++i)
+    {
+        if(n3d_pushes[i].object_index == object_index)
+            return (int)i;
+    }
+
+    return -1;
+}
+
+int N3D_RE_RegisterPushObject(uint16_t object_index)
+{
+    const int existing = N3D_RE_FindPushSlotByObject(object_index);
+    if(existing >= 0)
+        return existing;
+
+    if(n3d_push_count >= N3D_MAX_PUSHES)
+        return -1;
+
+    const uint16_t slot = n3d_push_count++;
+    memset(&n3d_pushes[slot], 0, sizeof(n3d_pushes[slot]));
+    n3d_pushes[slot].object_index = object_index;
+    return (int)slot;
 }
 
 uint8_t N3D_RE_PanelActivation(const n3d_panel_record* panel)
