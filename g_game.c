@@ -2,6 +2,7 @@
 #include "g_textures.h"
 #include "m_obj.h"
 #include "n3d_re_runtime.h"
+#include "g_think.h"
 
 
 bool G_GameIsDone()
@@ -17,6 +18,7 @@ void G_StartMainGame()
 
 void G_UpdateMainGame()
 {
+    G_HandleRecoveredGuardThinking();
     G_ShowWalls();
 
     R_DrawRaycaster();
