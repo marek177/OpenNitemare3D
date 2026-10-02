@@ -150,6 +150,36 @@ const n3d_definition_record* N3D_RE_FindDefinition(
     return &table->record[id];
 }
 
+int N3D_RE_DefinitionVariantIndex(
+    const n3d_definition_table* table,
+    uint8_t id,
+    uint8_t* variant_index)
+{
+    if(!table || !variant_index)
+        return 0;
+
+    const n3d_definition_record* target =
+        N3D_RE_FindDefinition(table, id);
+    if(!target)
+        return 0;
+
+    uint8_t variant = 0;
+    for(int raw = 0; raw < id; ++raw)
+    {
+        const n3d_definition_record* record =
+            N3D_RE_FindDefinition(table, (uint8_t)raw);
+
+        if(record &&
+           strcmp(record->class_name, target->class_name) == 0)
+        {
+            ++variant;
+        }
+    }
+
+    *variant_index = variant;
+    return 1;
+}
+
 int N3D_RE_KnownWallMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type)
