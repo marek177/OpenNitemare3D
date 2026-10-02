@@ -1042,6 +1042,11 @@ namespace Nitemare3D
             {
                 // Runtime behavior is selected by MAP header class, not WallType name.
                 tile = new SlidingDoorTile(wallClass);
+
+                // IMG wall directory entry is the original wall-ID -> first-frame map.
+                int mappedFrame = Img.current == null ? -1 : Img.current.GetWallFrameIndex(id);
+                if (mappedFrame >= 0)
+                    texture = mappedFrame;
             }
 
             tile.x = (byte)x;
