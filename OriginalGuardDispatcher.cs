@@ -23,6 +23,16 @@ namespace Nitemare3D
         DeathAnimation
     }
 
+    public struct OriginalGuardMovementResult
+    {
+        public bool XBlocked;
+        public bool YBlocked;
+        public bool PositionCommitted;
+        public bool Bounced;
+        public short AppliedX;
+        public short AppliedY;
+    }
+
     /// <summary>
     /// Executable-backed pieces of the Win16 1.10 GUARD dispatcher.
     /// Partial states stay deliberately unimplemented rather than receiving guessed behavior.
@@ -743,6 +753,125 @@ namespace Nitemare3D
                 guard.MoveX,
                 guard.MoveY);
             return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        public static bool MovementCandidateTouchesPlayer(
+            short candidateX,
+            short candidateY,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            return Math.Abs(candidateX - playerWorldX) < 0x2A &&
+                   Math.Abs(candidateY - playerWorldY) < 0x2A;
+        }
+
+        static short DirectionPadding(sbyte component)
+        {
+            if (component < 0) return -0x10;
+            if (component > 0) return 0x10;
+            return 0;
+        }
+
+        static void AdvanceMovementFrame(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            int firstFrame = guard.DefinitionValue & 0xFF;
+            int frameCount = (guard.DefinitionValue >> 8) & 0xFF;
+            int frame = (unchecked((byte)obj.Component03) + 1) & 0xFF;
+
+            if (firstFrame + frameCount <= frame)
+                frame = firstFrame;
+
+            obj.Component03 = unchecked((sbyte)(byte)frame);
+        }
+
+        /// <summary>
+        /// Recovered coordinate/collision core of FUN_1010_71DC.
+        /// isBlockedAt models FUN_1010_700A (true = blocked). Map-cell occupancy
+        /// bookkeeping and its side effects stay outside this helper.
+        /// </summary>
+        public static OriginalGuardMovementResult TickMovementCollisionCore(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            Func<short, short, bool> isBlockedAt,
+            ushort randomValue)
+        {
+            if (isBlockedAt == null)
+                throw new ArgumentNullException(nameof(isBlockedAt));
+
+            sbyte originalMoveX = guard.MoveX;
+            sbyte originalMoveY = guard.MoveY;
+
+            short xProbe = (short)(
+                obj.WorldX + originalMoveX + DirectionPadding(originalMoveX));
+            short yProbe = (short)(
+                obj.WorldY + originalMoveY + DirectionPadding(originalMoveY));
+
+            bool xBlocked = originalMoveX != 0 &&
+                (isBlockedAt(xProbe, (short)(obj.WorldY - 0x10)) ||
+                 isBlockedAt(xProbe, (short)(obj.WorldY + 0x10)));
+
+            bool yBlocked = originalMoveY != 0 &&
+                (isBlockedAt((short)(obj.WorldX - 0x10), yProbe) ||
+                 isBlockedAt((short)(obj.WorldX + 0x10), yProbe));
+
+            short appliedX = xBlocked ? (short)0 : originalMoveX;
+            short appliedY = yBlocked ? (short)0 : originalMoveY;
+
+            // State 8 refuses the entire coordinate commit if either axis is
+            // blocked. Other movement states commit the unblocked axis.
+            bool positionCommitted =
+                guard.State != (byte)OriginalGuardState.Move08 ||
+                (!xBlocked && !yBlocked);
+
+            if (positionCommitted)
+            {
+                obj.WorldX = (short)(obj.WorldX + appliedX);
+                obj.WorldY = (short)(obj.WorldY + appliedY);
+            }
+
+            bool bounced = false;
+            int octantX = appliedX;
+            int octantY = appliedY;
+
+            if (guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                xBlocked &&
+                yBlocked)
+            {
+                bounced = true;
+
+                // The Win16 assembly negates one byte component and writes only
+                // the low byte into a zeroed 16-bit local before FUN_6E66.
+                // Preserve that compiler-visible behavior here.
+                if ((randomValue & 1) != 0)
+                {
+                    guard.MoveX = unchecked((sbyte)-guard.MoveX);
+                    octantX = unchecked((byte)guard.MoveX);
+                    octantY = 0;
+                }
+                else
+                {
+                    guard.MoveY = unchecked((sbyte)-guard.MoveY);
+                    octantX = 0;
+                    octantY = unchecked((byte)guard.MoveY);
+                }
+            }
+
+            if (octantX != 0 || octantY != 0)
+                AdvanceMovementFrame(ref guard, ref obj);
+
+            UpdateOctantFromMovement(ref guard, octantX, octantY);
+
+            return new OriginalGuardMovementResult
+            {
+                XBlocked = xBlocked,
+                YBlocked = yBlocked,
+                PositionCommitted = positionCommitted,
+                Bounced = bounced,
+                AppliedX = appliedX,
+                AppliedY = appliedY
+            };
         }
 
         /// <summary>
