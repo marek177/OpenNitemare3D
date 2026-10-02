@@ -128,9 +128,7 @@ namespace Nitemare3D
             if (guard.State != (byte)OriginalGuardState.Transition13)
                 return OriginalGuardDispatchResult.NotHandled;
 
-            if (guard.Timer > 0)
-                guard.Timer--;
-
+            // The recovered helper transitions only when called with timer already 0.
             if (guard.Timer <= 0)
             {
                 guard.Timer = 0;
@@ -139,12 +137,15 @@ namespace Nitemare3D
                 return OriginalGuardDispatchResult.Transitioned;
             }
 
+            guard.Timer--;
+
             if (guard.Timer == 8)
             {
                 return OriginalGuardDispatchResult.SoundPoint;
             }
 
-            // The seven updates after the timer reaches 8 perform the stored move.
+            // nextTimer < 8 performs a movement attempt, including 1 -> 0.
+            // Therefore a state-13 sequence performs eight possible 8-unit moves.
             if (guard.Timer < 8)
             {
                 short candidateX = (short)(obj.WorldX + guard.MoveX);
@@ -159,6 +160,42 @@ namespace Nitemare3D
             }
 
             return OriginalGuardDispatchResult.Waiting;
+        }
+
+        /// <summary>
+        /// Recovered normal directional movement step. Eight facings collapse
+        /// into four cardinal vectors. Strategy 2 doubles 8 world units to 16.
+        /// </summary>
+        public static void GetDirectionalStep(
+            byte facing,
+            byte strategy,
+            out sbyte moveX,
+            out sbyte moveY)
+        {
+            int scale = strategy == 2 ? 16 : 8;
+
+            switch (facing & 7)
+            {
+                case 0:
+                case 7:
+                    moveX = 0;
+                    moveY = (sbyte)-scale;
+                    break;
+                case 1:
+                case 2:
+                    moveX = (sbyte)scale;
+                    moveY = 0;
+                    break;
+                case 3:
+                case 4:
+                    moveX = 0;
+                    moveY = (sbyte)scale;
+                    break;
+                default:
+                    moveX = (sbyte)-scale;
+                    moveY = 0;
+                    break;
+            }
         }
 
         /// <summary>
