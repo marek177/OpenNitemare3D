@@ -108,6 +108,13 @@ namespace Nitemare3D
             guard.ObjectSlot = (ushort)objectSlot;
             guard.Strength = OriginalRuntime.GuardInitialStrength;
 
+            var profile = OriginalGuardProfiles.ForObjectClass(objectClass);
+            guard.Strategy = profile.Strategy;
+            guard.State = profile.State;
+            guard.NextState = profile.NextState;
+            // PerceptionMode is recovered by class, but its exact destination field
+            // is still semantically partial; do not write it into +0x16 yet.
+
             bindings[entity] = new Binding
             {
                 ObjectSlot = objectSlot,
