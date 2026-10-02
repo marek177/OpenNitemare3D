@@ -416,17 +416,42 @@ namespace Nitemare3D
             NoRuntimeBinding,
             NoDamage,
             PainReaction,
+            ReactionAnimation,
+            ReactionSkipped,
+            DeathSequenceStarted,
+            MissingDefinition,
             SpecialReactionRequired,
             Killed,
             DraculaTransformed
         }
 
         /// <summary>
-        /// Applies the confirmed normal GUARD damage receiver path.
-        /// Special strategy-specific hit branches are deliberately not folded into
-        /// this helper until their semantics are fully closed.
+        /// Compatibility overload. The original selector is RNG-driven; callers
+        /// requiring exact RNG-stream parity should use the overload that supplies
+        /// nextRandom and the recovered perception result.
         /// </summary>
-        public static GuardHitResult ApplyNormalGuardDamage(Entity entity, byte damage)
+        public static GuardHitResult ApplyNormalGuardDamage(
+            Entity entity,
+            byte damage)
+        {
+            return ApplyNormalGuardDamage(
+                entity,
+                damage,
+                () => 0,
+                false);
+        }
+
+        /// <summary>
+        /// Applies the recovered FUN_1010_80F8 receiver transition. This covers
+        /// HP subtraction, resoct=8, strategy 2/4 handling, state-specific pain
+        /// routing and lethal death-sequence setup. Class-specific state-09
+        /// finalization is a later step and is intentionally separate.
+        /// </summary>
+        public static GuardHitResult ApplyNormalGuardDamage(
+            Entity entity,
+            byte damage,
+            Func<ushort> nextRandom,
+            bool perceptionSucceeded)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
                 binding.GuardSlot < 0 ||
@@ -436,53 +461,158 @@ namespace Nitemare3D
             }
 
             if (damage == 0)
-            {
                 return GuardHitResult.NoDamage;
-            }
 
             ref var guard = ref Guards[binding.GuardSlot];
             ref var obj = ref Objects[binding.ObjectSlot];
 
             if (damage >= guard.Strength)
             {
-                if (obj.ObjectClass == OriginalRuntime.DraculaPhase1Class)
+                if (!ObjectDefinitions.TryGet(
+                        obj.DefinitionId,
+                        out var deathDefinition))
                 {
+                    guard.Strength = 0;
+                    return GuardHitResult.MissingDefinition;
+                }
+
+                var transition =
+                    OriginalGuardDispatcher.BeginLethalHitTransition(
+                        ref guard,
+                        ref obj,
+                        deathDefinition,
+                        nextRandom);
+
+                return transition == OriginalGuardHitTransition.DeathAnimation
+                    ? GuardHitResult.DeathSequenceStarted
+                    : GuardHitResult.MissingDefinition;
+            }
+
+            guard.Strength = (byte)(guard.Strength - damage);
+
+            // Strategy 4 exits before the reaction selector in the original.
+            if (guard.Strategy == 4)
+            {
+                guard.ResultOctant = 8;
+                return GuardHitResult.ReactionSkipped;
+            }
+
+            if (!ObjectDefinitions.TryGet(
+                    obj.DefinitionId,
+                    out var reactionDefinition))
+            {
+                guard.ResultOctant = 8;
+                return GuardHitResult.MissingDefinition;
+            }
+
+            var reaction =
+                OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                    ref guard,
+                    ref obj,
+                    reactionDefinition,
+                    nextRandom,
+                    perceptionSucceeded);
+
+            switch (reaction)
+            {
+                case OriginalGuardHitTransition.Pain15:
+                    return GuardHitResult.PainReaction;
+
+                case OriginalGuardHitTransition.AnimationTo05:
+                case OriginalGuardHitTransition.AnimationTo08:
+                    return GuardHitResult.ReactionAnimation;
+
+                case OriginalGuardHitTransition.ReactionSkipped:
+                    return GuardHitResult.ReactionSkipped;
+
+                default:
+                    return GuardHitResult.MissingDefinition;
+            }
+        }
+
+        static bool TryFindDefinitionIdForObjectClass(
+            byte objectClass,
+            out byte definitionId)
+        {
+            for (int i = 0; i < ObjectCount; i++)
+            {
+                if (Objects[i].ObjectClass == objectClass)
+                {
+                    definitionId = Objects[i].DefinitionId;
+                    return true;
+                }
+            }
+
+            definitionId = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// Recovered state-0x09 FUN_1010_A0EE death finalization core.
+        /// Ordinary class side effects are limited to the confirmed OBJECT flag
+        /// writes. Draculas phase change is performed here, after its death
+        /// animation, rather than at lethal-hit time.
+        /// </summary>
+        public static GuardHitResult FinalizeDeath09(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return GuardHitResult.NoRuntimeBinding;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            if (guard.State != (byte)OriginalGuardState.DeathFinalize09)
+                return GuardHitResult.SpecialReactionRequired;
+
+            obj.Flags |= 0x01;
+            guard.State = (byte)OriginalGuardState.NoLocalAction0A;
+
+            switch (obj.ObjectClass)
+            {
+                // These FUN_A0EE cases clear the bit it sets on entry.
+                case 0x09:
+                case 0x0A:
+                case 0x12:
+                case 0x13:
+                case 0x1A:
+                case 0x1E:
+                case 0x1F:
+                    obj.Flags &= 0xFE;
+                    return GuardHitResult.Killed;
+
+                case OriginalRuntime.DraculaPhase1Class:
+                    // FUN_1010_23DC(8) finds the first OBJECT class 0x08 and
+                    // returns its OBJECT+0x04 definition id for the Bat resource.
+                    if (!TryFindDefinitionIdForObjectClass(
+                            0x08,
+                            out byte batDefinitionId))
+                    {
+                        return GuardHitResult.SpecialReactionRequired;
+                    }
+
+                    obj.DefinitionId = batDefinitionId;
                     obj.ObjectClass = OriginalRuntime.DraculaBatPhase2Class;
+                    obj.Runtime1A = 0x23;
+
                     guard.Strength = OriginalRuntime.GuardInitialStrength;
                     guard.State = (byte)OriginalGuardState.Move08;
                     guard.NextState = (byte)OriginalGuardState.Active02;
                     guard.Timer = 1;
                     return GuardHitResult.DraculaTransformed;
-                }
 
-                guard.Strength = 0;
-                return GuardHitResult.Killed;
+                case OriginalRuntime.DrHamersteinClass:
+                    // The same function also mutates end-game globals for
+                    // Hamerstein. Keep that global side effect outside this
+                    // bridge until those globals are represented explicitly.
+                    return GuardHitResult.SpecialReactionRequired;
+
+                default:
+                    return GuardHitResult.Killed;
             }
-
-            guard.Strength = (byte)(guard.Strength - damage);
-            guard.ResultOctant = 8;
-
-            // The recovered hit handler has separate paths for states 3, 4 and 0x0B,
-            // and for strategies 3/4/5. Preserve the HP/resoct writes that occur
-            // before that split, but do not invent their reaction transition.
-            if (guard.State == (byte)OriginalGuardState.Detection03 ||
-                guard.State == (byte)OriginalGuardState.DetectionAttack04 ||
-                guard.State == (byte)OriginalGuardState.NoLocalAction0B ||
-                guard.Strategy == 3 ||
-                guard.Strategy == 4 ||
-                guard.Strategy == 5)
-            {
-                return GuardHitResult.SpecialReactionRequired;
-            }
-
-            // Ordinary reaction path preserves the current state only when nonzero.
-            if (guard.State != 0)
-            {
-                guard.NextState = guard.State;
-            }
-
-            guard.State = (byte)OriginalGuardState.Pain15;
-            return GuardHitResult.PainReaction;
         }
 
         public static void SetGuardStrength(Entity entity, byte strength)
