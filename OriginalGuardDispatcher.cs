@@ -13,6 +13,16 @@ namespace Nitemare3D
         Completed
     }
 
+    public enum OriginalGuardHitTransition
+    {
+        MissingSequence,
+        ReactionSkipped,
+        Pain15,
+        AnimationTo05,
+        AnimationTo08,
+        DeathAnimation
+    }
+
     /// <summary>
     /// Executable-backed pieces of the Win16 1.10 GUARD dispatcher.
     /// Partial states stay deliberately unimplemented rather than receiving guessed behavior.
@@ -369,6 +379,94 @@ namespace Nitemare3D
                 packedSequence,
                 (byte)OriginalGuardState.AnimationTimer,
                 (byte)nextState);
+        }
+
+        public static OriginalGuardHitTransition BeginNonLethalHitTransition(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            Func<ushort> nextRandom,
+            bool perceptionSucceeded)
+        {
+            // FUN_1010_80F8 writes these before all strategy/state branches.
+            guard.ResultOctant = 8;
+
+            // Strategy 4 exits before B9B2 and therefore consumes no selector RNG.
+            if (guard.Strategy == 4)
+                return OriginalGuardHitTransition.ReactionSkipped;
+
+            if (!TrySelectReactionSequence(
+                    definition,
+                    guard.ResultOctant,
+                    nextRandom,
+                    out _,
+                    out ushort reactionSequence))
+            {
+                return OriginalGuardHitTransition.MissingSequence;
+            }
+
+            // Strategy 2 has a dedicated state-0 animation returning to state 8.
+            if (guard.Strategy == 2)
+            {
+                BeginReactionAnimation(
+                    ref guard,
+                    ref obj,
+                    reactionSequence,
+                    OriginalGuardState.Move08);
+                return OriginalGuardHitTransition.AnimationTo08;
+            }
+
+            // States 3, 4 and 0x0B consume the selector but do not enter a
+            // local reaction animation in FUN_1010_80F8.
+            if (guard.State == (byte)OriginalGuardState.Detection03 ||
+                guard.State == (byte)OriginalGuardState.DetectionAttack04 ||
+                guard.State == (byte)OriginalGuardState.LethalPlayerContact0B)
+            {
+                return OriginalGuardHitTransition.ReactionSkipped;
+            }
+
+            // States 7, 8 and 0x15 refresh the perception cache and run the
+            // selected reaction sequence through state 0, returning to state 5.
+            if (guard.State == (byte)OriginalGuardState.Active07 ||
+                guard.State == (byte)OriginalGuardState.Move08 ||
+                guard.State == (byte)OriginalGuardState.Pain15)
+            {
+                guard.Unknown17 = perceptionSucceeded ? (byte)1 : (byte)0;
+                BeginReactionAnimation(
+                    ref guard,
+                    ref obj,
+                    reactionSequence,
+                    OriginalGuardState.Transition05);
+                return OriginalGuardHitTransition.AnimationTo05;
+            }
+
+            BeginPainReaction15(
+                ref guard,
+                ref obj,
+                reactionSequence);
+            return OriginalGuardHitTransition.Pain15;
+        }
+
+        public static OriginalGuardHitTransition BeginLethalHitTransition(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            Func<ushort> nextRandom)
+        {
+            guard.Strength = 0;
+
+            if (!TrySelectDeathSequence(
+                    definition,
+                    guard.ResultOctant,
+                    nextRandom,
+                    out _,
+                    out ushort deathSequence))
+            {
+                return OriginalGuardHitTransition.MissingSequence;
+            }
+
+            BeginDeathSequence(ref guard, ref obj, deathSequence);
+            return OriginalGuardHitTransition.DeathAnimation;
         }
 
         /// <summary>
