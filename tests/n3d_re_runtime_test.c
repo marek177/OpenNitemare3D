@@ -8,6 +8,7 @@
 #include "../n3d_re_door.h"
 #include "../n3d_re_special_runtime.h"
 #include "../n3d_re_use.h"
+#include "../n3d_re_pickup.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -656,6 +657,7 @@ int main(void)
     fputs("00 O NONE NULL Nothing\n", objects_test);
     fputs("01 O STARTIMG START Start north\n", objects_test);
     fputs("05 O KEYIMG KEY Red key\n", objects_test);
+    fputs("09 O CARDIMG IDCARD Red ID card\n", objects_test);
     fputs("0B O DESKIMG DUMB Office desk\n", objects_test);
     fputs("0D O LAMPIMG ELEVATED Ceiling lamp\n", objects_test);
     fputs("12 O FOODIMG FOOD Red potion\n", objects_test);
@@ -665,6 +667,8 @@ int main(void)
     fputs("1F O PENTIMG PENTAGRAM Red pentagram\n", objects_test);
     fputs("25 O WEAPONIMG WEAPON Plasma gun\n", objects_test);
     fputs("29 O AMMOIMG AMMO Silver bullets\n", objects_test);
+    fputs("2A O LASERAMMO AMMO Plasma power cell\n", objects_test);
+    fputs("2B O WANDAMMO AMMO Spell book\n", objects_test);
     fputs("2C O SCROLLIMG SCROLL Code scroll\n", objects_test);
     fputs("3B O FIREIMG CAUSTIC Fire\n", objects_test);
     fputs("40 O TORCHIMG PERMEABLE Flaming torch\n", objects_test);
@@ -678,7 +682,7 @@ int main(void)
 
     assert(N3D_RE_LoadEpisodeDefinitions(1));
     assert(n3d_wall_definitions.count == 22);
-    assert(n3d_object_definitions.count == 21);
+    assert(n3d_object_definitions.count == 24);
 
     n3d_mapping_coverage wall_mapping_coverage =
         N3D_RE_WallMappingCoverage();
@@ -687,8 +691,8 @@ int main(void)
     assert(wall_mapping_coverage.total == 22);
     assert(wall_mapping_coverage.known == 21);
     assert(wall_mapping_coverage.unknown == 1);
-    assert(object_mapping_coverage.total == 21);
-    assert(object_mapping_coverage.known == 21);
+    assert(object_mapping_coverage.total == 24);
+    assert(object_mapping_coverage.known == 24);
     assert(object_mapping_coverage.unknown == 0);
 
     const n3d_definition_record* push_def =
@@ -1148,6 +1152,79 @@ int main(void)
     use_target = N3D_RE_ClassifyUseTarget(1);
     assert(use_target.kind == N3D_USE_MAPPED_OBJECT);
     assert(use_target.mapped_object_type == 0x08);
+
+    /*
+     * Verified object-touch subset: key/card/pentagram masks and three ammo
+     * pools. Object removal/SFX/score remain caller-side/deferred.
+     */
+    uint8_t pickup_payload[N3D_MAP_LEVEL_BYTES] = {0};
+    const int pickup_key_cell = 1 * N3D_MAP_WIDTH + 1;
+    const int pickup_card_cell = 2 * N3D_MAP_WIDTH + 2;
+    const int pickup_pentagram_cell = 3 * N3D_MAP_WIDTH + 3;
+    const int pickup_silver_cell = 4 * N3D_MAP_WIDTH + 4;
+    const int pickup_laser_cell = 5 * N3D_MAP_WIDTH + 5;
+    const int pickup_wand_cell = 6 * N3D_MAP_WIDTH + 6;
+    const int pickup_deferred_cell = 7 * N3D_MAP_WIDTH + 7;
+
+    pickup_payload[pickup_key_cell * N3D_MAP_CELL_BYTES + 1] = 0x05;
+    pickup_payload[pickup_card_cell * N3D_MAP_CELL_BYTES + 1] = 0x09;
+    pickup_payload[pickup_pentagram_cell * N3D_MAP_CELL_BYTES + 1] = 0x1F;
+    pickup_payload[pickup_silver_cell * N3D_MAP_CELL_BYTES + 1] = 0x29;
+    pickup_payload[pickup_laser_cell * N3D_MAP_CELL_BYTES + 1] = 0x2A;
+    pickup_payload[pickup_wand_cell * N3D_MAP_CELL_BYTES + 1] = 0x2B;
+    pickup_payload[pickup_deferred_cell * N3D_MAP_CELL_BYTES + 1] = 0x12;
+
+    assert(N3D_RE_LoadMapPayload(pickup_payload, sizeof(pickup_payload)));
+    n3d_player.colored_keys = 0;
+    n3d_player.id_cards = 0;
+    n3d_player.pentagrams = 0;
+    n3d_player.silver_ammo = 99;
+    n3d_player.laser_ammo = 100;
+    n3d_player.wand_ammo = 90;
+
+    n3d_pickup_result pickup_result =
+        N3D_RE_ApplyPickupAtCell(1, 1);
+    assert(pickup_result.kind == N3D_PICKUP_KEY_GRANTED);
+    assert(pickup_result.variant_index == 0);
+    assert(n3d_player.colored_keys == 0x01);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(2, 2);
+    assert(pickup_result.kind == N3D_PICKUP_IDCARD_GRANTED);
+    assert(pickup_result.variant_index == 0);
+    assert(n3d_player.id_cards == 0x01);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(3, 3);
+    assert(pickup_result.kind == N3D_PICKUP_PENTAGRAM_GRANTED);
+    assert(pickup_result.variant_index == 0);
+    assert(n3d_player.pentagrams == 0x01);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(4, 4);
+    assert(pickup_result.kind == N3D_PICKUP_AMMO_ADDED);
+    assert(pickup_result.ammo_pool == N3D_AMMO_POOL_SILVER);
+    assert(pickup_result.value_before == 99);
+    assert(pickup_result.value_after == 119);
+    assert(n3d_player.silver_ammo == 119);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(5, 5);
+    assert(pickup_result.kind == N3D_PICKUP_AMMO_AT_THRESHOLD);
+    assert(pickup_result.ammo_pool == N3D_AMMO_POOL_LASER);
+    assert(pickup_result.value_before == 100);
+    assert(pickup_result.value_after == 100);
+    assert(n3d_player.laser_ammo == 100);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(6, 6);
+    assert(pickup_result.kind == N3D_PICKUP_AMMO_ADDED);
+    assert(pickup_result.ammo_pool == N3D_AMMO_POOL_WAND);
+    assert(pickup_result.value_before == 90);
+    assert(pickup_result.value_after == 110);
+    assert(n3d_player.wand_ammo == 110);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(7, 7);
+    assert(pickup_result.kind == N3D_PICKUP_DEFERRED);
+    assert(pickup_result.object_class == 0x33);
+
+    assert(N3D_RE_ApplyPickupAtCell(63, 63).kind ==
+           N3D_PICKUP_UNRESOLVED);
 
     /* Execute exact USE effects that are already closed by RE evidence. */
     uint8_t use_payload[N3D_MAP_LEVEL_BYTES] = {0};
