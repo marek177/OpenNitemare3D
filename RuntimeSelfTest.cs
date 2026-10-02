@@ -119,6 +119,20 @@ namespace Nitemare3D
             Assert(OriginalProjectileRuntime.FirstFreeSlot(pool) == 1,
                 "projectile pool must advance to next free slot.");
 
+            Assert(OriginalProjectileRuntime.TryAllocateAndInitialize(
+                       pool, 0, 64, 128, 20, out int allocated) &&
+                   allocated == 1 &&
+                   pool[1].State == (byte)OriginalProjectileState.Flying,
+                "projectile allocator must initialize the first free slot.");
+
+            for (int i = 0; i < pool.Length; i++)
+                pool[i].State = (byte)OriginalProjectileState.Flying;
+
+            Assert(!OriginalProjectileRuntime.TryAllocateAndInitialize(
+                       pool, 0, 64, 128, 20, out int fullSlot) &&
+                   fullSlot == -1,
+                "full projectile pool must reject allocation before ammo use.");
+
             var projectile = new OriginalProjectileRecord();
             Assert(OriginalProjectileRuntime.InitializeSpawn(
                        ref projectile, 1, 100, 200, 10),
