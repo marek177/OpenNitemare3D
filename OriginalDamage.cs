@@ -87,9 +87,9 @@ namespace Nitemare3D
 
         /// <summary>
         /// Confirmed GUARD-to-player damage producer recovered from NITE3W 1.10.
-        /// distanceMetric is the positive result of the original tile-distance helper
-        /// (FUN_1018_32aa). Its exact metric is kept external until that helper is
-        /// independently closed. The class-0x16 boolean mirrors the original
+        /// distanceMetric is the recovered result of FUN_1018_32AA. Call
+        /// ComputeGuardToPlayerFromWorld when world coordinates are available.
+        /// The class-0x16 boolean mirrors the original
         /// (DAT_1048_7e52 == 3 || DAT_1048_51a6 != 0) gate.
         /// </summary>
         public static OriginalGuardAttackDamageResult ComputeGuardToPlayer(
