@@ -94,3 +94,47 @@ Dynamic-door draw/erase hooks (`DoorOpened`, `DoorClosed`) are present, but the 
 - compare logical RGB against original GAME.PAL;
 - later replace DDA discovery with recovered VEC discovery;
 - later replace local noise RNG with the shared original RNG stream.
+
+
+## VEC discovery closure update
+
+The branch now maps the existing DDA ray hit onto the original VEC orientation convention:
+
+- 0 = top edge
+- 1 = bottom edge
+- 2 = right edge
+- 3 = left edge
+
+For ordinary wall classes 0x01..0x30, the automap records the corresponding tile-boundary edge and merges contiguous cells with the same raw wall ID/material, matching the original VEC run concept.
+
+The MAP header is now read directly at offsets 0x0002..0x0101 to obtain the episode-specific 256-byte wall-ID -> class-ID table. This removes name-based door guessing.
+
+Door classes 0x31..0x40 use the recovered special VEC rule:
+- odd classes 0x31,0x33,...,0x3F accept vertical orientations 2/3;
+- even classes 0x32,0x34,...,0x40 accept horizontal orientations 0/1;
+- door automap color is logical 9;
+- request-1 erase behavior is exposed through DoorOpened(x,y,orientation,flag20), including the VEC+5 bit-0x20 neighbour-cell rule.
+
+Normal-wall boundary detection follows the original property split: a regular wall face borders an automap edge when the neighbour is not class 0x01..0x30. A neighbouring door therefore counts as an exposed normal-wall boundary, matching FUN_1018_4046.
+
+## Original RNG
+
+The local System.Random fallback has been removed.
+
+OpenNitemare3D now has OriginalRandom.cs implementing the exact Microsoft C RNG used by the reference executable:
+
+    state = state * 0x343FD + 0x269EC3
+    result = (state >> 16) & 0x7FFF
+
+Seed 1 produces the known initial sequence:
+
+    41, 18467, 6334, 26500, 19169
+
+Automap low-power noise now consumes this shared stream. The new-game load path resets it to seed 1, matching the recovered Nitemare-3D initialization path.
+
+## Remaining runtime gaps after this pass
+
+- The main renderer is still DDA rather than the original full VEC/column-owner renderer. Automap discovery now uses original VEC edge semantics, but visibility ownership is still driven by the current DDA hit.
+- The existing OpenNitemare3D dynamic-door runtime is not yet the recovered paired-VEC 1:1 implementation, so the exact DoorOpened(...flag20) hook is currently future-facing.
+- Player damage is not yet implemented in the current gameplay code; therefore the recovered damage-flash hook cannot be triggered correctly without first wiring the real damage path.
+- Runtime build/framebuffer validation is still required before merge.
