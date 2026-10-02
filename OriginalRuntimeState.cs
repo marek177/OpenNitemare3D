@@ -88,7 +88,9 @@ namespace Nitemare3D
 
         public static bool RegisterGuard(Entity entity, GuardType type, byte mapObjectId = 0)
         {
-            if (!TryMapPortGuardClass(type, out byte objectClass))
+            byte objectClass;
+            if (!OriginalGuardProfiles.TryClassFromMapObjectId(mapObjectId, out objectClass) &&
+                !TryMapPortGuardClass(type, out objectClass))
             {
                 return false;
             }
