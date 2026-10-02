@@ -197,6 +197,45 @@ namespace Nitemare3D
             return true;
         }
 
+        public static bool CompleteDeferredGuardState(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            return OriginalGuardDispatcher.CompleteDeferredState(ref guard) ==
+                   OriginalGuardDispatchResult.Completed;
+        }
+
+        public static bool CompleteGuardState06(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            return OriginalGuardDispatcher.CompleteState06(ref guard) ==
+                   OriginalGuardDispatchResult.Completed;
+        }
+
+        public static bool CompleteGuardState11(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            return OriginalGuardDispatcher.CompleteState11(ref guard) ==
+                   OriginalGuardDispatchResult.Completed;
+        }
+
         public static bool CompletePainReaction(Entity entity)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
