@@ -625,6 +625,32 @@ int main(void)
     assert(n3d_wall_mapped_type[255] == 0x2F);
     assert(n3d_wall_property_resolved[255] == 0x17);
 
+    uint8_t door_payload[N3D_MAP_LEVEL_BYTES] = {0};
+    const int doorv_cell = 5 * N3D_MAP_WIDTH + 4;
+    const int doorvc_cell = 7 * N3D_MAP_WIDTH + 6;
+    door_payload[doorv_cell * N3D_MAP_CELL_BYTES] = 0x70;
+    door_payload[doorvc_cell * N3D_MAP_CELL_BYTES] = 0x72;
+
+    assert(N3D_RE_LoadMapPayload(door_payload, sizeof(door_payload)));
+    assert(n3d_door_count == 2);
+    assert(N3D_RE_FindDoorSlotByCell(4, 5) >= 0);
+    assert(N3D_RE_FindDoorSlotByCell(6, 7) >= 0);
+    assert(!N3D_RE_DoorCellStateKnown(4, 5));
+    assert(!N3D_RE_DoorCellStateKnown(6, 7));
+    assert(!N3D_RE_DoorCellAllowsPassage(4, 5));
+    assert(!N3D_RE_DoorCellAllowsPassage(6, 7));
+
+    assert(N3D_RE_SetDoorCellState(4, 5, 0));
+    assert(N3D_RE_DoorCellStateKnown(4, 5));
+    assert(N3D_RE_DoorCellAllowsPassage(4, 5));
+
+    assert(N3D_RE_SetDoorCellState(6, 7, 2));
+    assert(N3D_RE_DoorCellStateKnown(6, 7));
+    assert(!N3D_RE_DoorCellAllowsPassage(6, 7));
+
+    assert(N3D_RE_SetDoorCellState(6, 7, 4));
+    assert(N3D_RE_DoorCellAllowsPassage(6, 7));
+
     N3D_RE_ResetRuntime();
     n3d_map[0].wall = 0;
     n3d_map[0].object = 0;
