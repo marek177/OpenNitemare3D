@@ -24,6 +24,29 @@ namespace Nitemare3D
             return tile == null ? (byte)0 : GetWallClass(tile.wallID);
         }
 
+        public static int GetFirstWallIdForClass(byte wallClass)
+        {
+            for (int i = 0; i < wallClassById.Length; i++)
+            {
+                if (wallClassById[i] == wallClass)
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int GetWallClassVariant(Tile tile)
+        {
+            if (tile == null)
+                return 0;
+
+            int first = GetFirstWallIdForClass(GetWallClass(tile));
+            if (first < 0 || tile.wallID < first)
+                return 0;
+
+            // FUN_1018_3E82 stores VEC+1 as (wallID - first ID of class) >> 1.
+            return (tile.wallID - first) >> 1;
+        }
+
         static void SpawnMapObject(int id, int x, int y)
         {
             if(id == 0){return;}
