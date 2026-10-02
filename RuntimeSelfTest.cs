@@ -18,6 +18,7 @@ namespace Nitemare3D
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
+            TestGuardMapClassMapping();
             TestGuardInitialProfiles();
             TestState07Decision();
             TestPainReturn();
@@ -206,6 +207,42 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "state 13 must clear strategy and return to state 02.");
+        }
+
+        static void TestGuardMapClassMapping()
+        {
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(128, out byte bat) &&
+                   bat == 0x08,
+                "Bat MAP object must map to class 0x08.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(139, out byte mummy) &&
+                   mummy == 0x0A,
+                "Mummy MAP object must map to class 0x0A.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(144, out byte skeleton) &&
+                   skeleton == 0x0B,
+                "Skeleton MAP object must map to class 0x0B.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(160, out byte baddie1) &&
+                   baddie1 == 0x0F,
+                "Baddie #1 MAP object must map to class 0x0F.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(176, out byte dracula) &&
+                   dracula == 0x11,
+                "Dracula MAP object must map to class 0x11.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(180, out byte cemetery) &&
+                   cemetery == 0x12,
+                "Cemetery gargoyle MAP object must map to class 0x12.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(184, out byte garden) &&
+                   garden == 0x13,
+                "Garden gargoyle MAP object must map to class 0x13.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(188, out byte penelope) &&
+                   penelope == 0x15,
+                "Penelope MAP object must map to class 0x15.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(196, out byte hamerstein) &&
+                   hamerstein == 0x16,
+                "Hamerstein MAP object must map to class 0x16.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(204, out byte cannon) &&
+                   cannon == 0x19,
+                "Cannon MAP object must map to class 0x19.");
+            Assert(!OriginalGuardProfiles.TryClassFromMapObjectId(140, out _),
+                "Dancers must remain outside ordinary GUARD class mapping.");
         }
 
         static void TestGuardInitialProfiles()
