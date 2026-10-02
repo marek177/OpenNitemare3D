@@ -17,6 +17,7 @@ namespace Nitemare3D
             TestObjectDefinitionCatalog();
             TestImgDefinitionLoader();
             TestDamageMatrix();
+            TestGuardSounds();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
             TestExactAnimationSchedulers();
@@ -233,6 +234,42 @@ namespace Nitemare3D
             Assert(OriginalDamage.ApplyClassWeaponTransform(
                        80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 3) == 3,
                 "Hamerstein gate value 3 must yield literal damage 3.");
+        }
+
+        static void TestGuardSounds()
+        {
+            Assert(OriginalGuardSounds.AlertSoundId(0x08, 0) == 0x22,
+                "Bat alert sound mismatch.");
+            Assert(OriginalGuardSounds.AlertSoundId(0x09, 2) == 0x3A,
+                "Frankenstein randomized alert sound mismatch.");
+            Assert(OriginalGuardSounds.AlertSoundId(0x0F, 1) == 0x37,
+                "Baddie randomized alert sound mismatch.");
+            Assert(OriginalGuardSounds.AlertSoundId(0x1F, 0) == 0x3D,
+                "Alien #2 alert sound mismatch.");
+            Assert(OriginalGuardSounds.AlertSoundId(0x15, 0) == 0,
+                "Penelope alert selector should take the default zero path.");
+
+            Assert(OriginalGuardSounds.AttackSoundId(0x09, 0) == 0x41,
+                "Frankenstein attack sound mismatch.");
+            Assert(OriginalGuardSounds.AttackSoundId(0x0F, 2) == 0x19,
+                "Baddie randomized attack sound mismatch.");
+            Assert(OriginalGuardSounds.AttackSoundId(0x13, 0) == 0x40,
+                "Garden gargoyle attack sound mismatch.");
+            Assert(OriginalGuardSounds.AttackSoundId(0x1B, 3) == 0x4E,
+                "Goldie randomized attack sound mismatch.");
+            Assert(OriginalGuardSounds.AttackSoundId(0x08, 0) == 0,
+                "Bat attack selector should take the default zero path.");
+
+            Assert(OriginalGuardSounds.DeathSoundId(0x08, 0) == 0x23,
+                "Bat death sound mismatch.");
+            Assert(OriginalGuardSounds.DeathSoundId(0x0F, 2) == 0x0D,
+                "Baddie randomized death sound mismatch.");
+            Assert(OriginalGuardSounds.DeathSoundId(0x1A, 0) == 0x4A,
+                "Ghost death sound mismatch.");
+            Assert(OriginalGuardSounds.DeathSoundId(0x1D, 0) == 0x09,
+                "Demon death sound mismatch.");
+            Assert(OriginalGuardSounds.DeathSoundId(0x16, 0) == 0,
+                "Hamerstein death selector should take the default zero path.");
         }
 
         static void TestGuardToPlayerDamage()
