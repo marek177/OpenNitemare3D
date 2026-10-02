@@ -1,4 +1,6 @@
 #include "n3d_re_definitions.h"
+#include "n3d_re_collision.h"
+#include "n3d_re_runtime.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -9,6 +11,11 @@ n3d_definition_table n3d_wall_definitions;
 n3d_definition_table n3d_object_definitions;
 uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
 uint8_t n3d_object_mapped_type[N3D_DEFINITION_COUNT];
+uint8_t n3d_wall_mapping_known[N3D_DEFINITION_COUNT];
+uint8_t n3d_object_mapping_known[N3D_DEFINITION_COUNT];
+uint8_t n3d_wall_property_resolved[N3D_DEFINITION_COUNT];
+uint8_t n3d_object_property_resolved[N3D_DEFINITION_COUNT];
+uint8_t n3d_definition_episode;
 
 void N3D_RE_ClearDefinitionTable(n3d_definition_table* table)
 {
@@ -164,13 +171,52 @@ int N3D_RE_KnownObjectMappedTypeForClass(
     return 0;
 }
 
+static void N3D_RE_SetKnownWallMapping(uint8_t raw_id, uint8_t mapped_type)
+{
+    n3d_wall_mapped_type[raw_id] = mapped_type;
+    n3d_wall_mapping_known[raw_id] = 1;
+    n3d_wall_property_resolved[raw_id] =
+        N3D_RE_WallPropertiesForMappedType(mapped_type);
+}
+
+static void N3D_RE_SetKnownObjectMapping(uint8_t raw_id, uint8_t mapped_type)
+{
+    n3d_object_mapped_type[raw_id] = mapped_type;
+    n3d_object_mapping_known[raw_id] = 1;
+    n3d_object_property_resolved[raw_id] =
+        N3D_RE_ObjectPropertiesForMappedType(mapped_type);
+}
+
 void N3D_RE_RebuildKnownMappedTypes(void)
 {
     memset(n3d_wall_mapped_type, N3D_MAPPED_TYPE_UNKNOWN,
            sizeof(n3d_wall_mapped_type));
     memset(n3d_object_mapped_type, N3D_MAPPED_TYPE_UNKNOWN,
            sizeof(n3d_object_mapped_type));
+    memset(n3d_wall_mapping_known, 0, sizeof(n3d_wall_mapping_known));
+    memset(n3d_object_mapping_known, 0, sizeof(n3d_object_mapping_known));
+    memset(n3d_wall_property_resolved, 0, sizeof(n3d_wall_property_resolved));
+    memset(n3d_object_property_resolved, 0, sizeof(n3d_object_property_resolved));
 
+    /* Empty MAP bytes are fully known and have no collision properties. */
+    N3D_RE_SetKnownWallMapping(0, 0);
+    N3D_RE_SetKnownObjectMapping(0, 0);
+
+    /*
+     * Guard spawn ID -> runtime OBJECT class is independently recovered from
+     * the executable and therefore can also seed the logical object mapping.
+     */
+    for(int id = 1; id < N3D_DEFINITION_COUNT; ++id)
+    {
+        uint8_t guard_class = 0;
+        if(N3D_RE_GuardClassFromMapObject((uint8_t)id, &guard_class))
+            N3D_RE_SetKnownObjectMapping((uint8_t)id, guard_class);
+    }
+
+    /*
+     * Definition class PUSH is directly cross-bound to mapped object type 0x28.
+     * Unknown textual classes remain unresolved instead of receiving guessed IDs.
+     */
     for(int id = 0; id < N3D_DEFINITION_COUNT; ++id)
     {
         const n3d_definition_record* object =
@@ -182,14 +228,39 @@ void N3D_RE_RebuildKnownMappedTypes(void)
             if(N3D_RE_KnownObjectMappedTypeForClass(
                     object->class_name, &mapped))
             {
-                n3d_object_mapped_type[id] = mapped;
+                N3D_RE_SetKnownObjectMapping((uint8_t)id, mapped);
             }
         }
     }
+
+    /*
+     * Episode-1 raw IDs come from the upstream enum generated from WALLS.1;
+     * their logical classes are independently verified in the EXE/MAP audit.
+     * Do not apply these raw-ID bindings to other episodes.
+     */
+    if(n3d_definition_episode == 1)
+    {
+        N3D_RE_SetKnownWallMapping(184, 0x47); /* Trigger1 */
+        N3D_RE_SetKnownWallMapping(185, 0x48); /* Trigger2 */
+        N3D_RE_SetKnownWallMapping(254, 0x2E); /* explodable family 1 */
+        N3D_RE_SetKnownWallMapping(255, 0x2F); /* explodable family 2 */
+    }
+}
+
+int N3D_RE_WallMappingKnown(uint8_t raw_id)
+{
+    return n3d_wall_mapping_known[raw_id] != 0;
+}
+
+int N3D_RE_ObjectMappingKnown(uint8_t raw_id)
+{
+    return n3d_object_mapping_known[raw_id] != 0;
 }
 
 int N3D_RE_LoadEpisodeDefinitions(uint8_t episode)
 {
+    n3d_definition_episode = episode;
+
     char walls_path[32];
     char objects_path[32];
 
