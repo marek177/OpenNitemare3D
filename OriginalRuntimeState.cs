@@ -119,8 +119,10 @@ namespace Nitemare3D
             guard.Strategy = profile.Strategy;
             guard.State = profile.State;
             guard.NextState = profile.NextState;
-            // PerceptionMode is recovered by class, but its exact destination field
-            // is still semantically partial; do not write it into +0x16 yet.
+            // FUN_1010_B02C writes this class-specific mode to GUARD +0x16.
+            // FUN_1010_7594 later selects proximity (0) vs perception (1/2)
+            // from the same byte during attack eligibility checks.
+            guard.TransitionControl = profile.PerceptionMode;
 
             bindings[entity] = new Binding
             {
