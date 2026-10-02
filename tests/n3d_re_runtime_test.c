@@ -641,6 +641,9 @@ int main(void)
     fputs("92 W LEVELIMG LEVEL_UP Level exit\n", walls_test);
     fputs("93 W MIRRORIMG WARP_S2 Other Side mirror\n", walls_test);
     fputs("94 W TRIGIMG TRIGGER2 Trigger two\n", walls_test);
+    fputs("95 W SWIRLIMG WARP_S1 Swirling mirror\n", walls_test);
+    fputs("96 W LEVEL2IMG LEVEL_UP2 Skip level\n", walls_test);
+    fputs("97 W REDKEYIMG WARP_L1 Red key gate\n", walls_test);
     fputs("B7 W ACTIONIMG ACTIONSPOT Action spot\n", walls_test);
     fputs("BA W FLOORIMG FLOOR Floor marker\n", walls_test);
     fputs("E1 W RETREATIMG RETREAT Retreat marker\n", walls_test);
@@ -674,15 +677,15 @@ int main(void)
     fclose(objects_test);
 
     assert(N3D_RE_LoadEpisodeDefinitions(1));
-    assert(n3d_wall_definitions.count == 19);
+    assert(n3d_wall_definitions.count == 22);
     assert(n3d_object_definitions.count == 21);
 
     n3d_mapping_coverage wall_mapping_coverage =
         N3D_RE_WallMappingCoverage();
     n3d_mapping_coverage object_mapping_coverage =
         N3D_RE_ObjectMappingCoverage();
-    assert(wall_mapping_coverage.total == 19);
-    assert(wall_mapping_coverage.known == 18);
+    assert(wall_mapping_coverage.total == 22);
+    assert(wall_mapping_coverage.known == 21);
     assert(wall_mapping_coverage.unknown == 1);
     assert(object_mapping_coverage.total == 21);
     assert(object_mapping_coverage.known == 21);
@@ -1240,6 +1243,76 @@ int main(void)
     n3d_player.tile_y = 10;
     use_execution = N3D_RE_ExecuteUse(1);
     assert(use_execution.kind == N3D_USE_EXEC_OBJECT_DEFERRED);
+
+    /* LEVEL_UP / LEVEL_UP2 return the exact zero-based level delta request. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x92;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_LEVEL_CHANGE_REQUEST);
+    assert(use_execution.level_delta == 1);
+
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x96;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_LEVEL_CHANGE_REQUEST);
+    assert(use_execution.level_delta == 2);
+
+    /* WARP_L4 checks colored-key bit 3 and never consumes it here. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x91;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    n3d_player.colored_keys = 0;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_KEY_GATE_BLOCKED);
+    assert(use_execution.required_inventory_bit == 3);
+
+    n3d_player.colored_keys = 0x08;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_KEY_GATE_PASSED);
+    assert(use_execution.required_inventory_bit == 3);
+    assert(n3d_player.colored_keys == 0x08);
+
+    /* WARP_L1 uses bit 0. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x97;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    n3d_player.colored_keys = 0x01;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_KEY_GATE_PASSED);
+    assert(use_execution.required_inventory_bit == 0);
+
+    /* WARP_S1 requires all four pentagram bits. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x95;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    n3d_player.pentagrams = 0x07;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_PENTAGRAM_GATE_BLOCKED);
+
+    n3d_player.pentagrams = 0x0F;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_PENTAGRAM_GATE_PASSED);
+
+    /* WARP_S2 remains a known class with intentionally deferred effect. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x93;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_WALL_DEFERRED);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
