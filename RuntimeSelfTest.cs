@@ -14,6 +14,8 @@ namespace Nitemare3D
         public static void Run()
         {
             TestRecordSizes();
+            TestDamageMatrix();
+            TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
             TestGuardInitialProfiles();
@@ -31,6 +33,99 @@ namespace Nitemare3D
                 "OBJECT record must be 28 bytes.");
             Assert(Marshal.SizeOf<OriginalGuardRecord>() == 26,
                 "GUARD record must be 26 bytes.");
+            Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
+                "projectile record must be 42 bytes.");
+        }
+
+        static void TestDamageMatrix()
+        {
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x0C, (byte)OriginalWeaponSelector.SingleShotLaser) == 10,
+                "class 0x0C divide-8 transform mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x0D, (byte)OriginalWeaponSelector.MagicWand) == 40,
+                "class 0x0D Wand divide-2 transform mismatch.");
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x0D, (byte)OriginalWeaponSelector.SilverPistol) == 10,
+                "class 0x0D Silver divide-8 transform mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x0E, (byte)OriginalWeaponSelector.MagicWand) == 40,
+                "class 0x0E Wand divide-2 transform mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       512, 0x0F, (byte)OriginalWeaponSelector.SingleShotLaser) == 2,
+                "Baddie non-Wand divide-256 transform mismatch.");
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x0F, (byte)OriginalWeaponSelector.MagicWand) == 40,
+                "Baddie Wand divide-2 transform mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x12, (byte)OriginalWeaponSelector.MagicWand) == 20,
+                "gargoyle divide-4 transform mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x1A, (byte)OriginalWeaponSelector.MagicWand) == 40,
+                "Ghost Wand transform mismatch.");
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x1A, (byte)OriginalWeaponSelector.SilverPistol) == 0,
+                "Ghost non-Wand immunity mismatch.");
+
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 2) == 0,
+                "Hamerstein must be immune when gate != 3.");
+            Assert(OriginalDamage.ApplyClassWeaponTransform(
+                       80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 3) == 3,
+                "Hamerstein gate value 3 must yield literal damage 3.");
+        }
+
+        static void TestProjectileRuntime()
+        {
+            Assert(OriginalRuntime.MaxProjectiles == 8,
+                "original projectile pool capacity must be 8.");
+            Assert(OriginalRuntime.ProjectileRuntimeStride == 42,
+                "original projectile stride must be 42 bytes.");
+
+            Assert(OriginalProjectileRuntime.WeaponUsesProjectile(0),
+                "single-shot laser must use projectile pool.");
+            Assert(OriginalProjectileRuntime.WeaponUsesProjectile(1),
+                "Magic Wand must use projectile pool.");
+            Assert(!OriginalProjectileRuntime.WeaponUsesProjectile(2),
+                "Silver Pistol is hitscan and must not use projectile pool.");
+            Assert(OriginalProjectileRuntime.WeaponUsesProjectile(3),
+                "continuous laser must use projectile pool.");
+
+            Assert(OriginalProjectileRuntime.TryGetSequenceOffsets(
+                       1, out var wandOffsets) &&
+                   wandOffsets.Flight == 2 && wandOffsets.Impact == 3,
+                "Magic Wand projectile sequence offsets mismatch.");
+
+            Assert(OriginalProjectileRuntime.HitsGuard(9, -9, 0, 0),
+                "projectile guard hit tolerance must include +/-9.");
+            Assert(!OriginalProjectileRuntime.HitsGuard(10, 0, 0, 0),
+                "projectile guard hit tolerance must exclude 10.");
+
+            Assert(OriginalProjectileRuntime.NeedsProjection(21, 0, 0, 0),
+                "projectile projection threshold must trigger beyond 20.");
+            Assert(!OriginalProjectileRuntime.NeedsProjection(20, -20, 0, 0),
+                "projectile projection threshold must not trigger at +/-20.");
+
+            var pool = new OriginalProjectileRecord[OriginalRuntime.MaxProjectiles];
+            Assert(OriginalProjectileRuntime.FirstFreeSlot(pool) == 0,
+                "empty projectile pool must allocate slot 0.");
+            pool[0].State = (byte)OriginalProjectileState.Flying;
+            Assert(OriginalProjectileRuntime.FirstFreeSlot(pool) == 1,
+                "projectile pool must advance to next free slot.");
+
+            var projectile = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying
+            };
+            OriginalProjectileRuntime.EnterImpact(ref projectile);
+            Assert(projectile.State == (byte)OriginalProjectileState.Impact &&
+                   (projectile.RenderObject.Flags & 0x10) != 0,
+                "projectile impact transition mismatch.");
         }
 
         static void TestDelayState()
