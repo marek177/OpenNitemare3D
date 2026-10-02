@@ -518,10 +518,34 @@ int main(void)
         N3D_RE_FindDefinition(&n3d_object_definitions, 0x18);
     assert(push_def != NULL);
     assert(strcmp(push_def->class_name, "PUSH") == 0);
+    assert(N3D_RE_ObjectMappingKnown(0x18));
     assert(n3d_object_mapped_type[0x18] == 0x28);
-    assert(n3d_object_mapped_type[0x80] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(n3d_object_property_resolved[0x18] == 0x03);
+
+    assert(N3D_RE_ObjectMappingKnown(0x80));
+    assert(n3d_object_mapped_type[0x80] == 0x08);
+    assert(n3d_object_property_resolved[0x80] == 0x0B);
+
+    assert(!N3D_RE_WallMappingKnown(0x01));
     assert(n3d_wall_mapped_type[0x01] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(!N3D_RE_WallMappingKnown(0x70));
     assert(n3d_wall_mapped_type[0x70] == N3D_MAPPED_TYPE_UNKNOWN);
+
+    assert(N3D_RE_WallMappingKnown(184));
+    assert(n3d_wall_mapped_type[184] == 0x47);
+    assert(n3d_wall_property_resolved[184] == 0x40);
+
+    assert(N3D_RE_WallMappingKnown(185));
+    assert(n3d_wall_mapped_type[185] == 0x48);
+    assert(n3d_wall_property_resolved[185] == 0x40);
+
+    assert(N3D_RE_WallMappingKnown(254));
+    assert(n3d_wall_mapped_type[254] == 0x2E);
+    assert(n3d_wall_property_resolved[254] == 0x17);
+
+    assert(N3D_RE_WallMappingKnown(255));
+    assert(n3d_wall_mapped_type[255] == 0x2F);
+    assert(n3d_wall_property_resolved[255] == 0x17);
 
     remove("WALLS.1");
     remove("OBJECTS.1");
