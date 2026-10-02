@@ -119,14 +119,43 @@ namespace Nitemare3D
             Assert(OriginalProjectileRuntime.FirstFreeSlot(pool) == 1,
                 "projectile pool must advance to next free slot.");
 
-            var projectile = new OriginalProjectileRecord
-            {
-                State = (byte)OriginalProjectileState.Flying
-            };
-            OriginalProjectileRuntime.EnterImpact(ref projectile);
+            var projectile = new OriginalProjectileRecord();
+            Assert(OriginalProjectileRuntime.InitializeSpawn(
+                       ref projectile, 1, 100, 200, 10),
+                "Magic Wand projectile spawn must initialize.");
+            Assert(projectile.State == (byte)OriginalProjectileState.Flying &&
+                   projectile.RenderObject.Component03 == 0 &&
+                   projectile.RenderObject.DefinitionId == 12 &&
+                   projectile.RenderObject.Flags == 0x01 &&
+                   projectile.RenderObject.ObjectClass == 5 &&
+                   projectile.RenderObject.WorldX == 100 &&
+                   projectile.RenderObject.WorldY == 200 &&
+                   projectile.RenderObject.Runtime1A == 5,
+                "projectile spawn template mismatch.");
+
+            OriginalProjectileRuntime.AdvanceAnimationFrame(ref projectile, 2);
+            Assert(projectile.RenderObject.Component03 == 1,
+                "flight animation first frame advance mismatch.");
+            OriginalProjectileRuntime.AdvanceAnimationFrame(ref projectile, 2);
+            Assert(projectile.RenderObject.Component03 == 0,
+                "flight animation must loop.");
+
+            Assert(OriginalProjectileRuntime.EnterImpact(
+                       ref projectile, 1, 10),
+                "Magic Wand projectile impact transition must initialize.");
             Assert(projectile.State == (byte)OriginalProjectileState.Impact &&
+                   projectile.RenderObject.Component03 == 0 &&
+                   projectile.RenderObject.DefinitionId == 13 &&
                    (projectile.RenderObject.Flags & 0x10) != 0,
                 "projectile impact transition mismatch.");
+
+            OriginalProjectileRuntime.AdvanceAnimationFrame(ref projectile, 2);
+            Assert(projectile.State == (byte)OriginalProjectileState.Impact &&
+                   projectile.RenderObject.Component03 == 1,
+                "impact animation intermediate frame mismatch.");
+            OriginalProjectileRuntime.AdvanceAnimationFrame(ref projectile, 2);
+            Assert(projectile.State == (byte)OriginalProjectileState.Free,
+                "impact animation must free slot after final frame.");
         }
 
         static void TestDelayState()
