@@ -174,10 +174,10 @@ n3d_resolved_collision_result N3D_RE_TestResolvedLeadingEdgePair(
     if(!a || !b)
         return result;
 
-    if(!N3D_RE_WallMappingKnown(a->wall) ||
-       !N3D_RE_WallMappingKnown(b->wall) ||
-       !N3D_RE_ObjectMappingKnown(a->object) ||
-       !N3D_RE_ObjectMappingKnown(b->object))
+    if(!N3D_RE_WallPropertyKnown(a->wall) ||
+       !N3D_RE_WallPropertyKnown(b->wall) ||
+       !N3D_RE_ObjectPropertyKnown(a->object) ||
+       !N3D_RE_ObjectPropertyKnown(b->object))
     {
         /*
          * Modern safety rule: unresolved definition mapping is not silently
