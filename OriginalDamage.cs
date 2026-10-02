@@ -17,6 +17,14 @@ namespace Nitemare3D
         public byte StoredByte;
     }
 
+    public struct OriginalGuardAttackDamageResult
+    {
+        public int DistanceSeed;
+        public int ClassTransformed;
+        public int DifficultyTransformed;
+        public byte StoredByte;
+    }
+
     /// <summary>
     /// Confirmed player-to-GUARD damage producer recovered from NITE3W 1.10.
     /// The caller supplies the projected OBJECT baseline, RNG value and current
@@ -26,6 +34,88 @@ namespace Nitemare3D
     {
         public const byte HamersteinGateRequiredValue = 3;
         public const byte HamersteinBaseDamage = 3;
+
+        /// <summary>
+        /// Confirmed GUARD-to-player damage producer recovered from NITE3W 1.10.
+        /// distanceMetric is the positive result of the original tile-distance helper
+        /// (FUN_1018_32aa). Its exact metric is kept external until that helper is
+        /// independently closed. The class-0x16 boolean mirrors the original
+        /// (DAT_1048_7e52 == 3 || DAT_1048_51a6 != 0) gate.
+        /// </summary>
+        public static OriginalGuardAttackDamageResult ComputeGuardToPlayer(
+            int distanceMetric,
+            byte objectClass,
+            byte difficulty,
+            bool class16FullDamageGate,
+            ushort rngValue)
+        {
+            int seed = distanceMetric > 0 ? 100 / distanceMetric : 100;
+            int damage = ApplyGuardAttackClassTransform(
+                seed, objectClass, class16FullDamageGate, rngValue);
+
+            int classTransformed = damage;
+
+            // Enemy-to-player difficulty scaling is the inverse of the
+            // player-to-GUARD path: hard doubles, easy halves.
+            if (difficulty == 2)
+                damage *= 2;
+            else if (difficulty == 0)
+                damage /= 2;
+
+            return new OriginalGuardAttackDamageResult
+            {
+                DistanceSeed = seed,
+                ClassTransformed = classTransformed,
+                DifficultyTransformed = damage,
+                StoredByte = unchecked((byte)damage)
+            };
+        }
+
+        /// <summary>
+        /// Exact class switch from FUN_1010_A1EA after the 100/distance seed.
+        /// rngValue is consumed only by classes whose original branch sampled RNG.
+        /// </summary>
+        public static int ApplyGuardAttackClassTransform(
+            int distanceSeed,
+            byte objectClass,
+            bool class16FullDamageGate,
+            ushort rngValue)
+        {
+            switch (objectClass)
+            {
+                case 0x08:
+                    return rngValue & 0x07;
+
+                case 0x09:
+                case 0x0A:
+                    return rngValue & 0x0F;
+
+                case 0x0B:
+                    return distanceSeed / 4;
+
+                case 0x0C:
+                case 0x1D:
+                case 0x1E:
+                    return distanceSeed;
+
+                case 0x11:
+                case 0x12:
+                case 0x13:
+                case 0x14:
+                    return rngValue & 0x1F;
+
+                case 0x16:
+                    return class16FullDamageGate ? 100 : 0x21;
+
+                case 0x19:
+                    return 100;
+
+                // 0x0D-0x10, 0x15, 0x17-0x18, 0x1A-0x1C and
+                // the original default branch (including 0x1F) halve the seed.
+                default:
+                    return distanceSeed / 2;
+            }
+        }
 
         public static OriginalDamageResult ComputePlayerToGuard(
             short projectedBaseRow,
