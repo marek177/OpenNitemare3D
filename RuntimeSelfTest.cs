@@ -18,6 +18,7 @@ namespace Nitemare3D
             TestState13Movement();
             TestState07Decision();
             TestPainReturn();
+            TestDoorSelector();
             TestWakeCache();
 
             Console.WriteLine("OpenNitemare3D runtime self-test: PASS");
@@ -161,6 +162,25 @@ namespace Nitemare3D
                 "pain reaction completion must be handled.");
             Assert(guard.State == (byte)OriginalGuardState.Active07,
                 "state 15 must return through nextstate.");
+        }
+
+        static void TestDoorSelector()
+        {
+            byte[] wallIds = { 0x70, 0x77, 0x79, 0x80, 0x82, 0x83, 0xA3, 0xA6, 0xAD, 0xAE };
+            foreach (byte wallId in wallIds)
+            {
+                Assert(OriginalDoorSelector.TryGet(wallId, out byte selector),
+                    "known DOOR-family wall must produce selector.");
+                Assert(selector == wallId - OriginalDoorSelector.FirstDoorWallId,
+                    "DOOR selector arithmetic mismatch.");
+            }
+
+            Assert(!OriginalDoorSelector.TryGet(0x78, out _),
+                "gap 0x78 must not be classified as DOOR family.");
+            Assert(!OriginalDoorSelector.TryGet(0x81, out _),
+                "gap 0x81 must not be classified as DOOR family.");
+            Assert(!OriginalDoorSelector.TryGet(0xA7, out _),
+                "wall 0xA7 must not be classified as DOOR family.");
         }
 
         static void TestWakeCache()
