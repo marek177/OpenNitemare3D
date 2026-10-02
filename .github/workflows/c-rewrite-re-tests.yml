@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build isolated recovered runtime test
-        run: gcc -std=c11 -Wall -Wextra -Werror tests/n3d_re_runtime_test.c n3d_re_runtime.c n3d_re_guard.c -o n3d_re_runtime_test
+        run: gcc -std=c11 -Wall -Wextra -Werror tests/n3d_re_runtime_test.c n3d_re_runtime.c n3d_re_guard.c n3d_re_collision.c -o n3d_re_runtime_test
 
       - name: Run recovered runtime test
         run: ./n3d_re_runtime_test
