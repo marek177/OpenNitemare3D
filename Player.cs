@@ -231,7 +231,22 @@ namespace Nitemare3D
                         flipped = Level.tilemap[mapX, mapY].flip;
 
                         var hitWall = Level.tilemap[mapX, mapY];
-                        Automap.DiscoverWall(mapX, mapY, hitWall);
+
+                        Automap.VecOrientation mapOrientation;
+                        if (side == 0)
+                        {
+                            mapOrientation = step.X > 0
+                                ? Automap.VecOrientation.Left
+                                : Automap.VecOrientation.Right;
+                        }
+                        else
+                        {
+                            mapOrientation = step.Y > 0
+                                ? Automap.VecOrientation.Top
+                                : Automap.VecOrientation.Bottom;
+                        }
+
+                        Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
                         
 
                         
