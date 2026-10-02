@@ -10,8 +10,8 @@ namespace Nitemare3D
 
     /// <summary>
     /// Class-specific initialization assignments recovered from the Win16
-    /// guard creation path. PerceptionMode is kept as a neutral recovered value
-    /// until its destination field semantics are fully named.
+    /// guard creation path. PerceptionMode is the confirmed GUARD +0x16 selector:
+    /// 0 uses one-tile proximity while 1/2 use the perception/LOS result.
     /// </summary>
     public static class OriginalGuardProfiles
     {
