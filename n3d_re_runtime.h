@@ -32,6 +32,17 @@ typedef struct n3d_map_cell
     uint8_t object;
 } n3d_map_cell;
 
+/*
+ * Portable binding metadata. Original OBJECT+0x0C/+0x0E is a Win16 far
+ * pointer to the MAP cell; do not forge a segment value in reconstructed C.
+ */
+typedef struct n3d_object_binding
+{
+    uint8_t used;
+    uint8_t cell_x;
+    uint8_t cell_y;
+} n3d_object_binding;
+
 #pragma pack(push, 1)
 typedef struct n3d_object_record
 {
@@ -138,6 +149,7 @@ typedef struct n3d_guard_initial_profile
 
 extern n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
 extern n3d_object_record n3d_objects[N3D_MAX_OBJECTS];
+extern n3d_object_binding n3d_object_bindings[N3D_MAX_OBJECTS];
 extern n3d_guard_record n3d_guards[N3D_MAX_GUARDS];
 extern n3d_projectile_record n3d_projectiles[N3D_MAX_PROJECTILES];
 extern uint16_t n3d_object_count;
@@ -146,6 +158,12 @@ extern uint16_t n3d_guard_count;
 void N3D_RE_ResetRuntime(void);
 int N3D_RE_LoadMapPayload(const uint8_t* payload, size_t payload_size);
 const n3d_map_cell* N3D_RE_MapCell(uint8_t x, uint8_t y);
+int N3D_RE_FindObjectSlotByCell(uint8_t x, uint8_t y);
+int N3D_RE_InstantiateMapObject(
+    uint8_t map_object_id,
+    uint8_t tile_x,
+    uint8_t tile_y,
+    int* object_slot);
 int N3D_RE_GuardClassFromMapObject(uint8_t map_object_id, uint8_t* object_class);
 n3d_guard_initial_profile N3D_RE_GuardInitialProfile(uint8_t object_class);
 int N3D_RE_RegisterGuardFromMap(uint8_t map_object_id, uint8_t tile_x, uint8_t tile_y);
