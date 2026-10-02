@@ -1172,7 +1172,7 @@ int main(void)
     pickup_payload[pickup_silver_cell * N3D_MAP_CELL_BYTES + 1] = 0x29;
     pickup_payload[pickup_laser_cell * N3D_MAP_CELL_BYTES + 1] = 0x2A;
     pickup_payload[pickup_wand_cell * N3D_MAP_CELL_BYTES + 1] = 0x2B;
-    pickup_payload[pickup_deferred_cell * N3D_MAP_CELL_BYTES + 1] = 0x12;
+    pickup_payload[pickup_deferred_cell * N3D_MAP_CELL_BYTES + 1] = 0x2C;
 
     assert(N3D_RE_LoadMapPayload(pickup_payload, sizeof(pickup_payload)));
     n3d_player.colored_keys = 0;
@@ -1247,7 +1247,7 @@ int main(void)
 
     pickup_result = N3D_RE_ApplyPickupAtCell(7, 7);
     assert(pickup_result.kind == N3D_PICKUP_DEFERRED);
-    assert(pickup_result.object_class == 0x33);
+    assert(pickup_result.object_class == 0x3D);
 
     assert(N3D_RE_ApplyPickupAtCell(63, 63).kind ==
            N3D_PICKUP_UNRESOLVED);
