@@ -95,15 +95,18 @@ n3d_use_target N3D_RE_ClassifyUseTarget(uint8_t octant)
     target.raw_wall_id = cell->wall;
     target.raw_object_id = cell->object;
 
-    if(!N3D_RE_WallMappingKnown(cell->wall) ||
-       !N3D_RE_ObjectMappingKnown(cell->object))
+    if(!N3D_RE_WallPropertyKnown(cell->wall) ||
+       !N3D_RE_ObjectPropertyKnown(cell->object))
     {
         target.kind = N3D_USE_UNRESOLVED;
         return target;
     }
 
-    target.mapped_wall_type = n3d_wall_mapped_type[cell->wall];
-    target.mapped_object_type = n3d_object_mapped_type[cell->object];
+    if(N3D_RE_WallMappingKnown(cell->wall))
+        target.mapped_wall_type = n3d_wall_mapped_type[cell->wall];
+
+    if(N3D_RE_ObjectMappingKnown(cell->object))
+        target.mapped_object_type = n3d_object_mapped_type[cell->object];
 
     if(n3d_wall_property_resolved[cell->wall] & 0x08)
     {
@@ -111,9 +114,21 @@ n3d_use_target N3D_RE_ClassifyUseTarget(uint8_t octant)
         return target;
     }
 
+    if(!N3D_RE_WallMappingKnown(cell->wall))
+    {
+        target.kind = N3D_USE_UNRESOLVED;
+        return target;
+    }
+
     if(target.mapped_wall_type != 0)
     {
         target.kind = N3D_USE_MAPPED_WALL;
+        return target;
+    }
+
+    if(cell->object != 0 && !N3D_RE_ObjectMappingKnown(cell->object))
+    {
+        target.kind = N3D_USE_UNRESOLVED;
         return target;
     }
 
