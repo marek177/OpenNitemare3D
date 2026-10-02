@@ -104,24 +104,31 @@ namespace Nitemare3D
 
         void OnTouchPlayer()
         {
+            if (!visible) return;
             switch (type)
             {
                 case PickupType.RedKey:
+                    Game.player.coloredKeyMask = RecoveredInventory.GrantBit(Game.player.coloredKeyMask, 0);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.GreenKey:
+                    Game.player.coloredKeyMask = RecoveredInventory.GrantBit(Game.player.coloredKeyMask, 1);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.BlueKey:
+                    Game.player.coloredKeyMask = RecoveredInventory.GrantBit(Game.player.coloredKeyMask, 2);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowKey:
+                    Game.player.coloredKeyMask = RecoveredInventory.GrantBit(Game.player.coloredKeyMask, 3);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedIDCard:
+                    Game.player.idCardMask = RecoveredInventory.GrantBit(Game.player.idCardMask, 0);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowIDCard:
+                    Game.player.idCardMask = RecoveredInventory.GrantBit(Game.player.idCardMask, 1);
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedPotion:

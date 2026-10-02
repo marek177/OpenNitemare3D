@@ -29,6 +29,8 @@ namespace Nitemare3D
     public class Player : Entity
     {
         public int health = 100;
+        public byte coloredKeyMask;
+        public byte idCardMask;
 
 
         public Vec2 plane = new Vec2(0, .8f);
