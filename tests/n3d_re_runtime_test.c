@@ -1146,6 +1146,101 @@ int main(void)
     assert(use_target.kind == N3D_USE_MAPPED_OBJECT);
     assert(use_target.mapped_object_type == 0x08);
 
+    /* Execute exact USE effects that are already closed by RE evidence. */
+    uint8_t use_payload[N3D_MAP_LEVEL_BYTES] = {0};
+    const int adjacent_cell = 10 * N3D_MAP_WIDTH + 11;
+    const int push_destination_cell = 10 * N3D_MAP_WIDTH + 12;
+
+    /* PANEL: OBJECTS class SECRET -> mapped object type 0x03. */
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x62;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+
+    n3d_use_execution use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_PANEL_ACTIVATED);
+    assert(use_execution.event_id == N3D_PANEL_USE_EVENT);
+    assert(use_execution.runtime_slot >= 0);
+    assert(N3D_RE_PanelActivation(
+        &n3d_panels[use_execution.runtime_slot]) == 2);
+
+    /* PUSH: empty destination starts 8 x 8-unit movement. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x18;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_PUSH_STARTED);
+    assert(use_execution.runtime_slot >= 0);
+    assert(n3d_pushes[use_execution.runtime_slot].steps_remaining == 8);
+
+    const int pushed_object_slot = N3D_RE_FindObjectSlotByCell(11, 10);
+    assert(pushed_object_slot >= 0);
+    const int16_t push_start_x = n3d_objects[pushed_object_slot].world_x;
+    const int16_t push_start_y = n3d_objects[pushed_object_slot].world_y;
+
+    for(int i = 0; i < 8; ++i)
+    {
+        int completed = 0;
+        assert(N3D_RE_StepPushObject(
+            use_execution.runtime_slot, &completed));
+        assert(completed == (i == 7));
+    }
+
+    assert(n3d_objects[pushed_object_slot].world_x == push_start_x + 64);
+    assert(n3d_objects[pushed_object_slot].world_y == push_start_y);
+    assert(n3d_pushes[use_execution.runtime_slot].steps_remaining == 0);
+
+    /* A confirmed blocking wall in the destination rejects the push. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x18;
+    use_payload[push_destination_cell * N3D_MAP_CELL_BYTES] = 0x01;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_PUSH_BLOCKED);
+
+    /* Unknown destination mapping is kept unresolved instead of guessed. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x18;
+    use_payload[push_destination_cell * N3D_MAP_CELL_BYTES] = 0x71;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_UNRESOLVED);
+
+    /* Door target is linked, but ordinary door transition remains deferred. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x70;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_DOOR_DEFERRED);
+    assert(use_execution.runtime_slot ==
+           N3D_RE_FindDoorSlotByCell(11, 10));
+
+    /* Known wall/object families without closed effects stay explicit deferred. */
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x92;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_WALL_DEFERRED);
+
+    memset(use_payload, 0, sizeof(use_payload));
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x05;
+    assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+    use_execution = N3D_RE_ExecuteUse(1);
+    assert(use_execution.kind == N3D_USE_EXEC_OBJECT_DEFERRED);
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
