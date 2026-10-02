@@ -44,6 +44,8 @@ namespace Nitemare3D
         public const int ObjectRuntimeStride = 28;
         public const int MaxGuards = 100;
         public const int GuardRuntimeStride = 26;
+        public const int MaxProjectiles = 8;
+        public const int ProjectileRuntimeStride = 42;
         public const int MaxVectors = 1000;
         public const int VectorRuntimeStride = 28;
         public const int VectorListOrientations = 4;
