@@ -1,6 +1,11 @@
 //handles thinking for every map object
 #ifndef G_THINK
 #define G_THINK
+
 #include "p_think.h"
+#include "n3d_re_guard.h"
+
 void G_HandleThinking();
+void G_HandleRecoveredGuardThinking();
+
 #endif
