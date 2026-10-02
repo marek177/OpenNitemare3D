@@ -5,6 +5,7 @@
 #include "../n3d_re_projectile.h"
 #include "../n3d_re_combat.h"
 #include "../n3d_re_definitions.h"
+#include "../n3d_re_door.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -594,6 +595,60 @@ int main(void)
 
     remove("WALLS.1");
     remove("OBJECTS.1");
+
+    assert(sizeof(n3d_door_record) == 22);
+    N3D_RE_ResetDoors();
+    assert(n3d_door_count == 0);
+
+    n3d_door_record door = {{0}};
+    N3D_RE_SetDoorStateValue(&door, 0);
+    assert(N3D_RE_DoorRecordAllowsPassage(&door));
+    N3D_RE_SetDoorStateValue(&door, 4);
+    assert(N3D_RE_DoorRecordAllowsPassage(&door));
+    N3D_RE_SetDoorStateValue(&door, 1);
+    assert(!N3D_RE_DoorRecordAllowsPassage(&door));
+    N3D_RE_SetDoorStateValue(&door, 2);
+    assert(!N3D_RE_DoorRecordAllowsPassage(&door));
+    N3D_RE_SetDoorStateValue(&door, 3);
+    assert(!N3D_RE_DoorRecordAllowsPassage(&door));
+
+    memset(&door, 0, sizeof(door));
+    N3D_RE_SetDoorStateValue(&door, 1);
+    assert(N3D_RE_ApplyRemoteDoorCommand(&door, 0x1E));
+    assert(N3D_RE_DoorStateValue(&door) == 2);
+    assert(N3D_RE_DoorTransitionFlag(&door) == 1);
+
+    memset(&door, 0, sizeof(door));
+    N3D_RE_SetDoorStateValue(&door, 3);
+    assert(N3D_RE_ApplyRemoteDoorCommand(&door, 0x1E));
+    assert(N3D_RE_DoorStateValue(&door) == 2);
+    assert(N3D_RE_DoorTransitionFlag(&door) == 1);
+
+    memset(&door, 0, sizeof(door));
+    N3D_RE_SetDoorStateValue(&door, 0);
+    assert(N3D_RE_ApplyRemoteDoorCommand(&door, 0x1F));
+    assert(N3D_RE_DoorStateValue(&door) == 3);
+    assert(N3D_RE_DoorTransitionFlag(&door) == 1);
+
+    memset(&door, 0, sizeof(door));
+    N3D_RE_SetDoorStateValue(&door, 2);
+    assert(N3D_RE_ApplyRemoteDoorCommand(&door, 0x1F));
+    assert(N3D_RE_DoorStateValue(&door) == 3);
+    assert(N3D_RE_DoorTransitionFlag(&door) == 1);
+
+    memset(&door, 0, sizeof(door));
+    N3D_RE_SetDoorStateValue(&door, 0);
+    assert(!N3D_RE_ApplyRemoteDoorCommand(&door, 0x1E));
+    assert(N3D_RE_DoorStateValue(&door) == 0);
+    assert(N3D_RE_DoorTransitionFlag(&door) == 0);
+    assert(!N3D_RE_ApplyRemoteDoorCommand(&door, 0x20));
+
+    n3d_door_count = 1;
+    n3d_doors[0] = door;
+    N3D_RE_ResetRuntime();
+    assert(n3d_door_count == 0);
+    assert(N3D_RE_DoorStateValue(&n3d_doors[0]) == 0);
+    assert(N3D_RE_DoorTransitionFlag(&n3d_doors[0]) == 0);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
