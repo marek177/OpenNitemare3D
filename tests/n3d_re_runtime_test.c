@@ -135,6 +135,53 @@ int main(void)
     assert(n3d_guards[1].timer >= 0 && n3d_guards[1].timer <= 7);
     assert(N3D_RE_WakeGuards(5, &rng_state) == 0);
 
+    n3d_guard_record state_guard = {0};
+    state_guard.state = N3D_GUARD_STATE_01;
+    state_guard.timer = 2;
+    assert(N3D_RE_TickState01(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_01 && state_guard.timer == 1);
+    assert(N3D_RE_TickState01(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_02 && state_guard.timer == 0);
+
+    state_guard.state = N3D_GUARD_STATE_00;
+    state_guard.next_state = N3D_GUARD_STATE_07;
+    assert(N3D_RE_CompleteDeferredState(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_07);
+
+    state_guard.state = N3D_GUARD_STATE_12;
+    state_guard.next_state = N3D_GUARD_STATE_02;
+    assert(N3D_RE_CompleteDeferredState(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_02);
+
+    state_guard.state = N3D_GUARD_STATE_06;
+    assert(N3D_RE_CompleteState06(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_03);
+
+    state_guard.state = N3D_GUARD_STATE_11;
+    state_guard.strategy = 2;
+    assert(N3D_RE_CompleteState11(&state_guard));
+    assert(state_guard.strategy == 0 && state_guard.state == N3D_GUARD_STATE_07);
+
+    state_guard.state = N3D_GUARD_STATE_PAIN;
+    state_guard.next_state = N3D_GUARD_STATE_07;
+    assert(N3D_RE_CompletePainState15(&state_guard));
+    assert(state_guard.state == N3D_GUARD_STATE_07);
+
+    state_guard.state = N3D_GUARD_STATE_07;
+    state_guard.strategy = 0;
+    assert(N3D_RE_ResolveState07Perception(&state_guard, 1, 1, 0));
+    assert(state_guard.state == N3D_GUARD_STATE_07);
+    assert(N3D_RE_ResolveState07Perception(&state_guard, 0, 1, 0));
+    assert(state_guard.state == N3D_GUARD_STATE_02);
+
+    state_guard.state = N3D_GUARD_STATE_07;
+    state_guard.strategy = 3;
+    state_guard.octant = 3;
+    assert(N3D_RE_ResolveState07Perception(&state_guard, 0, 1, 1));
+    assert(state_guard.state == N3D_GUARD_STATE_TIMED_DIRECTIONAL_MOVE);
+    assert(state_guard.timer == 9);
+    assert(state_guard.move_x == 0 && state_guard.move_y == 8);
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
