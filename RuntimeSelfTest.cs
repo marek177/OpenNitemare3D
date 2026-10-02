@@ -15,6 +15,9 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestDamageMatrix();
+            TestGuardToPlayerDamage();
+            TestPackedGuardSequences();
+            TestAttackGate();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -79,6 +82,140 @@ namespace Nitemare3D
             Assert(OriginalDamage.ApplyClassWeaponTransform(
                        80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 3) == 3,
                 "Hamerstein gate value 3 must yield literal damage 3.");
+        }
+
+        static void TestGuardToPlayerDamage()
+        {
+            var normal = OriginalDamage.ComputeGuardToPlayer(
+                5, 0x0C, 1, false, 0);
+            Assert(normal.DistanceSeed == 20 &&
+                   normal.ClassTransformed == 20 &&
+                   normal.DifficultyTransformed == 20 &&
+                   normal.StoredByte == 20,
+                "GUARD-to-player normal damage seed mismatch.");
+
+            var hardRandom = OriginalDamage.ComputeGuardToPlayer(
+                10, 0x08, 2, false, 7);
+            Assert(hardRandom.ClassTransformed == 7 &&
+                   hardRandom.DifficultyTransformed == 14,
+                "class 0x08 RNG/hard scaling mismatch.");
+
+            var easyQuarter = OriginalDamage.ComputeGuardToPlayer(
+                1, 0x0B, 0, false, 0);
+            Assert(easyQuarter.DistanceSeed == 100 &&
+                   easyQuarter.ClassTransformed == 25 &&
+                   easyQuarter.DifficultyTransformed == 12,
+                "class 0x0B quarter/easy scaling mismatch.");
+
+            Assert(OriginalDamage.ComputeGuardToPlayer(
+                       1, 0x16, 1, false, 0).DifficultyTransformed == 0x21,
+                "class 0x16 normal gate damage must be 33.");
+            Assert(OriginalDamage.ComputeGuardToPlayer(
+                       1, 0x16, 1, true, 0).DifficultyTransformed == 100,
+                "class 0x16 full-damage gate must be 100.");
+
+            Assert(OriginalDamage.ComputeGuardToPlayer(
+                       1, 0x19, 2, false, 0).DifficultyTransformed == 200,
+                "class 0x19 hard damage must be 200.");
+
+            Assert(OriginalDamage.ComputeGuardToPlayer(
+                       4, 0x1F, 1, false, 0).DifficultyTransformed == 12,
+                "class 0x1F must follow the original default half-seed branch.");
+        }
+
+        static void TestPackedGuardSequences()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active02
+            };
+            var obj = new OriginalObjectRecord();
+
+            Assert(OriginalGuardDispatcher.BeginState02AlertSequence(
+                       ref guard, ref obj, 0x0412) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "state 02 alert sequence should transition.");
+            Assert(guard.DefinitionValue == 0x0412 &&
+                   obj.Component03 == 0x12 &&
+                   guard.Timer == 3 &&
+                   guard.State == (byte)OriginalGuardState.AnimationTimer &&
+                   guard.NextState == (byte)OriginalGuardState.Detection03,
+                "state 02 packed sequence fields mismatch.");
+
+            Assert(OriginalGuardDispatcher.CompleteDeferredState(ref guard) ==
+                   OriginalGuardDispatchResult.Completed &&
+                   guard.State == (byte)OriginalGuardState.Detection03,
+                "state 02 sequence must return through state 03.");
+
+            Assert(OriginalGuardDispatcher.BeginState03AttackSequence(
+                       ref guard, ref obj, 0x0320) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "state 03 attack sequence should transition.");
+            Assert(obj.Component03 == 0x20 &&
+                   guard.Timer == 2 &&
+                   guard.NextState == (byte)OriginalGuardState.DetectionAttack04,
+                "state 03 packed sequence fields mismatch.");
+
+            OriginalGuardDispatcher.CompleteDeferredState(ref guard);
+            Assert(guard.State == (byte)OriginalGuardState.DetectionAttack04,
+                "state 03 sequence must return through state 04.");
+
+            Assert(OriginalGuardDispatcher.BeginState04RecoverySequence(
+                       ref guard, ref obj, 0x0230) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "state 04 recovery sequence should transition.");
+            Assert(obj.Component03 == 0x30 &&
+                   guard.Timer == 1 &&
+                   guard.NextState == (byte)OriginalGuardState.Transition05,
+                "state 04 packed sequence fields mismatch.");
+
+            OriginalGuardDispatcher.CompleteDeferredState(ref guard);
+            Assert(guard.State == (byte)OriginalGuardState.Transition05,
+                "state 04 sequence must return through state 05.");
+        }
+
+        static void TestAttackGate()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                TransitionControl = 0
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 200
+            };
+
+            Assert(OriginalGuardDispatcher.TryEvaluateAttackGate(
+                       ref guard, ref obj, 164, 264, false, out bool adjacent) &&
+                   adjacent &&
+                   guard.Unknown17 == 0 &&
+                   guard.Unknown18 == 1,
+                "attack mode 0 must use one-tile proximity.");
+
+            Assert(OriginalGuardDispatcher.TryEvaluateAttackGate(
+                       ref guard, ref obj, 165, 264, true, out bool outside) &&
+                   !outside &&
+                   guard.Unknown17 == 1 &&
+                   guard.Unknown18 == 0,
+                "attack mode 0 must ignore perception outside one tile.");
+
+            guard.TransitionControl = 1;
+            Assert(OriginalGuardDispatcher.TryEvaluateAttackGate(
+                       ref guard, ref obj, 300, 400, true, out bool visible) &&
+                   visible,
+                "attack mode 1 must use perception result.");
+
+            guard.TransitionControl = 2;
+            Assert(OriginalGuardDispatcher.TryEvaluateAttackGate(
+                       ref guard, ref obj, 300, 400, false, out bool hidden) &&
+                   !hidden,
+                "attack mode 2 must use perception result.");
+
+            guard.TransitionControl = 3;
+            Assert(!OriginalGuardDispatcher.TryEvaluateAttackGate(
+                       ref guard, ref obj, 100, 200, true, out _),
+                "unrecovered attack modes above 2 must stay rejected.");
         }
 
         static void TestProjectileRuntime()
