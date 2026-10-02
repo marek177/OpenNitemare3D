@@ -330,6 +330,81 @@ int N3D_RE_ObjectMappingKnown(uint8_t raw_id)
     return n3d_object_mapping_known[raw_id] != 0;
 }
 
+static n3d_mapping_coverage N3D_RE_MappingCoverage(
+    const n3d_definition_table* table,
+    const uint8_t known[N3D_DEFINITION_COUNT])
+{
+    n3d_mapping_coverage coverage = {0, 0, 0};
+
+    if(!table || !known)
+        return coverage;
+
+    for(int id = 0; id < N3D_DEFINITION_COUNT; ++id)
+    {
+        if(!table->record[id].present)
+            continue;
+
+        ++coverage.total;
+        if(known[id])
+            ++coverage.known;
+        else
+            ++coverage.unknown;
+    }
+
+    return coverage;
+}
+
+n3d_mapping_coverage N3D_RE_WallMappingCoverage(void)
+{
+    return N3D_RE_MappingCoverage(
+        &n3d_wall_definitions,
+        n3d_wall_mapping_known);
+}
+
+n3d_mapping_coverage N3D_RE_ObjectMappingCoverage(void)
+{
+    return N3D_RE_MappingCoverage(
+        &n3d_object_definitions,
+        n3d_object_mapping_known);
+}
+
+static void N3D_RE_DumpUnresolvedTable(
+    const char* label,
+    const n3d_definition_table* table,
+    const uint8_t known[N3D_DEFINITION_COUNT])
+{
+    if(!label || !table || !known)
+        return;
+
+    for(int id = 0; id < N3D_DEFINITION_COUNT; ++id)
+    {
+        const n3d_definition_record* record = &table->record[id];
+        if(!record->present || known[id])
+            continue;
+
+        printf(
+            "UNRESOLVED %s raw=%02X class=%s image=%s desc=%s\n",
+            label,
+            id,
+            record->class_name,
+            record->image_name,
+            record->description);
+    }
+}
+
+void N3D_RE_DumpUnresolvedMappings(void)
+{
+    N3D_RE_DumpUnresolvedTable(
+        "WALL",
+        &n3d_wall_definitions,
+        n3d_wall_mapping_known);
+
+    N3D_RE_DumpUnresolvedTable(
+        "OBJECT",
+        &n3d_object_definitions,
+        n3d_object_mapping_known);
+}
+
 int N3D_RE_LoadEpisodeDefinitions(uint8_t episode)
 {
     n3d_definition_episode = episode;
