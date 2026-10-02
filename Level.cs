@@ -12,6 +12,17 @@ namespace Nitemare3D
         public static int levelCount;
 
         public static Tile[,] tilemap = new Tile[64, 64];
+        public static byte[] wallClassById = new byte[256];
+
+        public static byte GetWallClass(byte wallID)
+        {
+            return wallClassById[wallID];
+        }
+
+        public static byte GetWallClass(Tile tile)
+        {
+            return tile == null ? (byte)0 : GetWallClass(tile.wallID);
+        }
 
         static void SpawnMapObject(int id, int x, int y)
         {
@@ -1028,6 +1039,7 @@ namespace Nitemare3D
             }
             tile.x = (byte)x;
             tile.y = (byte)y;
+            tile.wallID = (byte)id;
             tile.type = type;
             tile.textureID = texture;
             tilemap[x,y] = tile;
@@ -1066,8 +1078,15 @@ namespace Nitemare3D
         {
             var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
 
+            map.BaseStream.Position = 2;
+            wallClassById = map.ReadBytes(256);
+            if (wallClassById.Length != 256)
+            {
+                throw new InvalidDataException("MAP wall-class header is truncated.");
+            }
+
             map.BaseStream.Position = 514;
-            var data = map.ReadBytes((int)map.BaseStream.Length);
+            var data = map.ReadBytes((int)(map.BaseStream.Length - 514));
 
             int x = 0, y = 0;
             int j = 0;
