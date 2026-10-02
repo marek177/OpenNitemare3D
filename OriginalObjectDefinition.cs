@@ -4,12 +4,15 @@ using System.Runtime.InteropServices;
 namespace Nitemare3D
 {
     /// <summary>
-    /// Known byte-exact slice of the 0x5A-byte per-level object-definition block
-    /// allocated by FUN_1010_4C8A. Unknown fields intentionally remain unnamed.
+    /// Byte-exact known tail of the 0x5A-byte IMG definition record used by
+    /// OBJECT +0x04. FUN_1010_4B86 selects the object bank by adding 0x100
+    /// before multiplying by 0x5A.
     /// </summary>
     [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.ObjectDefinitionBytes)]
     public struct OriginalObjectDefinitionRecord
     {
+        [FieldOffset(0x02)] public byte FrameCount;
+
         [FieldOffset(OriginalRuntime.ObjectDefinitionAlertSequenceOffset)]
         public ushort AlertSequence;
 
@@ -18,13 +21,65 @@ namespace Nitemare3D
 
         [FieldOffset(OriginalRuntime.ObjectDefinitionRecoverySequenceOffset)]
         public ushort RecoverySequence;
+
+        [FieldOffset(0x3A)] public ushort ReactionSequence0;
+        [FieldOffset(0x3C)] public ushort ReactionSequence1;
+        [FieldOffset(0x3E)] public ushort ReactionSequence2;
+        [FieldOffset(0x40)] public ushort ReactionSequence3;
+        [FieldOffset(0x42)] public ushort ReactionSequence4;
+        [FieldOffset(0x44)] public ushort ReactionSequence5;
+        [FieldOffset(0x46)] public ushort ReactionSequence6;
+        [FieldOffset(0x48)] public ushort ReactionSequence7;
+
+        [FieldOffset(0x4A)] public ushort DeathSequence0;
+        [FieldOffset(0x4C)] public ushort DeathSequence1;
+        [FieldOffset(0x4E)] public ushort DeathSequence2;
+        [FieldOffset(0x50)] public ushort DeathSequence3;
+        [FieldOffset(0x52)] public ushort DeathSequence4;
+        [FieldOffset(0x54)] public ushort DeathSequence5;
+        [FieldOffset(0x56)] public ushort DeathSequence6;
+        [FieldOffset(0x58)] public ushort DeathSequence7;
+
+        public bool TryGetReactionSequence(int selector, out ushort sequence)
+        {
+            switch (selector)
+            {
+                case 0: sequence = ReactionSequence0; return sequence != 0;
+                case 1: sequence = ReactionSequence1; return sequence != 0;
+                case 2: sequence = ReactionSequence2; return sequence != 0;
+                case 3: sequence = ReactionSequence3; return sequence != 0;
+                case 4: sequence = ReactionSequence4; return sequence != 0;
+                case 5: sequence = ReactionSequence5; return sequence != 0;
+                case 6: sequence = ReactionSequence6; return sequence != 0;
+                case 7: sequence = ReactionSequence7; return sequence != 0;
+                default:
+                    sequence = 0;
+                    return false;
+            }
+        }
+
+        public bool TryGetDeathSequence(int selector, out ushort sequence)
+        {
+            switch (selector)
+            {
+                case 0: sequence = DeathSequence0; return sequence != 0;
+                case 1: sequence = DeathSequence1; return sequence != 0;
+                case 2: sequence = DeathSequence2; return sequence != 0;
+                case 3: sequence = DeathSequence3; return sequence != 0;
+                case 4: sequence = DeathSequence4; return sequence != 0;
+                case 5: sequence = DeathSequence5; return sequence != 0;
+                case 6: sequence = DeathSequence6; return sequence != 0;
+                case 7: sequence = DeathSequence7; return sequence != 0;
+                default:
+                    sequence = 0;
+                    return false;
+            }
+        }
     }
 
     /// <summary>
-    /// Mirrors the original per-level definition-index behavior without guessing
-    /// the upstream resource resolver. The caller supplies the original-equivalent
-    /// resource key and exact 0x5A-byte block. Equal source keys deduplicate to one
-    /// byte-sized DefinitionId, matching OBJECT +0x04.
+    /// Mirrors FUN_1010_4C8A's per-level definition deduplication. Equal source
+    /// keys collapse to one byte-sized DefinitionId, matching OBJECT +0x04.
     /// </summary>
     public sealed class OriginalObjectDefinitionCatalog
     {
@@ -84,20 +139,65 @@ namespace Nitemare3D
             {
                 case OriginalGuardState.Active02:
                     packedSequence = definition.AlertSequence;
-                    return true;
+                    return packedSequence != 0;
 
                 case OriginalGuardState.Detection03:
                     packedSequence = definition.AttackSequence;
-                    return true;
+                    return packedSequence != 0;
 
                 case OriginalGuardState.DetectionAttack04:
                     packedSequence = definition.RecoverySequence;
-                    return true;
+                    return packedSequence != 0;
 
                 default:
                     packedSequence = 0;
                     return false;
             }
+        }
+
+        public bool TryGetReactionSequence(
+            byte definitionId,
+            int selector,
+            out ushort packedSequence)
+        {
+            if (TryGet(definitionId, out var definition))
+                return definition.TryGetReactionSequence(selector, out packedSequence);
+
+            packedSequence = 0;
+            return false;
+        }
+
+        public bool TryGetDeathSequence(
+            byte definitionId,
+            int selector,
+            out ushort packedSequence)
+        {
+            if (TryGet(definitionId, out var definition))
+                return definition.TryGetDeathSequence(selector, out packedSequence);
+
+            packedSequence = 0;
+            return false;
+        }
+
+        public bool TryGetOrAdd(
+            uint sourceKey,
+            OriginalObjectDefinitionRecord definition,
+            out byte definitionId)
+        {
+            if (TryFindBySourceKey(sourceKey, out definitionId))
+                return true;
+
+            if (Count >= OriginalRuntime.MaxObjectDefinitions)
+            {
+                definitionId = 0;
+                return false;
+            }
+
+            definitionId = (byte)Count;
+            sourceKeys[Count] = sourceKey;
+            definitions[Count] = definition;
+            Count++;
+            return true;
         }
 
         public bool TryGetOrAdd(
@@ -109,18 +209,13 @@ namespace Nitemare3D
                 return true;
 
             if (block == null ||
-                block.Length < OriginalRuntime.ObjectDefinitionBytes ||
-                Count >= OriginalRuntime.MaxObjectDefinitions)
+                block.Length < OriginalRuntime.ObjectDefinitionBytes)
             {
                 definitionId = 0;
                 return false;
             }
 
-            definitionId = (byte)Count;
-            sourceKeys[Count] = sourceKey;
-            definitions[Count] = Parse(block, 0);
-            Count++;
-            return true;
+            return TryGetOrAdd(sourceKey, Parse(block, 0), out definitionId);
         }
 
         public static OriginalObjectDefinitionRecord Parse(byte[] block, int offset)
@@ -135,15 +230,26 @@ namespace Nitemare3D
 
             return new OriginalObjectDefinitionRecord
             {
-                AlertSequence = ReadUInt16LittleEndian(
-                    block,
-                    offset + OriginalRuntime.ObjectDefinitionAlertSequenceOffset),
-                AttackSequence = ReadUInt16LittleEndian(
-                    block,
-                    offset + OriginalRuntime.ObjectDefinitionAttackSequenceOffset),
-                RecoverySequence = ReadUInt16LittleEndian(
-                    block,
-                    offset + OriginalRuntime.ObjectDefinitionRecoverySequenceOffset)
+                FrameCount = block[offset + 0x02],
+                AlertSequence = ReadUInt16LittleEndian(block, offset + 0x34),
+                AttackSequence = ReadUInt16LittleEndian(block, offset + 0x36),
+                RecoverySequence = ReadUInt16LittleEndian(block, offset + 0x38),
+                ReactionSequence0 = ReadUInt16LittleEndian(block, offset + 0x3A),
+                ReactionSequence1 = ReadUInt16LittleEndian(block, offset + 0x3C),
+                ReactionSequence2 = ReadUInt16LittleEndian(block, offset + 0x3E),
+                ReactionSequence3 = ReadUInt16LittleEndian(block, offset + 0x40),
+                ReactionSequence4 = ReadUInt16LittleEndian(block, offset + 0x42),
+                ReactionSequence5 = ReadUInt16LittleEndian(block, offset + 0x44),
+                ReactionSequence6 = ReadUInt16LittleEndian(block, offset + 0x46),
+                ReactionSequence7 = ReadUInt16LittleEndian(block, offset + 0x48),
+                DeathSequence0 = ReadUInt16LittleEndian(block, offset + 0x4A),
+                DeathSequence1 = ReadUInt16LittleEndian(block, offset + 0x4C),
+                DeathSequence2 = ReadUInt16LittleEndian(block, offset + 0x4E),
+                DeathSequence3 = ReadUInt16LittleEndian(block, offset + 0x50),
+                DeathSequence4 = ReadUInt16LittleEndian(block, offset + 0x52),
+                DeathSequence5 = ReadUInt16LittleEndian(block, offset + 0x54),
+                DeathSequence6 = ReadUInt16LittleEndian(block, offset + 0x56),
+                DeathSequence7 = ReadUInt16LittleEndian(block, offset + 0x58)
             };
         }
 
