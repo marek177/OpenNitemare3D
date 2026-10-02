@@ -13,6 +13,13 @@ namespace Nitemare3D
     {
         [FieldOffset(0x02)] public byte FrameCount;
 
+        [FieldOffset(0x04)] public ulong DirectionalA0To3;
+        [FieldOffset(0x0C)] public ulong DirectionalA4To7;
+        [FieldOffset(0x14)] public ulong DirectionalB0To3;
+        [FieldOffset(0x1C)] public ulong DirectionalB4To7;
+        [FieldOffset(0x24)] public ulong DirectionalC0To3;
+        [FieldOffset(0x2C)] public ulong DirectionalC4To7;
+
         [FieldOffset(OriginalRuntime.ObjectDefinitionAlertSequenceOffset)]
         public ushort AlertSequence;
 
@@ -39,6 +46,43 @@ namespace Nitemare3D
         [FieldOffset(0x54)] public ushort DeathSequence5;
         [FieldOffset(0x56)] public ushort DeathSequence6;
         [FieldOffset(0x58)] public ushort DeathSequence7;
+
+        static ushort GetPackedDirectional(
+            ulong lowFour,
+            ulong highFour,
+            int selector)
+        {
+            if (selector < 0 || selector > 7)
+                return 0;
+
+            ulong packed = selector < 4 ? lowFour : highFour;
+            int shift = (selector & 3) * 16;
+            return (ushort)(packed >> shift);
+        }
+
+        public ushort GetDirectionalSequenceA(int selector)
+        {
+            return GetPackedDirectional(
+                DirectionalA0To3,
+                DirectionalA4To7,
+                selector);
+        }
+
+        public ushort GetDirectionalSequenceB(int selector)
+        {
+            return GetPackedDirectional(
+                DirectionalB0To3,
+                DirectionalB4To7,
+                selector);
+        }
+
+        public ushort GetDirectionalSequenceC(int selector)
+        {
+            return GetPackedDirectional(
+                DirectionalC0To3,
+                DirectionalC4To7,
+                selector);
+        }
 
         public bool TryGetReactionSequence(int selector, out ushort sequence)
         {
@@ -231,6 +275,12 @@ namespace Nitemare3D
             return new OriginalObjectDefinitionRecord
             {
                 FrameCount = block[offset + 0x02],
+                DirectionalA0To3 = ReadUInt64LittleEndian(block, offset + 0x04),
+                DirectionalA4To7 = ReadUInt64LittleEndian(block, offset + 0x0C),
+                DirectionalB0To3 = ReadUInt64LittleEndian(block, offset + 0x14),
+                DirectionalB4To7 = ReadUInt64LittleEndian(block, offset + 0x1C),
+                DirectionalC0To3 = ReadUInt64LittleEndian(block, offset + 0x24),
+                DirectionalC4To7 = ReadUInt64LittleEndian(block, offset + 0x2C),
                 AlertSequence = ReadUInt16LittleEndian(block, offset + 0x34),
                 AttackSequence = ReadUInt16LittleEndian(block, offset + 0x36),
                 RecoverySequence = ReadUInt16LittleEndian(block, offset + 0x38),
@@ -256,6 +306,14 @@ namespace Nitemare3D
         static ushort ReadUInt16LittleEndian(byte[] data, int offset)
         {
             return (ushort)(data[offset] | (data[offset + 1] << 8));
+        }
+
+        static ulong ReadUInt64LittleEndian(byte[] data, int offset)
+        {
+            ulong value = 0;
+            for (int i = 0; i < 8; i++)
+                value |= ((ulong)data[offset + i]) << (i * 8);
+            return value;
         }
     }
 }
