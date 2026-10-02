@@ -38,6 +38,8 @@ namespace Nitemare3D
 
                 if (Input.IsKeyDown(KeyboardKey.Enter))
                 {
+                    Game.episode = selection + 1;
+                    Game.level = 0;
                     FadeOut(Scene.LEVEL_GAME, 1f);
                 }
             }
@@ -52,6 +54,9 @@ namespace Nitemare3D
 
         public override void Load()
         {
+            selection = Game.episode - 1;
+            if (selection < 0) selection = 0;
+            if (selection >= episodeCount) selection = episodeCount - 1;
         }
 
         public override void UnLoad()
