@@ -80,5 +80,6 @@ int N3D_RE_StepPush(
     n3d_push_record* push,
     int8_t* dx,
     int8_t* dy);
+int N3D_RE_StepPushObject(int push_slot, int* completed);
 
 #endif
