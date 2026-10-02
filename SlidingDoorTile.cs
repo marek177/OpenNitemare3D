@@ -170,9 +170,8 @@ namespace Nitemare3D
         {
             RuntimeState = state;
 
-            // Closing propagation immediately restores collision on both VEC sides.
-            if (state == DoorRuntimeState.Closing)
-                obstacle = true;
+            // State 2 and 3 are both non-passable in the original helper.
+            obstacle = state != DoorRuntimeState.Open;
         }
 
         void PropagateStateToAdjacentDoors()
