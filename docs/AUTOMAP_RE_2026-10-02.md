@@ -138,3 +138,50 @@ Automap low-power noise now consumes this shared stream. The new-game load path 
 - The existing OpenNitemare3D dynamic-door runtime is not yet the recovered paired-VEC 1:1 implementation, so the exact DoorOpened(...flag20) hook is currently future-facing.
 - Player damage is not yet implemented in the current gameplay code; therefore the recovered damage-flash hook cannot be triggered correctly without first wiring the real damage path.
 - Runtime build/framebuffer validation is still required before merge.
+
+
+## Paired sliding-door runtime update
+
+The branch now instantiates MAP wall classes 0x31..0x40 as `SlidingDoorTile` rather than treating them as ordinary static tiles.
+
+Recovered controller state is preserved:
+
+- 0 = fully open / passable
+- 1 = fully closed
+- 2 = opening
+- 3 = closing
+- common activation transitions 0/2 -> 3 and 1/3 -> 2
+- collision stays active while opening and is cleared only when state 0 is reached
+- collision is restored immediately when closing begins
+- each motion update advances by 2 internal world units
+- travel to the terminal coordinate is 32 internal units = 16 motion updates
+- terminal OPEN erases the door from automap; terminal CLOSED redraws it
+
+The two timing domains are intentionally separate:
+
+- geometry motion is in the presentation branch, whose calibrated reference path clamps to a minimum measured render period of 40 ms (maximum about 25 Hz); at that maximum rate a full 16-step opening is about 0.64 s
+- delayed auto-close is in the 8 Hz slow simulation bundle; timer 32 is therefore about 4 s
+- an occupied door cell resets the close retry to 4 slow ticks, about 0.5 s
+
+Auto-close is disabled for remote classes 0x3B/0x3C. The recovered remote commands are exposed as `RemoteOpen()` and `RemoteClose()`. Manual USE is currently enabled only for ordinary classes 0x31/0x32 and curtains 0x3F/0x40; key/card gates remain separated until the player inventory masks are wired.
+
+The original activation helper copies the new state to neighbouring door controllers along the door axis. The implementation mirrors this with immediate adjacent `SlidingDoorTile` state propagation.
+
+Door occupancy now combines:
+- the original retained MAP object byte,
+- the player tile,
+- currently instantiated runtime entities.
+
+Accepted pickups clear the retained MAP object byte, matching the fact that consumed objects no longer block the door-cell occupancy test.
+
+`Level.IsWalkable` now follows runtime `tile.obstacle` instead of assuming `textureID == -1` means passable. The old Y upper-bound typo (`y > 64`) is corrected to `y > 63`.
+
+Player USE is now edge-triggered. This is necessary for the recovered 0x0200 USE semantics and prevents a held key from reversing door state every host render frame.
+
+### Door rendering boundary
+
+The runtime/controller side is now represented, but visual door rendering is not yet 1:1.
+
+The repository does not currently parse `WALLS.x`, and many class-0x31..0x40 entries therefore have no valid `textureID`. Original catalog evidence also disproves a simple `wall ID - 1 == IMG index` rule: for example, Episode 1 Dumb Waiter wall ID 144 uses a 16-frame resource whose current implementation starts at IMG entry 130.
+
+Therefore this branch does not invent door texture indices. Closed/moving doors still block movement and update automap state correctly; when their texture mapping is unavailable, the present DDA renderer can see through them visually. The next renderer task is a real `WALLS.x -> sequence/resource -> IMG frame` loader followed by center-plane sliding-door ray intersection using `OpenFraction`.
