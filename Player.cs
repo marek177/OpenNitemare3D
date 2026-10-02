@@ -231,6 +231,7 @@ namespace Nitemare3D
                         flipped = Level.tilemap[mapX, mapY].flip;
 
                         var hitWall = Level.tilemap[mapX, mapY];
+                        Automap.DiscoverWall(mapX, mapY, hitWall);
                         
 
                         
