@@ -38,8 +38,76 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Waiting;
         }
 
-        // State 0x00 and 0x12 both return through nextstate after their
-        // sequence/timer completion. The exact frame producer stays external.
+        /// <summary>
+        /// Exact state-0x00 sequence/timer scheduler from FUN_1010_7B56.
+        /// The low byte of DefinitionValue is the first frame and the high byte
+        /// is the frame count. The sequence loops while the timer counts down.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickAnimationTimer(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (guard.State != (byte)OriginalGuardState.AnimationTimer)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            int firstFrame = guard.DefinitionValue & 0xFF;
+            int frameCount = (guard.DefinitionValue >> 8) & 0xFF;
+            int frame = unchecked((byte)obj.Component03);
+            frame = (frame + 1) & 0xFF;
+
+            if (firstFrame + frameCount <= frame)
+                frame = firstFrame;
+
+            obj.Component03 = unchecked((sbyte)(byte)frame);
+            guard.Timer--;
+
+            if (guard.Timer <= 0)
+            {
+                guard.State = guard.NextState;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            return OriginalGuardDispatchResult.Waiting;
+        }
+
+        /// <summary>
+        /// Exact state-0x12 tail: advance toward the last sequence frame,
+        /// decay OBJECT+0x1A by five, count the timer down only while positive,
+        /// then return through nextState once both gates reach zero.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickWaitAnimation12(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (guard.State != (byte)OriginalGuardState.WaitAnimation12)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            int firstFrame = guard.DefinitionValue & 0xFF;
+            int frameCount = (guard.DefinitionValue >> 8) & 0xFF;
+            int lastFrame = firstFrame + frameCount - 1;
+            int frame = unchecked((byte)obj.Component03);
+
+            if (frame < lastFrame)
+                obj.Component03 = unchecked((sbyte)(byte)(frame + 1));
+
+            obj.Runtime1A = obj.Runtime1A > 5
+                ? (byte)(obj.Runtime1A - 5)
+                : (byte)0;
+
+            if (guard.Timer > 0)
+                guard.Timer--;
+
+            if (guard.Timer == 0 && obj.Runtime1A == 0)
+            {
+                guard.State = guard.NextState;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            return OriginalGuardDispatchResult.Waiting;
+        }
+
+        // Compatibility completion helper retained for call sites that already
+        // know the original sequence/timer gate has completed.
         public static OriginalGuardDispatchResult CompleteDeferredState(
             ref OriginalGuardRecord guard)
         {
@@ -166,9 +234,34 @@ namespace Nitemare3D
             }
         }
 
-        // State 0x15: confirmed damage reaction return.
-        // The original advances the selected reaction sequence first; callers invoke
-        // this only when that sequence reaches its final frame.
+        /// <summary>
+        /// Exact state-0x15 pain scheduler. It advances to the final selected
+        /// reaction frame, then returns through nextState.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickPainReaction(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (guard.State != (byte)OriginalGuardState.Pain15)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            int firstFrame = guard.DefinitionValue & 0xFF;
+            int frameCount = (guard.DefinitionValue >> 8) & 0xFF;
+            int lastFrame = firstFrame + frameCount - 1;
+            int frame = unchecked((byte)obj.Component03);
+
+            if (lastFrame <= frame)
+            {
+                guard.State = guard.NextState;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            obj.Component03 = unchecked((sbyte)(byte)(frame + 1));
+            return OriginalGuardDispatchResult.Waiting;
+        }
+
+        // Compatibility completion helper retained for callers that already
+        // know the selected pain sequence reached its final frame.
         public static OriginalGuardDispatchResult CompletePainReaction(
             ref OriginalGuardRecord guard)
         {
