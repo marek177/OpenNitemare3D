@@ -628,6 +628,120 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Waiting;
         }
 
+        public static byte ComputePlayerOctant(
+            byte control,
+            short guardWorldX,
+            short guardWorldY,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            int deltaX = playerWorldX - guardWorldX;
+            int deltaY = playerWorldY - guardWorldY;
+            int absX = Math.Abs(deltaX);
+            int absY = Math.Abs(deltaY);
+
+            if (control != 0)
+            {
+                if (absY * 2 < absX)
+                    return deltaX > 0 ? (byte)2 : (byte)6;
+
+                if (absX * 2 < absY)
+                    return deltaY > 0 ? (byte)4 : (byte)0;
+
+                if (deltaX > 0)
+                    return deltaY > 0 ? (byte)3 : (byte)1;
+
+                return deltaY > 0 ? (byte)5 : (byte)7;
+            }
+
+            if (deltaX < 0)
+            {
+                if (deltaY < 0)
+                    return absY > absX ? (byte)7 : (byte)6;
+
+                return absY > absX ? (byte)4 : (byte)5;
+            }
+
+            if (deltaY < 0)
+                return absY > absX ? (byte)0 : (byte)1;
+
+            return absY <= absX ? (byte)2 : (byte)3;
+        }
+
+        public static byte ComputeResultOctant(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            byte playerOctant = ComputePlayerOctant(
+                guard.Control,
+                obj.WorldX,
+                obj.WorldY,
+                playerWorldX,
+                playerWorldY);
+
+            int baseOffset = guard.Control == 0 ? 3 : 4;
+            return (byte)((baseOffset + guard.Octant - playerOctant) & 7);
+        }
+
+        public static ushort GetDirectionalSequence(
+            OriginalObjectDefinitionRecord definition,
+            byte state,
+            byte strategy,
+            byte resultOctant)
+        {
+            int selector = resultOctant & 7;
+
+            if (state == (byte)OriginalGuardState.MoveThen03 &&
+                strategy != 2)
+            {
+                return definition.GetDirectionalSequenceC(selector);
+            }
+
+            if (state == (byte)OriginalGuardState.Move08 ||
+                state == (byte)OriginalGuardState.Timed10 ||
+                state == (byte)OriginalGuardState.RecoverMove11)
+            {
+                return definition.GetDirectionalSequenceB(selector);
+            }
+
+            return definition.GetDirectionalSequenceA(selector);
+        }
+
+        /// <summary>
+        /// Recovered FUN_1010_6EE0 after the target-octant calculation.
+        /// forceRefresh corresponds to the original fifth parameter.
+        /// </summary>
+        public static OriginalGuardDispatchResult RefreshDirectionalSequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            bool forceRefresh)
+        {
+            byte resultOctant = ComputeResultOctant(
+                ref guard,
+                ref obj,
+                playerWorldX,
+                playerWorldY);
+
+            if (!forceRefresh && guard.ResultOctant == resultOctant)
+                return OriginalGuardDispatchResult.Waiting;
+
+            guard.ResultOctant = resultOctant;
+            ushort sequence = GetDirectionalSequence(
+                definition,
+                guard.State,
+                guard.Strategy,
+                resultOctant);
+
+            guard.DefinitionValue = sequence;
+            obj.Component03 = unchecked((sbyte)(byte)sequence);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         public static void UpdateOctantFromMovement(
             ref OriginalGuardRecord guard,
             int moveX,
