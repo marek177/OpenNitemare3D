@@ -15,6 +15,7 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestObjectDefinitionCatalog();
+            TestImgDefinitionLoader();
             TestDamageMatrix();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
@@ -54,12 +55,32 @@ namespace Nitemare3D
             blockA[0x37] = 0x03;
             blockA[0x38] = 0x30;
             blockA[0x39] = 0x02;
+            blockA[0x3A] = 0x2C;
+            blockA[0x3B] = 0x02;
+            blockA[0x48] = 0x55;
+            blockA[0x49] = 0x01;
+            blockA[0x4A] = 0x40;
+            blockA[0x4B] = 0x04;
+            blockA[0x58] = 0x66;
+            blockA[0x59] = 0x02;
+            blockA[0x02] = 48;
 
             var parsed = OriginalObjectDefinitionCatalog.Parse(blockA, 0);
-            Assert(parsed.AlertSequence == 0x0412 &&
+            Assert(parsed.FrameCount == 48 &&
+                   parsed.AlertSequence == 0x0412 &&
                    parsed.AttackSequence == 0x0320 &&
                    parsed.RecoverySequence == 0x0230,
                 "object-definition packed sequence offsets mismatch.");
+            Assert(parsed.TryGetReactionSequence(0, out ushort reaction0) &&
+                   reaction0 == 0x022C &&
+                   parsed.TryGetReactionSequence(7, out ushort reaction7) &&
+                   reaction7 == 0x0155,
+                "object-definition reaction sequence table mismatch.");
+            Assert(parsed.TryGetDeathSequence(0, out ushort death0) &&
+                   death0 == 0x0440 &&
+                   parsed.TryGetDeathSequence(7, out ushort death7) &&
+                   death7 == 0x0266,
+                "object-definition death sequence table mismatch.");
 
             var catalog = new OriginalObjectDefinitionCatalog();
             Assert(catalog.TryGetOrAdd(0x12345678, blockA, out byte first) &&
@@ -94,6 +115,76 @@ namespace Nitemare3D
                        first, OriginalGuardState.DetectionAttack04, out ushort seq04) &&
                    seq04 == 0x0230,
                 "state 04 object-definition sequence lookup mismatch.");
+        }
+
+        static void TestImgDefinitionLoader()
+        {
+            byte[] img = new byte[OriginalRuntime.ImgFirstFrameStreamOffset + 0x1000];
+
+            // Two directional object IDs share one frame-stream/source key, exactly
+            // like the four direction variants in the original IMG files.
+            uint sharedOffset = (uint)(OriginalRuntime.ImgFirstFrameStreamOffset + 0x100);
+            int dir80 = OriginalRuntime.ImgObjectDirectoryOffset + 0x80 * 4;
+            int dir81 = OriginalRuntime.ImgObjectDirectoryOffset + 0x81 * 4;
+            img[dir80 + 0] = (byte)sharedOffset;
+            img[dir80 + 1] = (byte)(sharedOffset >> 8);
+            img[dir80 + 2] = (byte)(sharedOffset >> 16);
+            img[dir80 + 3] = (byte)(sharedOffset >> 24);
+            img[dir81 + 0] = img[dir80 + 0];
+            img[dir81 + 1] = img[dir80 + 1];
+            img[dir81 + 2] = img[dir80 + 2];
+            img[dir81 + 3] = img[dir80 + 3];
+
+            int definition80 =
+                OriginalRuntime.ImgObjectDefinitionBankOffset +
+                0x80 * OriginalRuntime.ObjectDefinitionBytes;
+            int definition81 =
+                OriginalRuntime.ImgObjectDefinitionBankOffset +
+                0x81 * OriginalRuntime.ObjectDefinitionBytes;
+
+            img[definition80 + 0x02] = 12;
+            img[definition80 + 0x34] = 0x04;
+            img[definition80 + 0x35] = 0x02;
+            img[definition80 + 0x36] = 0x00;
+            img[definition80 + 0x37] = 0x02;
+            img[definition80 + 0x38] = 0x00;
+            img[definition80 + 0x39] = 0x02;
+            img[definition80 + 0x3A] = 0x04;
+            img[definition80 + 0x3B] = 0x02;
+            img[definition80 + 0x4A] = 0x08;
+            img[definition80 + 0x4B] = 0x04;
+
+            Array.Copy(
+                img,
+                definition80,
+                img,
+                definition81,
+                OriginalRuntime.ObjectDefinitionBytes);
+
+            Assert(OriginalImgDefinitionLoader.TryReadObjectDefinition(
+                       img, 0x80, out uint sourceKey, out var definition) &&
+                   sourceKey == sharedOffset &&
+                   definition.FrameCount == 12 &&
+                   definition.AlertSequence == 0x0204 &&
+                   definition.AttackSequence == 0x0200 &&
+                   definition.RecoverySequence == 0x0200 &&
+                   definition.ReactionSequence0 == 0x0204 &&
+                   definition.DeathSequence0 == 0x0408,
+                "IMG object-definition bank parse mismatch.");
+
+            var catalog = new OriginalObjectDefinitionCatalog();
+            Assert(OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
+                       img, 0x80, catalog, out byte first) &&
+                   first == 0 &&
+                   OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
+                       img, 0x81, catalog, out byte duplicate) &&
+                   duplicate == 0 &&
+                   catalog.Count == 1,
+                "IMG shared directory key must deduplicate definition ids.");
+
+            Assert(!OriginalImgDefinitionLoader.TryReadObjectDefinition(
+                       img, 0x00, out _, out _),
+                "zero IMG object directory entry must not create a definition.");
         }
 
         static void TestDamageMatrix()
@@ -500,38 +591,61 @@ namespace Nitemare3D
 
         static void TestGuardMapClassMapping()
         {
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(128, out byte bat) &&
-                   bat == 0x08,
-                "Bat MAP object must map to class 0x08.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(139, out byte mummy) &&
-                   mummy == 0x0A,
-                "Mummy MAP object must map to class 0x0A.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(144, out byte skeleton) &&
-                   skeleton == 0x0B,
-                "Skeleton MAP object must map to class 0x0B.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(160, out byte baddie1) &&
-                   baddie1 == 0x0F,
-                "Baddie #1 MAP object must map to class 0x0F.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(176, out byte dracula) &&
-                   dracula == 0x11,
-                "Dracula MAP object must map to class 0x11.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(180, out byte cemetery) &&
-                   cemetery == 0x12,
-                "Cemetery gargoyle MAP object must map to class 0x12.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(184, out byte garden) &&
-                   garden == 0x13,
-                "Garden gargoyle MAP object must map to class 0x13.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(188, out byte penelope) &&
-                   penelope == 0x15,
-                "Penelope MAP object must map to class 0x15.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(196, out byte hamerstein) &&
-                   hamerstein == 0x16,
-                "Hamerstein MAP object must map to class 0x16.");
-            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(204, out byte cannon) &&
-                   cannon == 0x19,
-                "Cannon MAP object must map to class 0x19.");
-            Assert(!OriginalGuardProfiles.TryClassFromMapObjectId(140, out _),
-                "Dancers must remain outside ordinary GUARD class mapping.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0x80, out byte e1Bat) && e1Bat == 0x08,
+                "episode 1 Bat must map to class 0x08.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0xB0, out byte e1Dracula) && e1Dracula == 0x11,
+                "episode 1 Dracula must map to class 0x11.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0xBC, out byte e1Penelope) && e1Penelope == 0x15,
+                "episode 1 Penelope must map to class 0x15.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0xC4, out byte e1Hamerstein) && e1Hamerstein == 0x16,
+                "episode 1 Hamerstein must map to class 0x16.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0xCC, out byte e1Cannon) && e1Cannon == 0x19,
+                "episode 1 Cannon must map to class 0x19.");
+            Assert(!OriginalGuardProfiles.TryClassFromMapObjectId(
+                       1, 0x8C, out _),
+                "episode 1 Dancers/GUARD26 must remain outside ordinary mapping.");
+
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       2, 0xBC, out byte e2Robot1) && e2Robot1 == 0x17,
+                "episode 2 Tall slim robot must map to class 0x17.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       2, 0xC0, out byte e2Robot2) && e2Robot2 == 0x18,
+                "episode 2 Trashcan robot must map to class 0x18.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       2, 0xC8, out byte e2Cannon) && e2Cannon == 0x19,
+                "episode 2 Cannon must map to class 0x19.");
+            Assert(!OriginalGuardProfiles.TryClassFromMapObjectId(
+                       2, 0xCC, out _),
+                "episode 2 object 0xCC must not inherit episode 1 Cannon mapping.");
+
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x70, out byte e3Penelope) && e3Penelope == 0x15,
+                "episode 3 Penelope must map to class 0x15.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x78, out byte e3Hamerstein) && e3Hamerstein == 0x16,
+                "episode 3 Hamerstein must map to class 0x16.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x80, out byte e3Ghost) && e3Ghost == 0x1A,
+                "episode 3 Ghost must map to class 0x1A.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x8C, out byte e3Demon) && e3Demon == 0x1D,
+                "episode 3 Demon must map to class 0x1D.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x90, out byte e3Alien1) && e3Alien1 == 0x1E,
+                "episode 3 Alien #1 must map to class 0x1E.");
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       3, 0x98, out byte e3Alien2) && e3Alien2 == 0x1F,
+                "episode 3 Alien #2 must map to class 0x1F.");
+
+            Assert(OriginalGuardProfiles.TryClassFromMapObjectId(
+                       0x80, out byte compatibilityBat) &&
+                   compatibilityBat == 0x08,
+                "episode-1 compatibility map-class overload mismatch.");
         }
 
         static void TestGuardInitialProfiles()
