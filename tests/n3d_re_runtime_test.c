@@ -1,8 +1,23 @@
 #include "../n3d_re_runtime.h"
 #include "../n3d_re_guard.h"
+#include "../n3d_re_collision.h"
 
 #include <assert.h>
 #include <stdio.h>
+
+static int test_door_passable(uint8_t x, uint8_t y, void* user)
+{
+    (void)x;
+    (void)y;
+    return *(int*)user;
+}
+
+static void test_touch(uint8_t x, uint8_t y, void* user)
+{
+    (void)x;
+    (void)y;
+    ++*(int*)user;
+}
 
 int main(void)
 {
@@ -134,6 +149,106 @@ int main(void)
     assert(n3d_guards[0].timer >= 0 && n3d_guards[0].timer <= 7);
     assert(n3d_guards[1].timer >= 0 && n3d_guards[1].timer <= 7);
     assert(N3D_RE_WakeGuards(5, &rng_state) == 0);
+
+    for(unsigned i = 0; i < 256; ++i)
+    {
+        uint8_t expected_wall = 0;
+        if(i >= 0x01 && i <= 0x30) expected_wall |= 0x04;
+        if(i >= 0x2E && i <= 0x2F) expected_wall |= 0x10;
+        if(i >= 0x31 && i <= 0x40) expected_wall |= 0x08;
+        if(expected_wall & (0x04 | 0x08)) expected_wall |= 0x01;
+        if(i >= 0x01 && i <= 0x40) expected_wall |= 0x02;
+        if(i >= 0x47 && i <= 0x48) expected_wall |= 0x40;
+        assert(N3D_RE_WallPropertiesForMappedType((uint8_t)i) == expected_wall);
+
+        uint8_t expected_object = 0;
+        if(i >= 0x06 && i <= 0x3D) expected_object |= 0x01;
+        if(i >= 0x08 && i <= 0x2D) expected_object |= 0x02;
+        if(i >= 0x2F && i <= 0x3D) expected_object |= 0x04;
+        if(i >= 0x08 && i <= 0x25) expected_object |= 0x08;
+        if(i == 0x2A) expected_object |= 0x20;
+        if(i == 0x04) expected_object |= 0x40;
+        assert(N3D_RE_ObjectPropertiesForMappedType((uint8_t)i) == expected_object);
+    }
+
+    assert(N3D_RE_DoorStateAllowsPassage(0));
+    assert(N3D_RE_DoorStateAllowsPassage(4));
+    assert(!N3D_RE_DoorStateAllowsPassage(1));
+    assert(!N3D_RE_DoorStateAllowsPassage(256));
+
+    assert(N3D_RE_WorldToTile(-65) == -2);
+    assert(N3D_RE_WorldToTile(-64) == -1);
+    assert(N3D_RE_WorldToTile(-1) == -1);
+    assert(N3D_RE_WorldToTile(0) == 0);
+    assert(N3D_RE_WorldToTile(63) == 0);
+    assert(N3D_RE_WorldToTile(64) == 1);
+
+    uint16_t map_offset = 0;
+    assert(N3D_RE_MapCellByteOffset(0, 0, &map_offset) && map_offset == 0);
+    assert(N3D_RE_MapCellByteOffset(63, 63, &map_offset) && map_offset == 8190);
+    assert(!N3D_RE_MapCellByteOffset(-1, 0, &map_offset));
+    assert(!N3D_RE_MapCellByteOffset(64, 0, &map_offset));
+
+    n3d_post_move_result post = N3D_RE_PostMoveCell(64, 128, 0, 2);
+    assert(post.valid);
+    assert(post.tile_x == 1 && post.tile_y == 2);
+    assert(post.map_byte_offset == (uint16_t)((2 * 64 + 1) * 2));
+    assert(post.entered_tile_event == N3D_ENTERED_TILE_EVENT);
+
+    uint8_t mapped_walls[256] = {0};
+    uint8_t mapped_objects[256] = {0};
+    n3d_byte_table wall_props = {{0}};
+    n3d_byte_table object_props = {{0}};
+
+    mapped_walls[10] = 0x01;
+    mapped_objects[20] = 0x08;
+    N3D_RE_BuildWallProperties(mapped_walls, &wall_props);
+    N3D_RE_BuildObjectProperties(mapped_objects, &object_props);
+
+    N3D_RE_ResetRuntime();
+    n3d_map[0].wall = 10;
+    n3d_map[1].wall = 0;
+    assert(N3D_RE_TestLeadingEdgePair(
+               0, 0, 1, 0, 1,
+               &wall_props, &object_props, NULL) == 0);
+
+    mapped_walls[10] = 0x31;
+    N3D_RE_BuildWallProperties(mapped_walls, &wall_props);
+    int door_open = 0;
+    n3d_collision_callbacks callbacks = {
+        test_door_passable,
+        NULL,
+        NULL,
+        &door_open
+    };
+    assert(N3D_RE_TestLeadingEdgePair(
+               0, 0, 1, 0, 1,
+               &wall_props, &object_props, &callbacks) == 0);
+    door_open = 1;
+    assert(N3D_RE_TestLeadingEdgePair(
+               0, 0, 1, 0, 1,
+               &wall_props, &object_props, &callbacks) == 1);
+
+    mapped_walls[10] = 0;
+    mapped_objects[20] = 0x08;
+    N3D_RE_BuildWallProperties(mapped_walls, &wall_props);
+    N3D_RE_BuildObjectProperties(mapped_objects, &object_props);
+    n3d_map[0].wall = 10;
+    n3d_map[0].object = 20;
+    assert(N3D_RE_TestLeadingEdgePair(
+               0, 0, 1, 0, 1,
+               &wall_props, &object_props, NULL) == 0);
+
+    mapped_objects[20] = 0x2F;
+    N3D_RE_BuildObjectProperties(mapped_objects, &object_props);
+    int touch_count = 0;
+    callbacks.door_passable = NULL;
+    callbacks.object_touch = test_touch;
+    callbacks.user = &touch_count;
+    assert(N3D_RE_TestLeadingEdgePair(
+               0, 0, 1, 0, 1,
+               &wall_props, &object_props, &callbacks) == 1);
+    assert(touch_count == 1);
 
     n3d_guard_record state_guard = {0};
     state_guard.state = N3D_GUARD_STATE_01;
