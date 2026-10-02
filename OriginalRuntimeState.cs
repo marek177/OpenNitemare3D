@@ -86,7 +86,7 @@ namespace Nitemare3D
             }
         }
 
-        public static bool RegisterGuard(Entity entity, GuardType type)
+        public static bool RegisterGuard(Entity entity, GuardType type, byte mapObjectId = 0)
         {
             if (!TryMapPortGuardClass(type, out byte objectClass))
             {
@@ -102,6 +102,7 @@ namespace Nitemare3D
             int guardSlot = GuardCount++;
 
             ref var obj = ref Objects[objectSlot];
+            obj.MapObjectId = mapObjectId;
             obj.Flags = (byte)(RecoveredMechanics.ObjectRuntimePresent |
                                 RecoveredMechanics.ObjectCreatesGuard);
             obj.ObjectClass = objectClass;
