@@ -44,6 +44,7 @@ namespace Nitemare3D
 
         AnimationHandler anim = new AnimationHandler();
         GuardType type;
+        readonly byte mapObjectId;
         GuardState state = GuardState.idle;
         byte health = (byte)OriginalRuntime.GuardInitialStrength;
         const int SPRITE_FRANKENSTEIN_START = 322;
@@ -85,9 +86,10 @@ namespace Nitemare3D
 
 
 
-        public Guard(GuardType type)
+        public Guard(GuardType type, byte mapObjectId = 0)
         {
             this.type = type;
+            this.mapObjectId = mapObjectId;
             PlayAnim(GuardAnimation.idle);
             Game.player.AddSprite(this);
 
@@ -126,7 +128,7 @@ namespace Nitemare3D
 
         public override void Start()
         {
-            OriginalRuntimeState.RegisterGuard(this, type);
+            OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
         }
 
         float roarTimer = 0;
