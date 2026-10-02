@@ -1024,6 +1024,53 @@ namespace Nitemare3D
             };
         }
 
+        public static OriginalGuardDispatchResult TickState06Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            Func<short, short, bool> isBlockedAt,
+            ushort randomValue,
+            out OriginalGuardMovementResult movement)
+        {
+            movement = default;
+
+            if (guard.State != (byte)OriginalGuardState.MoveThen03)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            movement = TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                isBlockedAt,
+                randomValue);
+
+            guard.Timer--;
+
+            if (guard.Timer == 0)
+            {
+                guard.State = (byte)OriginalGuardState.Detection03;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            if (movement.AppliedX != 0 || movement.AppliedY != 0)
+                return movement.PositionCommitted
+                    ? OriginalGuardDispatchResult.Moved
+                    : OriginalGuardDispatchResult.MovementBlocked;
+
+            return movement.XBlocked || movement.YBlocked
+                ? OriginalGuardDispatchResult.MovementBlocked
+                : OriginalGuardDispatchResult.Waiting;
+        }
+
         /// <summary>
         /// Recovered normal directional movement step. Eight facings collapse
         /// into four cardinal vectors. Strategy 2 doubles 8 world units to 16.
