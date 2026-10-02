@@ -30,6 +30,22 @@ namespace Nitemare3D
     {
         public int health = 100;
 
+        // Original DS:4C28 / DS:4C29 inventory masks.
+        // Key bits: 0 red, 1 green, 2 blue, 3 yellow.
+        // Card bits: 0 red, 1 yellow.
+        public byte keyMask;
+        public byte idCardMask;
+
+        public bool HasKeyGroup(int group)
+        {
+            return group >= 0 && group < 4 && (keyMask & (1 << group)) != 0;
+        }
+
+        public bool HasIdCardGroup(int group)
+        {
+            return group >= 0 && group < 2 && (idCardMask & (1 << group)) != 0;
+        }
+
 
         public Vec2 plane = new Vec2(0, .8f);
 
