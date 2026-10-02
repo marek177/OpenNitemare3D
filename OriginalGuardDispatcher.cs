@@ -161,6 +161,33 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Waiting;
         }
 
+        /// <summary>
+        /// Confirmed state-0x07 decision slice after the original facing update.
+        /// If the shared processing gate is set or perception fails, state 7 remains.
+        /// Successful perception with strategy 3 enters state 0x13; otherwise state 2.
+        /// </summary>
+        public static OriginalGuardDispatchResult ResolveState07Perception(
+            ref OriginalGuardRecord guard,
+            bool processingGateSet,
+            bool perceptionSucceeded,
+            ushort randomValue)
+        {
+            if (guard.State != (byte)OriginalGuardState.Active07)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            if (processingGateSet || !perceptionSucceeded)
+                return OriginalGuardDispatchResult.Waiting;
+
+            if (guard.Strategy == 3)
+            {
+                EnterStrategy3TimedMove(ref guard, randomValue);
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            guard.State = (byte)OriginalGuardState.Active02;
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         // State 0x06: once its movement/timer work completes, continue at 0x03.
         public static OriginalGuardDispatchResult CompleteState06(
             ref OriginalGuardRecord guard)
