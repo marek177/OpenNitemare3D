@@ -157,6 +157,9 @@ namespace Nitemare3D
                 float deltaDistY = Math.Abs(1 / rayDirY);
 
                 float perpWallDist;
+                bool hitSlidingDoor = false;
+                float slidingDoorDistance = 0;
+                float slidingDoorTextureCoord = 0;
 
 
                 Vec2i step = new Vec2i();
@@ -239,20 +242,36 @@ namespace Nitemare3D
                                 : Automap.VecOrientation.Bottom;
                         }
 
-                    bool fullyOpenDoor =
-                        hitWall is SlidingDoorTile slidingDoor &&
-                        slidingDoor.IsFullyOpen;
+                    var wall = hitWall.textureID;
+                    bool hasRenderableWall =
+                        wall >= 0 &&
+                        Img.current != null &&
+                        wall < Img.current.entries.Count;
 
-                    if (!fullyOpenDoor)
+                    if (hitWall is SlidingDoorTile slidingDoor)
+                    {
+                        if (!slidingDoor.IsFullyOpen)
+                        {
+                            Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
+
+                            if (hasRenderableWall &&
+                                slidingDoor.TryIntersectRay(
+                                    position,
+                                    rayDirX,
+                                    rayDirY,
+                                    out slidingDoorDistance,
+                                    out slidingDoorTextureCoord))
+                            {
+                                hit = 1;
+                                hitSlidingDoor = true;
+                            }
+                        }
+                    }
+                    else
                     {
                         Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
-                    }
-
-                    var wall = hitWall.textureID;
-                    bool hasRenderableWall = wall <= 149 && wall > -1;
-                    if (hasRenderableWall && !fullyOpenDoor)
-                    {
-                        hit = 1;
+                        if (hasRenderableWall)
+                            hit = 1;
                     }
 
                     if (hit == 1)
@@ -271,9 +290,20 @@ namespace Nitemare3D
 
 
 
-                //Calculate distance projected on camera direction (Euclidean distance will give fisheye effect!)
-                if (side == 0) perpWallDist = (mapX - position.X + (1 - step.X) / 2) / rayDirX;
-                else perpWallDist = (mapY - position.Y + (1 - step.Y) / 2) / rayDirY;
+                // Calculate projected distance. Dynamic doors live on the recovered
+                // center plane instead of the tile boundary used by ordinary DDA walls.
+                if (hitSlidingDoor)
+                {
+                    perpWallDist = slidingDoorDistance;
+                }
+                else if (side == 0)
+                {
+                    perpWallDist = (mapX - position.X + (1 - step.X) / 2) / rayDirX;
+                }
+                else
+                {
+                    perpWallDist = (mapY - position.Y + (1 - step.Y) / 2) / rayDirY;
+                }
 
                 //Calculate height of line to draw on screen
                 int lineHeight = (int)(RayHeight / perpWallDist);
@@ -289,10 +319,17 @@ namespace Nitemare3D
                 var texPos = (drawStart - (int)RayHeight / 2 + lineHeight / 2) * stepAmount;
 
 
-                float wallX; 
-                if (side == 0) wallX = position.Y + perpWallDist * rayDirY;
-                else wallX = position.X + perpWallDist * rayDirX;
-                wallX -= (float)Math.Floor((wallX));
+                float wallX;
+                if (hitSlidingDoor)
+                {
+                    wallX = slidingDoorTextureCoord / 64.0f;
+                }
+                else
+                {
+                    if (side == 0) wallX = position.Y + perpWallDist * rayDirY;
+                    else wallX = position.X + perpWallDist * rayDirX;
+                    wallX -= (float)Math.Floor(wallX);
+                }
 
 
 
