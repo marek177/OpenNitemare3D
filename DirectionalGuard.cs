@@ -46,6 +46,11 @@ namespace Nitemare3D
 
         int texOffset;
 
+        public override void Start()
+        {
+            OriginalRuntimeState.RegisterGuard(this, type);
+        }
+
         GuardState state = GuardState.patrol;
         /*
             Nitemare 3D has certain tiles used to guide the patrol state of certain guards,
@@ -155,6 +160,7 @@ namespace Nitemare3D
             spritePosition = position;
 
             spriteIndex = texOffset + (int)direction * 4;
+            OriginalRuntimeState.SyncGuardPosition(this);
 
 
         }
