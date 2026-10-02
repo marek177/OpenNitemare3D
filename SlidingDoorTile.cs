@@ -220,6 +220,10 @@ namespace Nitemare3D
 
         bool Occupied()
         {
+            // Original auto-close first tests MAP-cell object byte +1.
+            if (Level.tilemap[x, y].objectID != 0)
+                return true;
+
             if (Game.player != null &&
                 (int)Game.player.position.X == x &&
                 (int)Game.player.position.Y == y)
@@ -229,7 +233,7 @@ namespace Nitemare3D
 
             foreach (Entity entity in Entity.entities)
             {
-                if (!entity.hasCollision)
+                if (entity == Game.player)
                     continue;
 
                 if ((int)entity.position.X == x &&
@@ -297,18 +301,20 @@ namespace Nitemare3D
 
         public override void Update()
         {
-            presentationAccumulator += Time.dt;
-            while (presentationAccumulator >= PresentationStepSeconds)
-            {
-                presentationAccumulator -= PresentationStepSeconds;
-                MotionTick();
-            }
-
+            // Original outer scheduler runs the 8 Hz simulation bundle before the
+            // presentation branch that advances door geometry.
             slowAccumulator += Time.dt;
             while (slowAccumulator >= SlowStepSeconds)
             {
                 slowAccumulator -= SlowStepSeconds;
                 SlowTick();
+            }
+
+            presentationAccumulator += Time.dt;
+            while (presentationAccumulator >= PresentationStepSeconds)
+            {
+                presentationAccumulator -= PresentationStepSeconds;
+                MotionTick();
             }
         }
     }
