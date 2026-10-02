@@ -26,6 +26,7 @@ namespace Nitemare3D
             TestDelayState();
             TestState13Movement();
             TestMovementPlanning();
+            TestMovementCollisionCore();
             TestGuardMapClassMapping();
             TestGuardInitialProfiles();
             TestState07Decision();
@@ -1041,6 +1042,138 @@ namespace Nitemare3D
                    guard.State == (byte)OriginalGuardState.MoveThen03 &&
                    guard.Octant == 6,
                 "strategy-2 movement plan mismatch.");
+        }
+
+        static void TestMovementCollisionCore()
+        {
+            Assert(OriginalGuardDispatcher.MovementCandidateTouchesPlayer(
+                       100, 100, 141, 141),
+                "player collision must include +/-41 world units.");
+            Assert(!OriginalGuardDispatcher.MovementCandidateTouchesPlayer(
+                       100, 100, 142, 100),
+                "player collision must exclude 42 world units.");
+
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.MoveThen03,
+                MoveX = 8,
+                MoveY = 8,
+                DefinitionValue = 0x0304,
+                Octant = 0
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100,
+                Component03 = 4
+            };
+
+            var moved = OriginalGuardDispatcher.TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                (x, y) => false,
+                0);
+
+            Assert(!moved.XBlocked &&
+                   !moved.YBlocked &&
+                   moved.PositionCommitted &&
+                   !moved.Bounced &&
+                   moved.AppliedX == 8 &&
+                   moved.AppliedY == 8 &&
+                   obj.WorldX == 108 &&
+                   obj.WorldY == 108 &&
+                   unchecked((byte)obj.Component03) == 5 &&
+                   guard.Octant == 3,
+                "unblocked state-6 diagonal movement mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.MoveThen03,
+                MoveX = 8,
+                MoveY = 8,
+                DefinitionValue = 0x0304
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100,
+                Component03 = 4
+            };
+
+            var slide = OriginalGuardDispatcher.TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                (x, y) => x == 124,
+                0);
+
+            Assert(slide.XBlocked &&
+                   !slide.YBlocked &&
+                   slide.PositionCommitted &&
+                   obj.WorldX == 100 &&
+                   obj.WorldY == 108 &&
+                   guard.Octant == 4,
+                "state 6 must slide along the unblocked axis.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Move08,
+                MoveX = 8,
+                MoveY = 8,
+                DefinitionValue = 0x0304
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100,
+                Component03 = 4
+            };
+
+            var state8Blocked = OriginalGuardDispatcher.TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                (x, y) => x == 124,
+                0);
+
+            Assert(state8Blocked.XBlocked &&
+                   !state8Blocked.YBlocked &&
+                   !state8Blocked.PositionCommitted &&
+                   obj.WorldX == 100 &&
+                   obj.WorldY == 100 &&
+                   unchecked((byte)obj.Component03) == 5 &&
+                   guard.Octant == 4,
+                "state 8 must reject the whole coordinate commit when one axis blocks.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.MoveThen03,
+                MoveX = 8,
+                MoveY = 8,
+                DefinitionValue = 0x0304
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100,
+                Component03 = 6
+            };
+
+            var bounced = OriginalGuardDispatcher.TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                (x, y) => true,
+                1);
+
+            Assert(bounced.XBlocked &&
+                   bounced.YBlocked &&
+                   bounced.PositionCommitted &&
+                   bounced.Bounced &&
+                   obj.WorldX == 100 &&
+                   obj.WorldY == 100 &&
+                   guard.MoveX == -8 &&
+                   guard.MoveY == 8 &&
+                   unchecked((byte)obj.Component03) == 4 &&
+                   guard.Octant == 2,
+                "double-block state-6 X bounce/compiler-byte behavior mismatch.");
         }
 
         static void TestGuardMapClassMapping()
