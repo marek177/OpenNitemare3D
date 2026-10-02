@@ -27,6 +27,7 @@ namespace Nitemare3D
             TestState13Movement();
             TestMovementPlanning();
             TestMovementCollisionCore();
+            TestDirectionalSequenceRefresh();
             TestGuardMapClassMapping();
             TestGuardInitialProfiles();
             TestState07Decision();
@@ -1174,6 +1175,139 @@ namespace Nitemare3D
                    unchecked((byte)obj.Component03) == 4 &&
                    guard.Octant == 2,
                 "double-block state-6 X bounce/compiler-byte behavior mismatch.");
+        }
+
+        static void TestDirectionalSequenceRefresh()
+        {
+            byte[] block = new byte[OriginalRuntime.ObjectDefinitionBytes];
+            for (int i = 0; i < 8; i++)
+            {
+                block[0x04 + i * 2] = (byte)(0x10 + i);
+                block[0x05 + i * 2] = 0x01;
+
+                block[0x14 + i * 2] = (byte)(0x20 + i);
+                block[0x15 + i * 2] = 0x02;
+
+                block[0x24 + i * 2] = (byte)(0x30 + i);
+                block[0x25 + i * 2] = 0x03;
+            }
+
+            var definition =
+                OriginalObjectDefinitionCatalog.Parse(block, 0);
+
+            for (int i = 0; i < 8; i++)
+            {
+                Assert(definition.GetDirectionalSequenceA(i) ==
+                       (ushort)(0x0110 + i),
+                    "directional bank A mismatch at " + i);
+                Assert(definition.GetDirectionalSequenceB(i) ==
+                       (ushort)(0x0220 + i),
+                    "directional bank B mismatch at " + i);
+                Assert(definition.GetDirectionalSequenceC(i) ==
+                       (ushort)(0x0330 + i),
+                    "directional bank C mismatch at " + i);
+            }
+
+            Assert(OriginalGuardDispatcher.ComputePlayerOctant(
+                       1, 0, 0, 100, 0) == 2,
+                "control-1 east player octant mismatch.");
+            Assert(OriginalGuardDispatcher.ComputePlayerOctant(
+                       1, 0, 0, 0, -100) == 0,
+                "control-1 north player octant mismatch.");
+            Assert(OriginalGuardDispatcher.ComputePlayerOctant(
+                       1, 0, 0, 100, -100) == 1,
+                "control-1 northeast player octant mismatch.");
+
+            // The control-0 quantizer uses a different 45-degree split. This
+            // point resolves NE there but E in the control-1 2:1-threshold path.
+            Assert(OriginalGuardDispatcher.ComputePlayerOctant(
+                       0, 0, 0, 100, -20) == 1,
+                "control-0 biased octant mismatch.");
+            Assert(OriginalGuardDispatcher.ComputePlayerOctant(
+                       1, 0, 0, 100, -20) == 2,
+                "control-1 2:1 octant threshold mismatch.");
+
+            var guard = new OriginalGuardRecord
+            {
+                Control = 1,
+                Octant = 3,
+                State = (byte)OriginalGuardState.MoveThen03,
+                Strategy = 0,
+                ResultOctant = 0
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 0,
+                WorldY = 0
+            };
+
+            Assert(OriginalGuardDispatcher.ComputeResultOctant(
+                       ref guard,
+                       ref obj,
+                       100,
+                       0) == 5,
+                "relative result-octant arithmetic mismatch.");
+
+            Assert(OriginalGuardDispatcher.GetDirectionalSequence(
+                       definition,
+                       (byte)OriginalGuardState.MoveThen03,
+                       0,
+                       5) == 0x0335,
+                "state 6 normal movement must use directional bank C.");
+            Assert(OriginalGuardDispatcher.GetDirectionalSequence(
+                       definition,
+                       (byte)OriginalGuardState.MoveThen03,
+                       2,
+                       5) == 0x0115,
+                "state 6 strategy 2 must use directional bank A.");
+            Assert(OriginalGuardDispatcher.GetDirectionalSequence(
+                       definition,
+                       (byte)OriginalGuardState.Move08,
+                       0,
+                       5) == 0x0225,
+                "state 8 must use directional bank B.");
+            Assert(OriginalGuardDispatcher.GetDirectionalSequence(
+                       definition,
+                       (byte)OriginalGuardState.Timed10,
+                       0,
+                       5) == 0x0225,
+                "state 0x10 must use directional bank B.");
+            Assert(OriginalGuardDispatcher.GetDirectionalSequence(
+                       definition,
+                       (byte)OriginalGuardState.Detection03,
+                       0,
+                       5) == 0x0115,
+                "ordinary states must use directional bank A.");
+
+            Assert(OriginalGuardDispatcher.RefreshDirectionalSequence(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       100,
+                       0,
+                       false) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.ResultOctant == 5 &&
+                   guard.DefinitionValue == 0x0335 &&
+                   unchecked((byte)obj.Component03) == 0x35,
+                "FUN_6EE0 directional refresh mismatch.");
+
+            Assert(OriginalGuardDispatcher.RefreshDirectionalSequence(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       100,
+                       0,
+                       false) == OriginalGuardDispatchResult.Waiting,
+                "unchanged resoct must skip a non-forced directional refresh.");
+
+            Assert(OriginalGuardDispatcher.RefreshDirectionalSequence(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       100,
+                       0,
+                       true) == OriginalGuardDispatchResult.Transitioned,
+                "forced FUN_6EE0 refresh must rewrite the sequence.");
         }
 
         static void TestGuardMapClassMapping()
