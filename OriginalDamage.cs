@@ -36,6 +36,56 @@ namespace Nitemare3D
         public const byte HamersteinBaseDamage = 3;
 
         /// <summary>
+        /// Exact 16-bit distance helper used by FUN_1010_A1EA through
+        /// FUN_1018_32AA/FUN_1018_324A. World coordinates are converted to
+        /// 64-unit tiles before the original integer square-root rounding rule.
+        /// </summary>
+        public static int ComputeGuardAttackDistanceMetric(
+            short guardWorldX,
+            short guardWorldY,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            int dx = (guardWorldX >> 6) - (playerWorldX >> 6);
+            int dy = (guardWorldY >> 6) - (playerWorldY >> 6);
+            return OriginalRoundedSqrt(dx * dx + dy * dy);
+        }
+
+        public static int OriginalRoundedSqrt(int squaredDistance)
+        {
+            if (squaredDistance <= 1)
+                return squaredDistance < 0 ? 0 : squaredDistance;
+
+            int root = (int)System.Math.Sqrt(squaredDistance);
+            int remainder = squaredDistance - root * root;
+
+            // FUN_1018_324A compares the remainder against root-1.
+            if (remainder >= root - 1)
+                root++;
+
+            return root;
+        }
+
+        public static OriginalGuardAttackDamageResult ComputeGuardToPlayerFromWorld(
+            short guardWorldX,
+            short guardWorldY,
+            short playerWorldX,
+            short playerWorldY,
+            byte objectClass,
+            byte difficulty,
+            bool class16FullDamageGate,
+            ushort rngValue)
+        {
+            return ComputeGuardToPlayer(
+                ComputeGuardAttackDistanceMetric(
+                    guardWorldX, guardWorldY, playerWorldX, playerWorldY),
+                objectClass,
+                difficulty,
+                class16FullDamageGate,
+                rngValue);
+        }
+
+        /// <summary>
         /// Confirmed GUARD-to-player damage producer recovered from NITE3W 1.10.
         /// distanceMetric is the positive result of the original tile-distance helper
         /// (FUN_1018_32aa). Its exact metric is kept external until that helper is
