@@ -104,14 +104,101 @@ n3d_pickup_result N3D_RE_ApplyPickupObject(uint16_t object_slot)
             result.accepted = 1;
             break;
 
-        case 0x3C: /* PENTAGRAM: subtype selects progress bit */
-            if(object->variant >= 4)
+        case 0x31: /* score-only pickup */
+            n3d_player.score += 200;
+            result.kind = N3D_PICKUP_SCORE_ADDED;
+            result.score_delta = 200;
+            result.accepted = 1;
+            break;
+
+        case 0x32:
+            /*
+             * Special/panel charge writer is known, including a 99 limit, but
+             * the exact edge write when the shifted increment crosses that
+             * limit remains intentionally deferred in this C port.
+             */
+            return N3D_RE_DeferredPickup(object);
+
+        case 0x33: /* FOOD / health: + (20 >> subtype), gated by HP < 100 */
+        {
+            if(n3d_player.health >= N3D_PLAYER_MAX_HEALTH)
+            {
+                result.kind = N3D_PICKUP_HEALTH_AT_THRESHOLD;
+                result.value_before = n3d_player.health;
+                result.value_after = n3d_player.health;
+                break;
+            }
+
+            if(object->variant >= 8)
                 return N3D_RE_DeferredPickup(object);
 
-            N3D_RE_GrantInventoryBit(
-                &n3d_player.pentagrams,
-                object->variant);
-            result.kind = N3D_PICKUP_PENTAGRAM_GRANTED;
+            const uint8_t amount = (uint8_t)(20u >> object->variant);
+            if(amount == 0)
+                return N3D_RE_DeferredPickup(object);
+
+            result.value_before = n3d_player.health;
+            n3d_player.health =
+                (uint8_t)(n3d_player.health + amount);
+            result.value_after = n3d_player.health;
+            result.kind = N3D_PICKUP_HEALTH_ADDED;
+            result.accepted = 1;
+            break;
+        }
+
+        case 0x34: /* +30 HP and +250 score, only when HP < 100 */
+            if(n3d_player.health >= N3D_PLAYER_MAX_HEALTH)
+            {
+                result.kind = N3D_PICKUP_HEALTH_AT_THRESHOLD;
+                result.value_before = n3d_player.health;
+                result.value_after = n3d_player.health;
+                break;
+            }
+
+            result.value_before = n3d_player.health;
+            n3d_player.health =
+                (uint8_t)(n3d_player.health + 30);
+            result.value_after = n3d_player.health;
+            n3d_player.score += 250;
+            result.score_delta = 250;
+            result.kind = N3D_PICKUP_HEALTH_ADDED;
+            result.accepted = 1;
+            break;
+
+        case 0x35: /* restore HP/plasma, +500 score, increment 4C1E */
+            n3d_player.health = N3D_PLAYER_MAX_HEALTH;
+            n3d_player.laser_ammo = N3D_NORMAL_AMMO_CAP;
+            n3d_player.score += 500;
+            ++n3d_player.pickup_counter_4c1e;
+            result.kind = N3D_PICKUP_RESTORE_BONUS;
+            result.score_delta = 500;
+            result.accepted = 1;
+            break;
+
+        case 0x36: /* WEAPON: subtype is runtime weapon selector 0..3 */
+            if(!N3D_RE_QueueOwnedWeapon(object->variant))
+                return N3D_RE_DeferredPickup(object);
+
+            result.kind = N3D_PICKUP_WEAPON_GRANTED;
+            result.accepted = 1;
+            break;
+
+        case 0x37:
+            /* 4C2B writer is known but its subtype operation stays deferred. */
+            return N3D_RE_DeferredPickup(object);
+
+        case 0x38: /* secondary resource 4C21: +20 when below 100 */
+            result.value_before = n3d_player.resource_4c21;
+            if(n3d_player.resource_4c21 >= N3D_NORMAL_AMMO_CAP)
+            {
+                result.value_after = n3d_player.resource_4c21;
+                result.kind = N3D_PICKUP_RESOURCE_AT_THRESHOLD;
+                break;
+            }
+
+            n3d_player.resource_4c21 =
+                (uint8_t)(n3d_player.resource_4c21 + 20);
+            result.value_after = n3d_player.resource_4c21;
+            result.kind = N3D_PICKUP_RESOURCE_ADDED;
             result.accepted = 1;
             break;
 
@@ -151,10 +238,56 @@ n3d_pickup_result N3D_RE_ApplyPickupObject(uint16_t object_slot)
             {
                 result.value_after = *ammo;
                 result.kind = N3D_PICKUP_AMMO_AT_THRESHOLD;
-                result.accepted = 0;
             }
             break;
         }
+
+        case 0x3A: /* Crystal Ball charge */
+            result.value_before = n3d_player.crystal_ball_charge;
+            if(n3d_player.crystal_ball_charge >= N3D_NORMAL_AMMO_CAP)
+            {
+                result.value_after = n3d_player.crystal_ball_charge;
+                result.kind = N3D_PICKUP_CRYSTAL_CHARGE_AT_THRESHOLD;
+                break;
+            }
+
+            n3d_player.crystal_ball_charge =
+                (uint8_t)(n3d_player.crystal_ball_charge + 20);
+            result.value_after = n3d_player.crystal_ball_charge;
+            result.kind = N3D_PICKUP_CRYSTAL_CHARGE_ADDED;
+            result.accepted = 1;
+            break;
+
+        case 0x3B: /* Magic Eye charge */
+            result.value_before = n3d_player.magic_eye_charge;
+            if(n3d_player.magic_eye_charge >= N3D_NORMAL_AMMO_CAP)
+            {
+                result.value_after = n3d_player.magic_eye_charge;
+                result.kind = N3D_PICKUP_EYE_CHARGE_AT_THRESHOLD;
+                break;
+            }
+
+            n3d_player.magic_eye_charge =
+                (uint8_t)(n3d_player.magic_eye_charge + 20);
+            result.value_after = n3d_player.magic_eye_charge;
+            result.kind = N3D_PICKUP_EYE_CHARGE_ADDED;
+            result.accepted = 1;
+            break;
+
+        case 0x3C: /* PENTAGRAM: subtype selects progress bit */
+            if(object->variant >= 4)
+                return N3D_RE_DeferredPickup(object);
+
+            N3D_RE_GrantInventoryBit(
+                &n3d_player.pentagrams,
+                object->variant);
+            result.kind = N3D_PICKUP_PENTAGRAM_GRANTED;
+            result.accepted = 1;
+            break;
+
+        case 0x3D:
+            /* Script/scroll helper is a separate subsystem. */
+            return N3D_RE_DeferredPickup(object);
 
         default:
             return N3D_RE_DeferredPickup(object);
