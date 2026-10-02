@@ -11,6 +11,11 @@ namespace Nitemare3D
 		extern public static int XInitThreads();
 		static void Main(string[] args)
 		{
+			if (args.Length > 0 && args[0] == "--self-test")
+			{
+				RuntimeSelfTest.Run();
+				return;
+			}
 
 			XInitThreads();
 
