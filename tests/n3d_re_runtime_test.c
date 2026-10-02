@@ -7,6 +7,7 @@
 #include "../n3d_re_definitions.h"
 #include "../n3d_re_door.h"
 #include "../n3d_re_special_runtime.h"
+#include "../n3d_re_use.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -701,6 +702,82 @@ int main(void)
     assert(n3d_push_count == 0);
     assert(N3D_RE_PanelActivation(&n3d_panels[0]) == 0);
     assert(n3d_pushes[0].steps_remaining == 0);
+
+    N3D_RE_ResetUseLatch();
+    assert(!N3D_RE_UseRisingEdge(0));
+    assert(N3D_RE_UseRisingEdge(1));
+    assert(!N3D_RE_UseRisingEdge(1));
+    assert(!N3D_RE_UseRisingEdge(0));
+    assert(N3D_RE_UseRisingEdge(1));
+
+    uint8_t use_x = 0, use_y = 0;
+    assert(N3D_RE_AdjacentUseCell(10, 10, 0, &use_x, &use_y));
+    assert(use_x == 10 && use_y == 9);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 1, &use_x, &use_y));
+    assert(use_x == 11 && use_y == 10);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 2, &use_x, &use_y));
+    assert(use_x == 11 && use_y == 10);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 3, &use_x, &use_y));
+    assert(use_x == 10 && use_y == 11);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 4, &use_x, &use_y));
+    assert(use_x == 10 && use_y == 11);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 5, &use_x, &use_y));
+    assert(use_x == 9 && use_y == 10);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 6, &use_x, &use_y));
+    assert(use_x == 9 && use_y == 10);
+    assert(N3D_RE_AdjacentUseCell(10, 10, 7, &use_x, &use_y));
+    assert(use_x == 10 && use_y == 9);
+    assert(!N3D_RE_AdjacentUseCell(0, 0, 0, &use_x, &use_y));
+    assert(!N3D_RE_AdjacentUseCell(0, 0, 6, &use_x, &use_y));
+
+    N3D_RE_InitPlayerAtTile(10, 10);
+    N3D_RE_ResetRuntime();
+    n3d_player.tile_x = 10;
+    n3d_player.tile_y = 10;
+
+    const int use_east_cell = 10 * N3D_MAP_WIDTH + 11;
+    n3d_map[use_east_cell].wall = 0;
+    n3d_map[use_east_cell].object = 0;
+
+    n3d_use_target use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_NONE);
+    assert(use_target.x == 11 && use_target.y == 10);
+
+    n3d_map[use_east_cell].wall = 0x70;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_UNRESOLVED);
+
+    n3d_wall_mapping_known[5] = 1;
+    n3d_wall_mapped_type[5] = 0x31;
+    n3d_wall_property_resolved[5] =
+        N3D_RE_WallPropertiesForMappedType(0x31);
+    n3d_map[use_east_cell].wall = 5;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_DYNAMIC_DOOR);
+    assert(use_target.mapped_wall_type == 0x31);
+
+    n3d_map[use_east_cell].wall = 184;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_MAPPED_WALL);
+    assert(use_target.mapped_wall_type == 0x47);
+
+    n3d_map[use_east_cell].wall = 0;
+    n3d_object_mapping_known[98] = 1;
+    n3d_object_mapped_type[98] = 0x03;
+    n3d_object_property_resolved[98] =
+        N3D_RE_ObjectPropertiesForMappedType(0x03);
+    n3d_map[use_east_cell].object = 98;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_PANEL);
+
+    n3d_map[use_east_cell].object = 0x18;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_PUSH);
+
+    n3d_map[use_east_cell].object = 0x80;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_MAPPED_OBJECT);
+    assert(use_target.mapped_object_type == 0x08);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
