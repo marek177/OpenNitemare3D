@@ -533,6 +533,17 @@ int main(void)
     assert(n3d_wall_definitions.count == 7);
     assert(n3d_object_definitions.count == 2);
 
+    n3d_mapping_coverage wall_mapping_coverage =
+        N3D_RE_WallMappingCoverage();
+    n3d_mapping_coverage object_mapping_coverage =
+        N3D_RE_ObjectMappingCoverage();
+    assert(wall_mapping_coverage.total == 7);
+    assert(wall_mapping_coverage.known == 5);
+    assert(wall_mapping_coverage.unknown == 2);
+    assert(object_mapping_coverage.total == 2);
+    assert(object_mapping_coverage.known == 2);
+    assert(object_mapping_coverage.unknown == 0);
+
     const n3d_definition_record* push_def =
         N3D_RE_FindDefinition(&n3d_object_definitions, 0x18);
     assert(push_def != NULL);
