@@ -6,6 +6,7 @@
 #include "../n3d_re_combat.h"
 #include "../n3d_re_definitions.h"
 #include "../n3d_re_door.h"
+#include "../n3d_re_special_runtime.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -649,6 +650,57 @@ int main(void)
     assert(n3d_door_count == 0);
     assert(N3D_RE_DoorStateValue(&n3d_doors[0]) == 0);
     assert(N3D_RE_DoorTransitionFlag(&n3d_doors[0]) == 0);
+
+    assert(sizeof(n3d_panel_record) == 22);
+    assert(sizeof(n3d_push_record) == 6);
+
+    n3d_panel_record panel = {{0}};
+    assert(N3D_RE_PanelActivation(&panel) == 0);
+    N3D_RE_ActivatePanelUse(&panel);
+    assert(N3D_RE_PanelActivation(&panel) == 2);
+    N3D_RE_SetPanelActivation(&panel, 1);
+    assert(N3D_RE_PanelActivation(&panel) == 1);
+
+    n3d_push_direction push_dir = N3D_RE_PushDirectionForOctant(0);
+    assert(push_dir.dx == 0 && push_dir.dy == -8);
+    push_dir = N3D_RE_PushDirectionForOctant(1);
+    assert(push_dir.dx == 8 && push_dir.dy == 0);
+    push_dir = N3D_RE_PushDirectionForOctant(4);
+    assert(push_dir.dx == 0 && push_dir.dy == 8);
+    push_dir = N3D_RE_PushDirectionForOctant(6);
+    assert(push_dir.dx == -8 && push_dir.dy == 0);
+
+    n3d_push_record push = {0};
+    assert(N3D_RE_CanStartPush(&push, 0));
+    assert(!N3D_RE_CanStartPush(&push, 0x02));
+    assert(N3D_RE_BeginPush(&push, 7, 1));
+    assert(push.object_index == 7);
+    assert(push.delta_x == 8 && push.delta_y == 0);
+    assert(push.steps_remaining == 8);
+    assert(!N3D_RE_BeginPush(&push, 8, 1));
+
+    int push_total_x = 0;
+    int push_total_y = 0;
+    for(int i = 0; i < 8; ++i)
+    {
+        int8_t dx = 0, dy = 0;
+        assert(N3D_RE_StepPush(&push, &dx, &dy));
+        push_total_x += dx;
+        push_total_y += dy;
+    }
+    assert(push_total_x == 64 && push_total_y == 0);
+    assert(push.steps_remaining == 0);
+    assert(!N3D_RE_StepPush(&push, NULL, NULL));
+
+    n3d_panel_count = 1;
+    n3d_push_count = 1;
+    n3d_panels[0] = panel;
+    n3d_pushes[0] = push;
+    N3D_RE_ResetRuntime();
+    assert(n3d_panel_count == 0);
+    assert(n3d_push_count == 0);
+    assert(N3D_RE_PanelActivation(&n3d_panels[0]) == 0);
+    assert(n3d_pushes[0].steps_remaining == 0);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
