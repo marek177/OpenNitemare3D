@@ -93,7 +93,8 @@ namespace Nitemare3D
         public static bool RegisterGuard(Entity entity, GuardType type, byte mapObjectId = 0)
         {
             byte objectClass;
-            if (!OriginalGuardProfiles.TryClassFromMapObjectId(mapObjectId, out objectClass) &&
+            if (!OriginalGuardProfiles.TryClassFromMapObjectId(
+                    Game.episode, mapObjectId, out objectClass) &&
                 !TryMapPortGuardClass(type, out objectClass))
             {
                 return false;
@@ -113,6 +114,10 @@ namespace Nitemare3D
                                 RecoveredMechanics.ObjectCreatesGuard);
             obj.ObjectClass = objectClass;
             obj.GuardIndex = (byte)guardSlot;
+
+            if (RegisterMapObjectDefinition(mapObjectId, out byte definitionId))
+                obj.DefinitionId = definitionId;
+
             WriteWorldPosition(ref obj, entity.position);
 
             ref var guard = ref Guards[guardSlot];
@@ -135,6 +140,34 @@ namespace Nitemare3D
             };
 
             return true;
+        }
+
+        public static bool RegisterMapObjectDefinition(
+            byte mapObjectId,
+            out byte definitionId)
+        {
+            definitionId = 0;
+
+            if (mapObjectId == 0 || Img.current == null)
+                return false;
+
+            if (!Img.current.TryGetObjectDefinition(
+                    mapObjectId,
+                    out uint sourceKey,
+                    out var definition))
+            {
+                return false;
+            }
+
+            return ObjectDefinitions.TryGetOrAdd(
+                sourceKey,
+                definition,
+                out definitionId);
+        }
+
+        public static bool RegisterMapObjectDefinition(byte mapObjectId)
+        {
+            return RegisterMapObjectDefinition(mapObjectId, out _);
         }
 
         public static void SyncGuardPosition(Entity entity)
