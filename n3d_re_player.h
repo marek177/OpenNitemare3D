@@ -11,6 +11,8 @@
 #define N3D_AMMO_PICKUP_AMOUNT 20
 #define N3D_AMMO_FORCED_SET_AMOUNT 50
 #define N3D_ALL_PENTAGRAMS_MASK 0x0F
+#define N3D_WEAPON_COUNT 4
+#define N3D_WEAPON_START_AMMO 50
 
 enum n3d_input_mask
 {
@@ -56,14 +58,28 @@ typedef struct n3d_player_runtime
     uint8_t omnipotent;
     uint8_t difficulty;
 
+    uint32_t score;
+
+    uint8_t pickup_counter_4c1e;
     uint8_t silver_ammo;
     uint8_t laser_ammo;
-    uint8_t wand_ammo;
+    uint8_t resource_4c21;
+    uint8_t special_charge_4c22;
     uint8_t active_weapon;
-    uint8_t weapon_jam;
+    uint8_t queued_weapon;
+    uint16_t weapon_ui_mode;
 
     uint8_t colored_keys;
     uint8_t id_cards;
+    uint8_t owned_weapons;
+    uint8_t aux_inventory_4c2b;
+    uint8_t magic_eye_active;
+    uint8_t crystal_ball_active;
+    uint8_t weapon_jam;
+
+    uint8_t crystal_ball_charge;
+    uint8_t magic_eye_charge;
+    uint8_t wand_ammo;
     uint8_t pentagrams;
 
     uint16_t input_mask;
@@ -74,7 +90,10 @@ extern n3d_player_runtime n3d_player;
 void N3D_RE_ResetPlayer(void);
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y);
 uint8_t N3D_RE_ClampPlayerHealthForHud(void);
+void N3D_RE_ClampPlayerResourcesForHud(void);
 int N3D_RE_ApplyFixedHealthPickup(uint8_t amount);
+int N3D_RE_QueueOwnedWeapon(uint8_t weapon_selector);
+uint8_t* N3D_RE_AmmoPoolForWeapon(uint8_t weapon_selector);
 n3d_player_damage_result N3D_RE_ApplyEnemyDamage(uint8_t damage);
 int N3D_RE_CommitPlayerWorldPosition(int32_t world_x, int32_t world_y, uint8_t* event_id);
 
