@@ -157,17 +157,21 @@ namespace Nitemare3D
             colorsReady = false;
         }
 
+        static byte WallClass(Tile tile)
+        {
+            return Level.GetWallClass(tile);
+        }
+
         static bool IsDynamicDoor(Tile tile)
         {
-            if (tile == null)
-                return false;
+            byte wallClass = WallClass(tile);
+            return wallClass >= 0x31 && wallClass <= 0x40;
+        }
 
-            if (tile.door || tile is Curtain)
-                return true;
-
-            string name = tile.type.ToString();
-            return name.IndexOf("door", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   name.IndexOf("curtain", StringComparison.OrdinalIgnoreCase) >= 0;
+        static bool IsOriginalWall(Tile tile)
+        {
+            byte wallClass = WallClass(tile);
+            return wallClass >= 0x01 && wallClass <= 0x40;
         }
 
         public enum VecOrientation : byte
@@ -180,7 +184,7 @@ namespace Nitemare3D
 
         static bool IsRendererWall(Tile tile)
         {
-            return tile != null && tile.textureID >= 0 && tile.textureID <= 149;
+            return tile != null && IsOriginalWall(tile);
         }
 
         static bool SameVecMaterial(Tile a, Tile b)
