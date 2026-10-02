@@ -110,12 +110,82 @@ namespace Nitemare3D
                    dy > RenderDistanceThreshold || dy < -RenderDistanceThreshold;
         }
 
-        public static void EnterImpact(ref OriginalProjectileRecord projectile)
+        public static bool InitializeSpawn(
+            ref OriginalProjectileRecord projectile,
+            byte weaponSelector,
+            short worldX,
+            short worldY,
+            byte sequenceBase)
         {
+            if (!TryGetSequenceOffsets(weaponSelector, out var offsets))
+                return false;
+
+            projectile = default;
+            projectile.State = (byte)OriginalProjectileState.Flying;
+            projectile.RenderObject.Component03 = 0;
+            projectile.RenderObject.DefinitionId =
+                (byte)(sequenceBase + offsets.Flight);
+            projectile.RenderObject.Flags = 0x01;
+            projectile.RenderObject.ObjectClass = 5;
+            projectile.RenderObject.WorldX = worldX;
+            projectile.RenderObject.WorldY = worldY;
+            projectile.RenderObject.Runtime1A = 5;
+            return true;
+        }
+
+        public static bool EnterImpact(
+            ref OriginalProjectileRecord projectile,
+            byte weaponSelector,
+            byte sequenceBase)
+        {
+            if (!TryGetSequenceOffsets(weaponSelector, out var offsets))
+                return false;
+
             projectile.State = (byte)OriginalProjectileState.Impact;
             projectile.RenderObject.Component03 = 0;
+            projectile.RenderObject.DefinitionId =
+                (byte)(sequenceBase + offsets.Impact);
             projectile.RenderObject.Flags =
                 (byte)(projectile.RenderObject.Flags | 0x10);
+            return true;
+        }
+
+        /// <summary>
+        /// Advances one animation frame after the caller has determined that the
+        /// sequence deadline elapsed. Flight loops; impact frees the slot after
+        /// the final frame.
+        /// </summary>
+        public static void AdvanceAnimationFrame(
+            ref OriginalProjectileRecord projectile,
+            int frameCount)
+        {
+            if (frameCount <= 0 ||
+                projectile.State == (byte)OriginalProjectileState.Free)
+            {
+                return;
+            }
+
+            int nextFrame = projectile.RenderObject.Component03 + 1;
+
+            if (projectile.State == (byte)OriginalProjectileState.Flying)
+            {
+                if (nextFrame >= frameCount)
+                    nextFrame = 0;
+
+                projectile.RenderObject.Component03 = (sbyte)nextFrame;
+                return;
+            }
+
+            if (projectile.State == (byte)OriginalProjectileState.Impact)
+            {
+                if (nextFrame >= frameCount)
+                {
+                    projectile.State = (byte)OriginalProjectileState.Free;
+                    return;
+                }
+
+                projectile.RenderObject.Component03 = (sbyte)nextFrame;
+            }
         }
     }
 
