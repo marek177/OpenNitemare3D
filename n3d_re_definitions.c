@@ -13,6 +13,8 @@ uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
 uint8_t n3d_object_mapped_type[N3D_DEFINITION_COUNT];
 uint8_t n3d_wall_mapping_known[N3D_DEFINITION_COUNT];
 uint8_t n3d_object_mapping_known[N3D_DEFINITION_COUNT];
+uint8_t n3d_wall_property_known[N3D_DEFINITION_COUNT];
+uint8_t n3d_object_property_known[N3D_DEFINITION_COUNT];
 uint8_t n3d_wall_property_resolved[N3D_DEFINITION_COUNT];
 uint8_t n3d_object_property_resolved[N3D_DEFINITION_COUNT];
 uint8_t n3d_definition_episode;
@@ -201,9 +203,68 @@ int N3D_RE_KnownWallMappedTypeForClass(
         return 1;
     }
 
+    if(strcmp(class_name, "DOORVC") == 0)
+    {
+        *mapped_type = 0x3F;
+        return 1;
+    }
+
+    if(strcmp(class_name, "DOORHC") == 0)
+    {
+        *mapped_type = 0x40;
+        return 1;
+    }
+
     if(strcmp(class_name, "TRIGGER2") == 0)
     {
         *mapped_type = 0x48;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int N3D_RE_IsKnownDynamicDoorClass(const char* class_name)
+{
+    static const char* classes[] = {
+        "DOORV", "DOORH",
+        "DOORVL", "DOORHL",
+        "DOORVL2", "DOORHL2",
+        "DOORVL3", "DOORHL3",
+        "DOORVI", "DOORHI",
+        "DOORVR", "DOORHR",
+        "DOORVC", "DOORHC"
+    };
+
+    if(!class_name)
+        return 0;
+
+    for(size_t i = 0; i < sizeof(classes) / sizeof(classes[0]); ++i)
+    {
+        if(strcmp(class_name, classes[i]) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+int N3D_RE_KnownWallPropertyForClass(
+    const char* class_name,
+    uint8_t* property_flags)
+{
+    if(!class_name || !property_flags)
+        return 0;
+
+    if(N3D_RE_IsKnownDynamicDoorClass(class_name))
+    {
+        *property_flags = 0x0B; /* mapped type 0x31..0x40 */
+        return 1;
+    }
+
+    uint8_t mapped_type = 0;
+    if(N3D_RE_KnownWallMappedTypeForClass(class_name, &mapped_type))
+    {
+        *property_flags = N3D_RE_WallPropertiesForMappedType(mapped_type);
         return 1;
     }
 
@@ -237,6 +298,7 @@ static void N3D_RE_SetKnownWallMapping(uint8_t raw_id, uint8_t mapped_type)
 {
     n3d_wall_mapped_type[raw_id] = mapped_type;
     n3d_wall_mapping_known[raw_id] = 1;
+    n3d_wall_property_known[raw_id] = 1;
     n3d_wall_property_resolved[raw_id] =
         N3D_RE_WallPropertiesForMappedType(mapped_type);
 }
@@ -245,6 +307,7 @@ static void N3D_RE_SetKnownObjectMapping(uint8_t raw_id, uint8_t mapped_type)
 {
     n3d_object_mapped_type[raw_id] = mapped_type;
     n3d_object_mapping_known[raw_id] = 1;
+    n3d_object_property_known[raw_id] = 1;
     n3d_object_property_resolved[raw_id] =
         N3D_RE_ObjectPropertiesForMappedType(mapped_type);
 }
@@ -257,6 +320,8 @@ void N3D_RE_RebuildKnownMappedTypes(void)
            sizeof(n3d_object_mapped_type));
     memset(n3d_wall_mapping_known, 0, sizeof(n3d_wall_mapping_known));
     memset(n3d_object_mapping_known, 0, sizeof(n3d_object_mapping_known));
+    memset(n3d_wall_property_known, 0, sizeof(n3d_wall_property_known));
+    memset(n3d_object_property_known, 0, sizeof(n3d_object_property_known));
     memset(n3d_wall_property_resolved, 0, sizeof(n3d_wall_property_resolved));
     memset(n3d_object_property_resolved, 0, sizeof(n3d_object_property_resolved));
 
@@ -290,6 +355,16 @@ void N3D_RE_RebuildKnownMappedTypes(void)
                     wall->class_name, &mapped))
             {
                 N3D_RE_SetKnownWallMapping((uint8_t)id, mapped);
+            }
+            else
+            {
+                uint8_t property_flags = 0;
+                if(N3D_RE_KnownWallPropertyForClass(
+                        wall->class_name, &property_flags))
+                {
+                    n3d_wall_property_known[id] = 1;
+                    n3d_wall_property_resolved[id] = property_flags;
+                }
             }
         }
 
@@ -328,6 +403,16 @@ int N3D_RE_WallMappingKnown(uint8_t raw_id)
 int N3D_RE_ObjectMappingKnown(uint8_t raw_id)
 {
     return n3d_object_mapping_known[raw_id] != 0;
+}
+
+int N3D_RE_WallPropertyKnown(uint8_t raw_id)
+{
+    return n3d_wall_property_known[raw_id] != 0;
+}
+
+int N3D_RE_ObjectPropertyKnown(uint8_t raw_id)
+{
+    return n3d_object_property_known[raw_id] != 0;
 }
 
 static n3d_mapping_coverage N3D_RE_MappingCoverage(
