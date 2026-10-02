@@ -94,8 +94,8 @@ namespace Nitemare3D
             int guardSlot = GuardCount++;
 
             ref var obj = ref Objects[objectSlot];
-            obj.Flags = RecoveredMechanics.ObjectRuntimePresent |
-                        RecoveredMechanics.ObjectCreatesGuard;
+            obj.Flags = (byte)(RecoveredMechanics.ObjectRuntimePresent |
+                                RecoveredMechanics.ObjectCreatesGuard);
             obj.ObjectClass = objectClass;
             obj.GuardIndex = (byte)guardSlot;
             WriteWorldPosition(ref obj, entity.position);
