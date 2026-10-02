@@ -27,8 +27,6 @@ namespace Nitemare3D
 
         static readonly byte[] cells = new byte[MapSize * MapSize];
         static readonly byte[] logicalColors = new byte[16];
-        static readonly Random noiseRandom = new Random(0x4E3344);
-
         static bool colorsReady;
         static bool playerBlink;
         static bool previousF9;
@@ -576,8 +574,8 @@ namespace Nitemare3D
 
             for (int i = 0; i < count; i++)
             {
-                int x = noiseRandom.Next(ViewWidth);
-                int y = noiseRandom.Next(ViewHeight);
+                int x = OriginalRandom.Next() % ViewWidth;
+                int y = OriginalRandom.Next() % ViewHeight;
                 PutLogicalPixel(ViewScreenX + x, ViewScreenY + y, color);
             }
         }
