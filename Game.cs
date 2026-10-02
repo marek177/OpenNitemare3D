@@ -23,6 +23,7 @@ namespace Nitemare3D
 			pcx = hud;
 
 			player = Entity.Create<Player>();
+			Automap.Reset();
 
 			Level.LoadMap(level, episode);
 		}
