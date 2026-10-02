@@ -1037,29 +1037,38 @@ namespace Nitemare3D
         }
 
 
-        //TODO: make entity collision detection less garbage
+        // Cell-level collision query used by legacy actor movement.
+        // Player movement uses WorldCollision for the recovered 27-unit AABB.
         public static bool IsWalkable(int x, int y, Entity ent)
         {
-            if(x < 0 || x > 63 || y < 0 || y > 64){return false;}
-            bool isEntity = false;
-            foreach(var entity in Entity.entities)
+            if (x < 0 || x >= OriginalRuntime.MapWidth ||
+                y < 0 || y >= OriginalRuntime.MapHeight)
             {
-                var ex = (int)MathF.Round(entity.position.X);
-                var ey = (int)MathF.Round(entity.position.Y);
-                if(entity.id == ent.id){continue;} //dont want to check collision on ourselves!
+                return false;
+            }
 
-                
-                if (x == ex && ey == y)
+            var tile = tilemap[x, y];
+            if (tile == null || tile.obstacle)
+            {
+                return false;
+            }
+
+            foreach (var entity in Entity.entities)
+            {
+                if (ReferenceEquals(entity, ent) || !entity.hasCollision)
                 {
-                    if(entity.hasCollision)
-                    {
-                        isEntity = true;
-                        break;
-                    }
+                    continue;
                 }
 
+                var ex = (int)MathF.Floor(entity.position.X);
+                var ey = (int)MathF.Floor(entity.position.Y);
+                if (x == ex && y == ey)
+                {
+                    return false;
+                }
             }
-            return ((tilemap[x,y].textureID == -1)) && !isEntity;
+
+            return true;
         }
 
         public static void LoadMap(int id, int episode)
