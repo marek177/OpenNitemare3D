@@ -1,6 +1,7 @@
 #include "../n3d_re_runtime.h"
 #include "../n3d_re_guard.h"
 #include "../n3d_re_collision.h"
+#include "../n3d_re_player.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -296,6 +297,60 @@ int main(void)
     assert(state_guard.state == N3D_GUARD_STATE_TIMED_DIRECTIONAL_MOVE);
     assert(state_guard.timer == 9);
     assert(state_guard.move_x == 0 && state_guard.move_y == 8);
+
+    N3D_RE_InitPlayerAtTile(10, 20);
+    assert(n3d_player.world_x == 10 * 64 + 32);
+    assert(n3d_player.world_y == 20 * 64 + 32);
+    assert(n3d_player.tile_x == 10 && n3d_player.tile_y == 20);
+    assert(n3d_player.map_cell_offset == (uint16_t)((20 * 64 + 10) * 2));
+    assert(n3d_player.health == 100);
+    assert(n3d_player.active_weapon == N3D_WEAPON_NONE);
+
+    n3d_player.health = 99;
+    assert(N3D_RE_ApplyFixedHealthPickup(20));
+    assert(n3d_player.health == 119);
+    assert(N3D_RE_ClampPlayerHealthForHud() == 100);
+    assert(n3d_player.health == 100);
+    assert(!N3D_RE_ApplyFixedHealthPickup(20));
+
+    n3d_player.health = 50;
+    n3d_player.game_state = 1;
+    n3d_player.omnipotent = 0;
+    assert(N3D_RE_ApplyEnemyDamage(10) == N3D_PLAYER_DAMAGE_NONLETHAL);
+    assert(n3d_player.health == 40);
+    assert(N3D_RE_ApplyEnemyDamage(40) == N3D_PLAYER_DAMAGE_LETHAL);
+    assert(n3d_player.health == 0 && n3d_player.game_state == 2);
+
+    n3d_player.health = 50;
+    n3d_player.game_state = 1;
+    n3d_player.omnipotent = 1;
+    assert(N3D_RE_ApplyEnemyDamage(50) == N3D_PLAYER_DAMAGE_SUPPRESSED_OMNIPOTENT);
+    assert(n3d_player.health == 50);
+
+    uint8_t mask = 0;
+    N3D_RE_GrantInventoryBit(&mask, 3);
+    assert(mask == 0x08 && N3D_RE_HasInventoryBit(mask, 3));
+    assert(!N3D_RE_HasInventoryBit(mask, 8));
+
+    n3d_player.pentagrams = 0x07;
+    assert(!N3D_RE_HasAllPentagrams());
+    n3d_player.pentagrams = 0x0F;
+    assert(N3D_RE_HasAllPentagrams());
+
+    n3d_player.input_mask = N3D_INPUT_FORWARD | N3D_INPUT_FIRE | N3D_INPUT_USE;
+    assert(N3D_RE_HasInput(N3D_INPUT_FORWARD));
+    assert(N3D_RE_HasInput(N3D_INPUT_FIRE));
+    assert(N3D_RE_HasInput(N3D_INPUT_USE));
+    assert(!N3D_RE_HasInput(N3D_INPUT_BACKWARD));
+
+    N3D_RE_InitPlayerAtTile(1, 1);
+    uint8_t event_id = 0;
+    assert(N3D_RE_CommitPlayerWorldPosition(2 * 64 + 32, 1 * 64 + 32, &event_id));
+    assert(n3d_player.tile_x == 2 && n3d_player.tile_y == 1);
+    assert(event_id == N3D_ENTERED_TILE_EVENT);
+    event_id = 0;
+    assert(N3D_RE_CommitPlayerWorldPosition(2 * 64 + 40, 1 * 64 + 40, &event_id));
+    assert(event_id == 0);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
