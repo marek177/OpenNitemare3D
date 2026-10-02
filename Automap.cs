@@ -33,6 +33,8 @@ namespace Nitemare3D
         static bool playerBlink;
         static bool previousF9;
         static bool previousF10;
+        static int lastPlayerX = -1;
+        static int lastPlayerY = -1;
 
         static double slowAccumulator;
         static uint slowTick;
@@ -59,6 +61,8 @@ namespace Nitemare3D
             playerBlink = false;
             previousF9 = false;
             previousF10 = false;
+            lastPlayerX = -1;
+            lastPlayerY = -1;
             slowAccumulator = 0;
             slowTick = 0;
             damageFlashTimer = -1;
@@ -232,6 +236,7 @@ namespace Nitemare3D
 
         public static byte[] CopyPersistentMap()
         {
+            ClearPlayerCellForSave();
             var result = new byte[cells.Length];
             Array.Copy(cells, result, cells.Length);
             return result;
@@ -244,6 +249,8 @@ namespace Nitemare3D
                 return;
 
             Array.Copy(data, cells, Math.Min(data.Length, cells.Length));
+            lastPlayerX = -1;
+            lastPlayerY = -1;
         }
 
         static void ToggleInput()
@@ -349,11 +356,19 @@ namespace Nitemare3D
             int playerX = (int)Game.player.position.X;
             int playerY = (int)Game.player.position.Y;
 
+            if (InsideMap(lastPlayerX, lastPlayerY) &&
+                (lastPlayerX != playerX || lastPlayerY != playerY))
+            {
+                cells[Index(lastPlayerX, lastPlayerY)] = 0;
+            }
+
             if (InsideMap(playerX, playerY))
             {
                 cells[Index(playerX, playerY)] =
                     playerBlink ? ResolveLogicalColor(15) : ResolveLogicalColor(0);
                 playerBlink = !playerBlink;
+                lastPlayerX = playerX;
+                lastPlayerY = playerY;
             }
 
             for (int x = 0; x < ViewWidth; x++)
@@ -484,7 +499,10 @@ namespace Nitemare3D
             }
 
             if (!MagicEyeActive && !CrystalBallActive)
+            {
+                ClearVisible();
                 return;
+            }
 
             UpdateViewOrigin();
 
