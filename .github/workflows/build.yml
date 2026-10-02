@@ -21,3 +21,6 @@ jobs:
 
       - name: Build
         run: dotnet build Nitemare3D.csproj --configuration Release --no-restore
+
+      - name: Runtime self-test
+        run: dotnet run --project Nitemare3D.csproj --configuration Release --no-build -- --self-test
