@@ -340,13 +340,42 @@ namespace Nitemare3D
                 cells[Index(x, y)] = 0;
         }
 
+        // Exact B1A4 request-1 erase rule for a dynamic-door VEC.
+        // flag20 corresponds to VEC+0x05 bit 0x20.
+        public static void DoorOpened(
+            int x,
+            int y,
+            VecOrientation orientation,
+            bool flag20)
+        {
+            int eraseX = x;
+            int eraseY = y;
+
+            if (!flag20)
+            {
+                if (orientation == VecOrientation.Top ||
+                    orientation == VecOrientation.Bottom)
+                {
+                    eraseX--;
+                }
+                else
+                {
+                    eraseY--;
+                }
+            }
+
+            if (InsideMap(eraseX, eraseY))
+                cells[Index(eraseX, eraseY)] = 0;
+        }
+
         public static void DoorClosed(int x, int y)
         {
             if (!InsideMap(x, y))
                 return;
 
             Tile tile = Level.tilemap[x, y];
-            cells[Index(x, y)] = ResolveLogicalColor(IsDynamicDoor(tile) ? 9 : 2);
+            if (IsDynamicDoor(tile))
+                cells[Index(x, y)] = ResolveLogicalColor(9);
         }
 
         public static bool TryAddMagicEye(int amount = 20)
