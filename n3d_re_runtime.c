@@ -183,7 +183,12 @@ int N3D_RE_InstantiateMapObject(
     if(object_class == N3D_PUSH_MAPPED_OBJECT_TYPE)
     {
         if(N3D_RE_RegisterPushObject(slot) < 0)
+        {
+            --n3d_object_count;
+            memset(obj, 0, sizeof(*obj));
+            memset(&n3d_object_bindings[slot], 0, sizeof(n3d_object_bindings[slot]));
             return 0;
+        }
     }
 
     if(object_slot)
