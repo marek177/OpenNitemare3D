@@ -1,6 +1,7 @@
 #include "n3d_re_runtime.h"
 #include "n3d_re_guard.h"
 #include "n3d_re_door.h"
+#include "n3d_re_special_runtime.h"
 #include <string.h>
 
 n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
@@ -18,6 +19,7 @@ void N3D_RE_ResetRuntime(void)
     memset(n3d_projectiles, 0, sizeof(n3d_projectiles));
     N3D_RE_ClearGuardWakeCache();
     N3D_RE_ResetDoors();
+    N3D_RE_ResetPanelsAndPushes();
     n3d_object_count = 0;
     n3d_guard_count = 0;
 }
