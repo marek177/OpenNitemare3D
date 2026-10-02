@@ -124,6 +124,77 @@ namespace Nitemare3D
             WriteWorldPosition(ref Objects[binding.ObjectSlot], entity.position);
         }
 
+        public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            switch ((OriginalGuardState)guard.State)
+            {
+                case OriginalGuardState.Delay:
+                    return OriginalGuardDispatcher.TickDelay(ref guard);
+
+                case OriginalGuardState.Transition13:
+                {
+                    var result = OriginalGuardDispatcher.TickState13(
+                        ref guard,
+                        ref obj,
+                        (worldX, worldY) =>
+                        {
+                            int tileX = worldX >> 6;
+                            int tileY = worldY >> 6;
+                            return Level.IsWalkable(tileX, tileY, entity);
+                        });
+
+                    if (result == OriginalGuardDispatchResult.Moved)
+                    {
+                        entity.position.X =
+                            (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
+                        entity.position.Y =
+                            (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+                    }
+
+                    return result;
+                }
+
+                default:
+                    return OriginalGuardDispatchResult.NotHandled;
+            }
+        }
+
+        public static bool EnterStrategy3TimedMove(Entity entity, ushort randomValue)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            OriginalGuardDispatcher.EnterStrategy3TimedMove(ref guard, randomValue);
+            return true;
+        }
+
+        public static bool CompletePainReaction(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            return OriginalGuardDispatcher.CompletePainReaction(ref guard) ==
+                   OriginalGuardDispatchResult.Completed;
+        }
+
         public static bool TryGetGuardRecord(Entity entity, out OriginalGuardRecord guard)
         {
             if (bindings.TryGetValue(entity, out var binding) &&
