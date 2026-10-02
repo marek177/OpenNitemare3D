@@ -166,10 +166,29 @@ namespace Nitemare3D
             return wallClass >= 0x31 && wallClass <= 0x40;
         }
 
-        static bool IsOriginalWall(Tile tile)
+        static bool IsRegularWall(Tile tile)
         {
             byte wallClass = WallClass(tile);
-            return wallClass >= 0x01 && wallClass <= 0x40;
+            return wallClass >= 0x01 && wallClass <= 0x30;
+        }
+
+        static bool IsOriginalWall(Tile tile)
+        {
+            return IsRegularWall(tile) || IsDynamicDoor(tile);
+        }
+
+        static bool DoorOrientationAllowed(Tile tile, VecOrientation orientation)
+        {
+            byte wallClass = WallClass(tile);
+            if (wallClass < 0x31 || wallClass > 0x40)
+                return false;
+
+            bool verticalClass = (wallClass & 1) != 0;
+            bool verticalOrientation =
+                orientation == VecOrientation.Right ||
+                orientation == VecOrientation.Left;
+
+            return verticalClass == verticalOrientation;
         }
 
         public enum VecOrientation : byte
@@ -218,7 +237,10 @@ namespace Nitemare3D
             if (!InsideMap(nx, ny))
                 return true;
 
-            return !IsRendererWall(Level.tilemap[nx, ny]);
+            // Original 4046 emits a normal wall edge whenever the neighbour
+            // does not have regular-wall property bit 0x04. Door classes
+            // 0x31..0x40 therefore count as an exposed boundary here.
+            return !IsRegularWall(Level.tilemap[nx, ny]);
         }
 
         static bool CanMergeVecCell(
@@ -231,7 +253,7 @@ namespace Nitemare3D
                 return false;
 
             Tile tile = Level.tilemap[x, y];
-            return IsRendererWall(tile) &&
+            return IsRegularWall(tile) &&
                    SameVecMaterial(tile, material) &&
                    IsFaceExposed(x, y, orientation);
         }
@@ -303,11 +325,13 @@ namespace Nitemare3D
 
             if (IsDynamicDoor(tile))
             {
-                cells[Index(x, y)] = ResolveLogicalColor(9);
+                if (DoorOrientationAllowed(tile, orientation))
+                    cells[Index(x, y)] = ResolveLogicalColor(9);
                 return;
             }
 
-            DrawNormalVecRun(x, y, orientation, tile);
+            if (IsRegularWall(tile))
+                DrawNormalVecRun(x, y, orientation, tile);
         }
 
         public static void DoorOpened(int x, int y)
