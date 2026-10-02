@@ -125,7 +125,27 @@ namespace Nitemare3D
                 return;
             }
 
-            WriteWorldPosition(ref Objects[binding.ObjectSlot], entity.position);
+            ref var obj = ref Objects[binding.ObjectSlot];
+            WriteWorldPosition(ref obj, entity.position);
+
+            if (binding.GuardSlot >= 0)
+            {
+                int tileX = obj.WorldX >> 6;
+                int tileY = obj.WorldY >> 6;
+
+                if (tileX >= 0 && tileY >= 0 &&
+                    tileX < OriginalRuntime.MapWidth &&
+                    tileY < OriginalRuntime.MapHeight)
+                {
+                    var tile = Level.tilemap[tileX, tileY];
+                    if (tile != null &&
+                        OriginalDoorSelector.TryGet((byte)tile.type, out byte selector))
+                    {
+                        // Non-DOOR cells intentionally do not clear this field.
+                        Guards[binding.GuardSlot].DefinitionLookup = selector;
+                    }
+                }
+            }
         }
 
         public static int WakeGuardsAfterPlayerFire(
