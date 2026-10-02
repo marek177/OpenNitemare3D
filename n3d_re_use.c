@@ -287,8 +287,44 @@ n3d_use_execution N3D_RE_ExecuteUse(uint8_t octant)
         }
 
         case N3D_USE_MAPPED_WALL:
+        {
+            const uint8_t wall_type = execution.target.mapped_wall_type;
+
+            if(wall_type == 0x09 || wall_type == 0x0A)
+            {
+                execution.level_delta =
+                    (uint8_t)(wall_type == 0x09 ? 1 : 2);
+                execution.kind = N3D_USE_EXEC_LEVEL_CHANGE_REQUEST;
+                return execution;
+            }
+
+            if(wall_type >= 0x19 && wall_type <= 0x1C)
+            {
+                const uint8_t required_bit =
+                    (uint8_t)(wall_type - 0x19);
+                execution.required_inventory_bit = required_bit;
+
+                execution.kind =
+                    N3D_RE_HasInventoryBit(
+                        n3d_player.colored_keys,
+                        required_bit)
+                        ? N3D_USE_EXEC_KEY_GATE_PASSED
+                        : N3D_USE_EXEC_KEY_GATE_BLOCKED;
+                return execution;
+            }
+
+            if(wall_type == 0x15)
+            {
+                execution.kind =
+                    N3D_RE_HasAllPentagrams()
+                        ? N3D_USE_EXEC_PENTAGRAM_GATE_PASSED
+                        : N3D_USE_EXEC_PENTAGRAM_GATE_BLOCKED;
+                return execution;
+            }
+
             execution.kind = N3D_USE_EXEC_WALL_DEFERRED;
             return execution;
+        }
 
         case N3D_USE_MAPPED_OBJECT:
             execution.kind = N3D_USE_EXEC_OBJECT_DEFERRED;
