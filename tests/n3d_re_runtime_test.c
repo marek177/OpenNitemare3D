@@ -4,6 +4,7 @@
 #include "../n3d_re_player.h"
 #include "../n3d_re_projectile.h"
 #include "../n3d_re_combat.h"
+#include "../n3d_re_definitions.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -478,6 +479,51 @@ int main(void)
     assert(n3d_guards[0].state == N3D_GUARD_STATE_08);
     assert(n3d_guards[0].next_state == N3D_GUARD_STATE_02);
     assert(n3d_guards[0].timer == 1);
+
+    n3d_definition_record parsed_definition;
+    assert(N3D_RE_ParseDefinitionLine(
+        "18 O TOMB PUSH Tombstone pushable",
+        &parsed_definition));
+    assert(parsed_definition.id == 0x18);
+    assert(strcmp(parsed_definition.visual_code, "O") == 0);
+    assert(strcmp(parsed_definition.image_name, "TOMB") == 0);
+    assert(strcmp(parsed_definition.class_name, "PUSH") == 0);
+    assert(strcmp(parsed_definition.description, "Tombstone pushable") == 0);
+
+    uint8_t known_mapped_type = 0;
+    assert(N3D_RE_KnownObjectMappedTypeForClass(
+        "PUSH", &known_mapped_type));
+    assert(known_mapped_type == 0x28);
+    assert(!N3D_RE_KnownObjectMappedTypeForClass(
+        "UNRESOLVED_CLASS", &known_mapped_type));
+
+    FILE* walls_test = fopen("WALLS.1", "wb");
+    assert(walls_test != NULL);
+    fputs("01 W WALLIMG SOLID Ordinary wall\n", walls_test);
+    fputs("70 D DOORIMG UNRESOLVED_DOOR Door variant\n", walls_test);
+    fclose(walls_test);
+
+    FILE* objects_test = fopen("OBJECTS.1", "wb");
+    assert(objects_test != NULL);
+    fputs("18 O TOMB PUSH Tombstone pushable\n", objects_test);
+    fputs("80 O BATIMG UNRESOLVED_GUARD Bat north\n", objects_test);
+    fclose(objects_test);
+
+    assert(N3D_RE_LoadEpisodeDefinitions(1));
+    assert(n3d_wall_definitions.count == 2);
+    assert(n3d_object_definitions.count == 2);
+
+    const n3d_definition_record* push_def =
+        N3D_RE_FindDefinition(&n3d_object_definitions, 0x18);
+    assert(push_def != NULL);
+    assert(strcmp(push_def->class_name, "PUSH") == 0);
+    assert(n3d_object_mapped_type[0x18] == 0x28);
+    assert(n3d_object_mapped_type[0x80] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(n3d_wall_mapped_type[0x01] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(n3d_wall_mapped_type[0x70] == N3D_MAPPED_TYPE_UNKNOWN);
+
+    remove("WALLS.1");
+    remove("OBJECTS.1");
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
