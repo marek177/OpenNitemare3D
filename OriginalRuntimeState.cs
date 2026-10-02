@@ -594,14 +594,10 @@ namespace Nitemare3D
                         return GuardHitResult.SpecialReactionRequired;
                     }
 
-                    obj.DefinitionId = batDefinitionId;
-                    obj.ObjectClass = OriginalRuntime.DraculaBatPhase2Class;
-                    obj.Runtime1A = 0x23;
-
-                    guard.Strength = OriginalRuntime.GuardInitialStrength;
-                    guard.State = (byte)OriginalGuardState.Move08;
-                    guard.NextState = (byte)OriginalGuardState.Active02;
-                    guard.Timer = 1;
+                    OriginalGuardDispatcher.ApplyDraculaPhase2Reset(
+                        ref guard,
+                        ref obj,
+                        batDefinitionId);
                     return GuardHitResult.DraculaTransformed;
 
                 case OriginalRuntime.DrHamersteinClass:
