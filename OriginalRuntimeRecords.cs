@@ -45,7 +45,7 @@ namespace Nitemare3D
         [FieldOffset(0x12)] public byte ResultOctant;
         [FieldOffset(0x13)] public sbyte MoveX;
         [FieldOffset(0x14)] public sbyte MoveY;
-        [FieldOffset(0x15)] public byte Unknown15;
+        [FieldOffset(0x15)] public sbyte VerticalBobStep;
         [FieldOffset(0x16)] public byte TransitionControl;
         [FieldOffset(0x17)] public byte Unknown17;
         [FieldOffset(0x18)] public byte Unknown18;
