@@ -54,8 +54,8 @@ void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 
         if(!p_player)
         {
-            p_player = M_Spawn(id, x, y, id-1);
-            p_player->player = malloc(sizeof(player_t));
+            obj_t* spawned_player = M_Spawn(id, x, y, id-1);
+            P_InitPlayer(spawned_player);
         }
 
         p_player->health = n3d_player.health;
