@@ -72,20 +72,32 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Original movement resolves X and Y independently, producing wall sliding.
+        /// The original movement path advances in one-world-unit increments and
+        /// collision-tests X/Y independently, producing wall sliding. The port uses
+        /// tile-space floats, so one recovered world unit is 1/64 of a tile.
         /// </summary>
         public static void MovePlayerWithSliding(Player player, Vec2 delta)
         {
-            var candidateX = new Vec2(player.position.X + delta.X, player.position.Y);
-            if (CanOccupyPlayer(candidateX, player))
-            {
-                player.position.X = candidateX.X;
-            }
+            float maxComponent = MathF.Max(MathF.Abs(delta.X), MathF.Abs(delta.Y));
+            int steps = Math.Max(1, (int)MathF.Ceiling(
+                maxComponent * OriginalRuntime.WorldUnitsPerTile));
 
-            var candidateY = new Vec2(player.position.X, player.position.Y + delta.Y);
-            if (CanOccupyPlayer(candidateY, player))
+            float stepX = delta.X / steps;
+            float stepY = delta.Y / steps;
+
+            for (int i = 0; i < steps; i++)
             {
-                player.position.Y = candidateY.Y;
+                var candidateX = new Vec2(player.position.X + stepX, player.position.Y);
+                if (CanOccupyPlayer(candidateX, player))
+                {
+                    player.position.X = candidateX.X;
+                }
+
+                var candidateY = new Vec2(player.position.X, player.position.Y + stepY);
+                if (CanOccupyPlayer(candidateY, player))
+                {
+                    player.position.Y = candidateY.Y;
+                }
             }
         }
     }
