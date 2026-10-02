@@ -236,6 +236,38 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "state 13 must clear strategy and return to state 02.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Transition13,
+                Strategy = 3,
+                Timer = 8,
+                MoveX = 8,
+                MoveY = 0
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100
+            };
+
+            int blockedAttempts = 0;
+            while (guard.State == (byte)OriginalGuardState.Transition13)
+            {
+                var result = OriginalGuardDispatcher.TickState13(
+                    ref guard, ref obj, (x, y) => false);
+
+                if (result == OriginalGuardDispatchResult.MovementBlocked)
+                    blockedAttempts++;
+            }
+
+            Assert(blockedAttempts == 8,
+                "blocked state 13 must still consume all eight movement attempts.");
+            Assert(obj.WorldX == 100 && obj.WorldY == 100,
+                "blocked state 13 must not commit coordinates.");
+            Assert(guard.Strategy == 0 &&
+                   guard.State == (byte)OriginalGuardState.Active02,
+                "blocked state 13 must still terminate normally.");
         }
 
         static void TestGuardMapClassMapping()
