@@ -124,6 +124,11 @@ namespace Nitemare3D
 
         }
 
+        public override void Start()
+        {
+            OriginalRuntimeState.RegisterGuard(this, type);
+        }
+
         float roarTimer = 0;
         float roarTime = .5f;
 
@@ -238,6 +243,7 @@ namespace Nitemare3D
 
         public void ShootPlasma()
         {
+            OriginalRuntimeState.SetGuardStrength(this, 0);
             state = GuardState.dead;
         }
 
@@ -317,6 +323,8 @@ namespace Nitemare3D
             {
                 yOffset += (32 - yOffset) * Time.dt;
             }
+
+            OriginalRuntimeState.SyncGuardPosition(this);
         }
     }
 }
