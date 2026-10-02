@@ -39,6 +39,8 @@ extern uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_object_mapped_type[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_wall_mapping_known[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_object_mapping_known[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_wall_property_known[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_object_property_known[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_wall_property_resolved[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_object_property_resolved[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_definition_episode;
@@ -59,6 +61,10 @@ int N3D_RE_KnownWallMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type);
 
+int N3D_RE_KnownWallPropertyForClass(
+    const char* class_name,
+    uint8_t* property_flags);
+
 int N3D_RE_KnownObjectMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type);
@@ -66,6 +72,8 @@ int N3D_RE_KnownObjectMappedTypeForClass(
 void N3D_RE_RebuildKnownMappedTypes(void);
 int N3D_RE_WallMappingKnown(uint8_t raw_id);
 int N3D_RE_ObjectMappingKnown(uint8_t raw_id);
+int N3D_RE_WallPropertyKnown(uint8_t raw_id);
+int N3D_RE_ObjectPropertyKnown(uint8_t raw_id);
 n3d_mapping_coverage N3D_RE_WallMappingCoverage(void);
 n3d_mapping_coverage N3D_RE_ObjectMappingCoverage(void);
 void N3D_RE_DumpUnresolvedMappings(void);
