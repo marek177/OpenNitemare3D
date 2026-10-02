@@ -1,4 +1,5 @@
 #include "n3d_re_collision.h"
+#include "n3d_re_definitions.h"
 
 #include <string.h>
 
@@ -157,4 +158,74 @@ int N3D_RE_TestLeadingEdgePair(
         return 0;
 
     return signed_step;
+}
+
+
+n3d_resolved_collision_result N3D_RE_TestResolvedLeadingEdgePair(
+    uint8_t ax, uint8_t ay,
+    uint8_t bx, uint8_t by,
+    int signed_step,
+    const n3d_collision_callbacks* callbacks)
+{
+    n3d_resolved_collision_result result = {0, 0};
+
+    const n3d_map_cell* a = N3D_RE_MapCell(ax, ay);
+    const n3d_map_cell* b = N3D_RE_MapCell(bx, by);
+    if(!a || !b)
+        return result;
+
+    if(!N3D_RE_WallMappingKnown(a->wall) ||
+       !N3D_RE_WallMappingKnown(b->wall) ||
+       !N3D_RE_ObjectMappingKnown(a->object) ||
+       !N3D_RE_ObjectMappingKnown(b->object))
+    {
+        /*
+         * Modern safety rule: unresolved definition mapping is not silently
+         * treated as passable. The caller can report/trace it separately.
+         */
+        return result;
+    }
+
+    result.resolved = 1;
+
+    const uint8_t wa = n3d_wall_property_resolved[a->wall];
+    const uint8_t wb = n3d_wall_property_resolved[b->wall];
+
+    if((wa & 0x04) || (wb & 0x04))
+        return result;
+
+    if(wa & 0x08)
+    {
+        if(!callbacks || !callbacks->door_passable ||
+           !callbacks->door_passable(ax, ay, callbacks->user))
+            return result;
+    }
+
+    if(wb & 0x08)
+    {
+        if(!callbacks || !callbacks->door_passable ||
+           !callbacks->door_passable(bx, by, callbacks->user))
+            return result;
+    }
+
+    if(callbacks && callbacks->wall_script_touch)
+    {
+        if(wa & 0x40) callbacks->wall_script_touch(ax, ay, callbacks->user);
+        if(wb & 0x40) callbacks->wall_script_touch(bx, by, callbacks->user);
+    }
+
+    const uint8_t oa = n3d_object_property_resolved[a->object];
+    const uint8_t ob = n3d_object_property_resolved[b->object];
+
+    if(callbacks && callbacks->object_touch)
+    {
+        if(oa & 0x04) callbacks->object_touch(ax, ay, callbacks->user);
+        if(ob & 0x04) callbacks->object_touch(bx, by, callbacks->user);
+    }
+
+    if((oa & 0x02) || (ob & 0x02))
+        return result;
+
+    result.step = signed_step;
+    return result;
 }
