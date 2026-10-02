@@ -29,6 +29,16 @@ extern uint8_t n3d_guard_wake_cache[N3D_GUARD_WAKE_CACHE_SIZE];
 uint16_t N3D_RE_RngNext(uint32_t* state);
 n3d_guard_move_vector N3D_RE_GuardDirectionalStep(uint8_t facing, uint8_t strategy);
 uint16_t N3D_RE_State13InitialTimer(uint16_t random_value);
+int N3D_RE_TickState01(n3d_guard_record* guard);
+int N3D_RE_CompleteDeferredState(n3d_guard_record* guard);
+int N3D_RE_CompleteState06(n3d_guard_record* guard);
+int N3D_RE_CompleteState11(n3d_guard_record* guard);
+int N3D_RE_CompletePainState15(n3d_guard_record* guard);
+int N3D_RE_ResolveState07Perception(
+    n3d_guard_record* guard,
+    int processing_gate_set,
+    int perception_succeeded,
+    uint16_t random_value);
 n3d_state13_step_result N3D_RE_StepState13(uint16_t current_timer, int target_cell_allows_move);
 void N3D_RE_ClearGuardWakeCache(void);
 int N3D_RE_DoorSelectorFromWallId(uint8_t wall_id, uint8_t* selector);
