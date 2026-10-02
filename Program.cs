@@ -45,8 +45,19 @@ namespace Nitemare3D
 				
 				
 				Entity.UpdateEntites();
+
+				if (Scene.currentScene is Game)
+				{
+					Automap.Update();
+				}
 				
 				GameWindow.DrawPcx();
+
+				if (Scene.currentScene is Game)
+				{
+					Automap.Render();
+				}
+
 				GameWindow.DrawFrameBuffer();
 				
 				if (!Scene.currentScene.fading)
