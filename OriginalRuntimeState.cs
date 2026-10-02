@@ -150,6 +150,60 @@ namespace Nitemare3D
             return false;
         }
 
+        public enum GuardHitResult
+        {
+            NoRuntimeBinding,
+            NoDamage,
+            PainReaction,
+            Killed,
+            DraculaTransformed
+        }
+
+        /// <summary>
+        /// Applies the confirmed normal GUARD damage receiver path.
+        /// Special strategy-specific hit branches are deliberately not folded into
+        /// this helper until their semantics are fully closed.
+        /// </summary>
+        public static GuardHitResult ApplyNormalGuardDamage(Entity entity, byte damage)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return GuardHitResult.NoRuntimeBinding;
+            }
+
+            if (damage == 0)
+            {
+                return GuardHitResult.NoDamage;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            if (damage >= guard.Strength)
+            {
+                if (obj.ObjectClass == OriginalRuntime.DraculaPhase1Class)
+                {
+                    obj.ObjectClass = OriginalRuntime.DraculaBatPhase2Class;
+                    guard.Strength = OriginalRuntime.GuardInitialStrength;
+                    guard.State = (byte)OriginalGuardState.Move08;
+                    guard.NextState = (byte)OriginalGuardState.Active02;
+                    guard.Timer = 1;
+                    return GuardHitResult.DraculaTransformed;
+                }
+
+                guard.Strength = 0;
+                return GuardHitResult.Killed;
+            }
+
+            guard.Strength = (byte)(guard.Strength - damage);
+            guard.ResultOctant = 8;
+            guard.NextState = guard.State;
+            guard.State = (byte)OriginalGuardState.Pain15;
+            return GuardHitResult.PainReaction;
+        }
+
         public static void SetGuardStrength(Entity entity, byte strength)
         {
             if (bindings.TryGetValue(entity, out var binding) &&
