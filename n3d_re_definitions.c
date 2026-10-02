@@ -192,16 +192,41 @@ int N3D_RE_KnownWallMappedTypeForClass(
         }
     }
 
-    if(strcmp(class_name, "LEVEL_UP") == 0)
-    {
-        *mapped_type = 0x09;
-        return 1;
-    }
+    /*
+     * Canonical class names cross-bound by the 2026-09-28 WALLS audit.
+     * Only names with an explicit class_hex association are listed.
+     */
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } wall_classes[] = {
+        {"WALL",       0x01},
+        {"REVWALL",    0x02},
+        {"CONTROL",    0x03},
+        {"ONE_SHOT",   0x07},
+        {"SPECIAL1",   0x08},
+        {"LEVEL_UP",   0x09},
+        {"LEVEL_UP2",  0x0A},
+        {"WARP_E1",    0x1D},
+        {"WALL_EX",    0x2D},
+        {"WALL_EX1",   0x2E},
+        {"WALL_EX2",   0x2F},
+        {"TURN",       0x41},
+        {"RETREAT",    0x42},
+        {"FLOOR",      0x44},
+        {"SAFESPOT",   0x45},
+        {"ACTIONSPOT", 0x46},
+        {"TRIGGER1",   0x47},
+        {"TRIGGER2",   0x48}
+    };
 
-    if(strcmp(class_name, "LEVEL_UP2") == 0)
+    for(size_t i = 0; i < sizeof(wall_classes) / sizeof(wall_classes[0]); ++i)
     {
-        *mapped_type = 0x0A;
-        return 1;
+        if(strcmp(class_name, wall_classes[i].name) == 0)
+        {
+            *mapped_type = wall_classes[i].mapped_type;
+            return 1;
+        }
     }
 
     if(strncmp(class_name, "WARP_", 5) == 0 &&
@@ -229,18 +254,6 @@ int N3D_RE_KnownWallMappedTypeForClass(
        class_name[7] == '\0')
     {
         *mapped_type = (uint8_t)(0x19 + (class_name[6] - '1'));
-        return 1;
-    }
-
-    if(strcmp(class_name, "TRIGGER1") == 0)
-    {
-        *mapped_type = 0x47;
-        return 1;
-    }
-
-    if(strcmp(class_name, "TRIGGER2") == 0)
-    {
-        *mapped_type = 0x48;
         return 1;
     }
 
@@ -302,16 +315,60 @@ int N3D_RE_KnownObjectMappedTypeForClass(
         return 0;
 
     /*
-     * Directly corroborated by the reconstructed LevelState and EXE audit:
-     * class PUSH is mapped object type 0x28.
-     *
-     * Do not assign other class strings here until their textual names are
-     * cross-bound to the executable's numeric 0x8296 mapping.
+     * Canonical OBJECTS class names from the 2026-09-28 class/map audit.
+     * Unknown class_hex values 0x04/0x05/0x3E and unnamed entries remain open.
      */
-    if(strcmp(class_name, "PUSH") == 0)
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } object_classes[] = {
+        {"NULL",      0x00},
+        {"START",     0x02},
+        {"SECRET",    0x03},
+        {"CAUSTIC",   0x07},
+        {"SAFE",      0x26},
+        {"TRUNK",     0x27},
+        {"PUSH",      0x28},
+        {"ACTION",    0x29},
+        {"PERMEABLE", 0x2A},
+        {"DUMB",      0x2B},
+        {"ELEVATED",  0x2E},
+        {"KEY",       0x2F},
+        {"IDCARD",    0x30},
+        {"FOOD",      0x33},
+        {"WEAPON",    0x36},
+        {"AMMO",      0x39},
+        {"CRYSTALB",  0x3A},
+        {"MAGICEYE",  0x3B},
+        {"PENTAGRAM", 0x3C},
+        {"SCROLL",    0x3D}
+    };
+
+    for(size_t i = 0; i < sizeof(object_classes) / sizeof(object_classes[0]); ++i)
     {
-        *mapped_type = 0x28;
-        return 1;
+        if(strcmp(class_name, object_classes[i].name) == 0)
+        {
+            *mapped_type = object_classes[i].mapped_type;
+            return 1;
+        }
+    }
+
+    /*
+     * Editor classes GUARD1..GUARD26 map directly to logical classes
+     * 0x08..0x21. The numeric suffix is validated rather than assumed from
+     * raw MAP IDs, so this also works across episode-specific raw IDs.
+     */
+    if(strncmp(class_name, "GUARD", 5) == 0)
+    {
+        char* endptr = NULL;
+        const long guard_number = strtol(class_name + 5, &endptr, 10);
+
+        if(endptr && *endptr == '\0' &&
+           guard_number >= 1 && guard_number <= 26)
+        {
+            *mapped_type = (uint8_t)(0x07 + guard_number);
+            return 1;
+        }
     }
 
     return 0;
