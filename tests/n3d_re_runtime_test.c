@@ -503,12 +503,37 @@ int main(void)
         "WARP_L1", &known_mapped_type) && known_mapped_type == 0x19);
     assert(N3D_RE_KnownWallMappedTypeForClass(
         "TRIGGER1", &known_mapped_type) && known_mapped_type == 0x47);
-    assert(N3D_RE_KnownWallMappedTypeForClass(
-        "DOORVC", &known_mapped_type) && known_mapped_type == 0x3F);
-    assert(N3D_RE_KnownWallMappedTypeForClass(
-        "DOORHC", &known_mapped_type) && known_mapped_type == 0x40);
+    static const struct {
+        const char* name;
+        uint8_t mapped_type;
+    } expected_door_classes[] = {
+        {"DOORV",   0x31},
+        {"DOORH",   0x32},
+        {"DOORVL",  0x33},
+        {"DOORHL",  0x34},
+        {"DOORVL2", 0x35},
+        {"DOORHL2", 0x36},
+        {"DOORVL3", 0x37},
+        {"DOORHL3", 0x38},
+        {"DOORVI",  0x39},
+        {"DOORHI",  0x3A},
+        {"DOORVR",  0x3B},
+        {"DOORHR",  0x3C},
+        {"DOORVC",  0x3F},
+        {"DOORHC",  0x40}
+    };
+
+    for(size_t i = 0;
+        i < sizeof(expected_door_classes) / sizeof(expected_door_classes[0]);
+        ++i)
+    {
+        assert(N3D_RE_KnownWallMappedTypeForClass(
+            expected_door_classes[i].name, &known_mapped_type));
+        assert(known_mapped_type == expected_door_classes[i].mapped_type);
+    }
+
     assert(!N3D_RE_KnownWallMappedTypeForClass(
-        "DOORV", &known_mapped_type));
+        "DOOR_UNRESOLVED_3D", &known_mapped_type));
 
     uint8_t known_property_flags = 0;
     assert(N3D_RE_KnownWallPropertyForClass(
@@ -554,8 +579,8 @@ int main(void)
     n3d_mapping_coverage object_mapping_coverage =
         N3D_RE_ObjectMappingCoverage();
     assert(wall_mapping_coverage.total == 9);
-    assert(wall_mapping_coverage.known == 6);
-    assert(wall_mapping_coverage.unknown == 3);
+    assert(wall_mapping_coverage.known == 7);
+    assert(wall_mapping_coverage.unknown == 2);
     assert(object_mapping_coverage.total == 2);
     assert(object_mapping_coverage.known == 2);
     assert(object_mapping_coverage.unknown == 0);
@@ -576,9 +601,9 @@ int main(void)
     assert(!N3D_RE_WallPropertyKnown(0x01));
     assert(n3d_wall_mapped_type[0x01] == N3D_MAPPED_TYPE_UNKNOWN);
 
-    assert(!N3D_RE_WallMappingKnown(0x70));
+    assert(N3D_RE_WallMappingKnown(0x70));
     assert(N3D_RE_WallPropertyKnown(0x70));
-    assert(n3d_wall_mapped_type[0x70] == N3D_MAPPED_TYPE_UNKNOWN);
+    assert(n3d_wall_mapped_type[0x70] == 0x31);
     assert(n3d_wall_property_resolved[0x70] == 0x0B);
 
     assert(!N3D_RE_WallMappingKnown(0x71));
@@ -868,6 +893,16 @@ int main(void)
     assert(use_target.kind == N3D_USE_UNRESOLVED);
 
     n3d_map[use_east_cell].wall = 0x70;
+    use_target = N3D_RE_ClassifyUseTarget(1);
+    assert(use_target.kind == N3D_USE_DYNAMIC_DOOR);
+    assert(use_target.mapped_wall_type == 0x31);
+
+    /* Prove the property-only layer still works independently of exact mapping. */
+    n3d_wall_mapping_known[0x73] = 0;
+    n3d_wall_property_known[0x73] = 1;
+    n3d_wall_mapped_type[0x73] = N3D_MAPPED_TYPE_UNKNOWN;
+    n3d_wall_property_resolved[0x73] = 0x0B;
+    n3d_map[use_east_cell].wall = 0x73;
     use_target = N3D_RE_ClassifyUseTarget(1);
     assert(use_target.kind == N3D_USE_DYNAMIC_DOOR);
     assert(use_target.mapped_wall_type == 0);
