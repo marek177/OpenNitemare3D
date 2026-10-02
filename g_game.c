@@ -1,6 +1,7 @@
 #include "g_game.h"
 #include "g_textures.h"
 #include "m_obj.h"
+#include "n3d_re_runtime.h"
 
 
 bool G_GameIsDone()
@@ -32,6 +33,12 @@ void G_LoadEpisode(uint8_t episode)
 //dear David P Gray, why?
 void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 {
+    /*
+     * The historical C rewrite only logged most guard spawns. Keep its shell,
+     * but build the recovered original OBJECT/GUARD records in parallel.
+     */
+    N3D_RE_RegisterGuardFromMap(id, x, y);
+
     if(id > 0 && id <= MT_StartpositionW)
     {
         if(!p_player)
@@ -63,7 +70,7 @@ void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 
     if(id >= MT_SkeletonN && id <= MT_SkeletonW)
     {
-        SDL_Log("spawned Mummy at {%d,%d}\n",x,y);
+        SDL_Log("spawned Skeleton at {%d,%d}\n",x,y);
     }
 }
 
@@ -82,32 +89,51 @@ void G_LoadLevel(uint8_t level)
 {
     I_ChangeSong(2);
     printf("loading level E%dL%d\n", gameinfo.episode, level + 1);
-    byte* data = malloc(8192);
-    unsigned char* filename[64];
+
+    byte* data = malloc(N3D_MAP_LEVEL_BYTES);
+    char filename[64];
 
     sprintf(filename, "MAP.%d", gameinfo.episode);
     FILE* file = fopen(filename, "rb");
-    fseek(file, 514, SEEK_SET);
-    long off = level * 8192;
-    
-    fread(data, 8192, 1, file);
-
-    for(int i = 1; i < 8192; i+=2)
+    if(!file)
     {
-        uint8_t x = i % 64;
-        uint8_t y = i / 64;
-        G_CreateMapObject(data[i], x,y);
+        printf("failed to open %s\n", filename);
+        free(data);
+        return;
     }
 
-    gameinfo.mapdata = malloc(4096);
-    
-    for(int i = 0; i < 8192; i++)
+    const long level_offset =
+        N3D_MAP_HEADER_BYTES + ((long)level * N3D_MAP_LEVEL_BYTES);
+    fseek(file, level_offset, SEEK_SET);
+
+    if(fread(data, N3D_MAP_LEVEL_BYTES, 1, file) != 1)
     {
-        if(i % 2 == 0)
-        {
-            gameinfo.mapdata[i/2] = data[i];
-        }
+        printf("failed to read level payload from %s\n", filename);
+        fclose(file);
+        free(data);
+        return;
     }
 
-    
+    N3D_RE_ResetRuntime();
+
+    for(int cell = 0; cell < N3D_MAP_WIDTH * N3D_MAP_HEIGHT; cell++)
+    {
+        uint8_t x = (uint8_t)(cell % N3D_MAP_WIDTH);
+        uint8_t y = (uint8_t)(cell / N3D_MAP_WIDTH);
+        byte object_id = data[cell * N3D_MAP_CELL_BYTES + 1];
+        G_CreateMapObject(object_id, x, y);
+    }
+
+    if(gameinfo.mapdata)
+        free(gameinfo.mapdata);
+
+    gameinfo.mapdata = malloc(N3D_MAP_WIDTH * N3D_MAP_HEIGHT);
+    for(int cell = 0; cell < N3D_MAP_WIDTH * N3D_MAP_HEIGHT; cell++)
+        gameinfo.mapdata[cell] = data[cell * N3D_MAP_CELL_BYTES];
+
+    fclose(file);
+    free(data);
+
+    printf("recovered runtime: %u OBJECT, %u GUARD\n",
+           n3d_object_count, n3d_guard_count);
 }
