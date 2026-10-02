@@ -57,6 +57,11 @@ const n3d_definition_record* N3D_RE_FindDefinition(
     const n3d_definition_table* table,
     uint8_t id);
 
+int N3D_RE_DefinitionVariantIndex(
+    const n3d_definition_table* table,
+    uint8_t id,
+    uint8_t* variant_index);
+
 int N3D_RE_KnownWallMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type);
