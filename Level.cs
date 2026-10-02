@@ -214,54 +214,54 @@ namespace Nitemare3D
                     ent = new HiddenPanel();
                     break;
                 case ObjectType.BatN:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatE:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatS:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatW:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.FrankensteinN:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinE:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinS:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinW:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.MummyN:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyE:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyS:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyW:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.Dancers:
                     break;
                 case ObjectType.SkeletonN:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonE:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonS:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonW:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.MrsHN:
                     break;
@@ -288,52 +288,52 @@ namespace Nitemare3D
                 case ObjectType.VampiraW:
                     break;
                 case ObjectType.Baddie1NBluecoat:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie1E:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie1S:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie1W:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie1MN:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie1ME:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie1MS:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie1MW:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie2NGreencoat:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie2E:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie2S:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie2W:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie2MN:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie2ME:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie2MS:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie2MW:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West, (byte)id);
                     break;
                 case ObjectType.DraculaN:
                     break;
