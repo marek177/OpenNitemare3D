@@ -161,6 +161,30 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Waiting;
         }
 
+        // State 0x06: once its movement/timer work completes, continue at 0x03.
+        public static OriginalGuardDispatchResult CompleteState06(
+            ref OriginalGuardRecord guard)
+        {
+            if (guard.State != (byte)OriginalGuardState.MoveThen03)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            guard.State = (byte)OriginalGuardState.Detection03;
+            return OriginalGuardDispatchResult.Completed;
+        }
+
+        // State 0x11: after the confirmed movement/timer sequence, strategy is
+        // cleared and normal state-7 processing resumes.
+        public static OriginalGuardDispatchResult CompleteState11(
+            ref OriginalGuardRecord guard)
+        {
+            if (guard.State != (byte)OriginalGuardState.RecoverMove11)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            guard.Strategy = 0;
+            guard.State = (byte)OriginalGuardState.Active07;
+            return OriginalGuardDispatchResult.Completed;
+        }
+
         // States 0x0A/0x0B share a no-local-action dispatcher target.
         public static bool IsNoLocalActionState(byte state)
         {
