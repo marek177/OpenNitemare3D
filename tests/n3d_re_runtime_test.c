@@ -2,6 +2,7 @@
 #include "../n3d_re_guard.h"
 #include "../n3d_re_collision.h"
 #include "../n3d_re_player.h"
+#include "../n3d_re_projectile.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -351,6 +352,56 @@ int main(void)
     event_id = 0;
     assert(N3D_RE_CommitPlayerWorldPosition(2 * 64 + 40, 1 * 64 + 40, &event_id));
     assert(event_id == 0);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_FirstFreeProjectileSlot() == 0);
+    assert(N3D_RE_WeaponUsesProjectile(N3D_WEAPON_SINGLE_LASER));
+    assert(N3D_RE_WeaponUsesProjectile(N3D_WEAPON_MAGIC_WAND));
+    assert(!N3D_RE_WeaponUsesProjectile(N3D_WEAPON_SILVER_PISTOL));
+    assert(N3D_RE_WeaponUsesProjectile(N3D_WEAPON_CONTINUOUS_LASER));
+
+    n3d_projectile_sequence_offsets projectile_seq = {0};
+    assert(N3D_RE_ProjectileSequenceOffsets(N3D_WEAPON_MAGIC_WAND, &projectile_seq));
+    assert(projectile_seq.flight == 2 && projectile_seq.impact == 3);
+    assert(!N3D_RE_ProjectileSequenceOffsets(N3D_WEAPON_SILVER_PISTOL, &projectile_seq));
+
+    assert(N3D_RE_ProjectileHitsGuard(9, -9, 0, 0));
+    assert(!N3D_RE_ProjectileHitsGuard(10, 0, 0, 0));
+    assert(N3D_RE_ProjectileNeedsProjection(21, 0, 0, 0));
+    assert(!N3D_RE_ProjectileNeedsProjection(20, -20, 0, 0));
+
+    assert(N3D_RE_InitializeProjectile(
+        0, N3D_WEAPON_MAGIC_WAND, 100, 200, 10));
+    assert(n3d_projectiles[0].state == 1);
+    assert(n3d_projectiles[0].object.animation_frame == 0);
+    assert(n3d_projectiles[0].object.sequence_id == 12);
+    assert(n3d_projectiles[0].object.flags == N3D_OBJECT_RUNTIME_PRESENT);
+    assert(n3d_projectiles[0].object.object_class == 5);
+    assert(n3d_projectiles[0].object.world_x == 100);
+    assert(n3d_projectiles[0].object.world_y == 200);
+    assert(n3d_projectiles[0].object.runtime_1a == 5);
+    assert(N3D_RE_FirstFreeProjectileSlot() == 1);
+
+    N3D_RE_AdvanceProjectileAnimation(0, 2);
+    assert(n3d_projectiles[0].object.animation_frame == 1);
+    N3D_RE_AdvanceProjectileAnimation(0, 2);
+    assert(n3d_projectiles[0].object.animation_frame == 0);
+
+    assert(N3D_RE_EnterProjectileImpact(
+        0, N3D_WEAPON_MAGIC_WAND, 10));
+    assert(n3d_projectiles[0].state == 2);
+    assert(n3d_projectiles[0].object.sequence_id == 13);
+    assert((n3d_projectiles[0].object.flags & 0x10) != 0);
+
+    N3D_RE_AdvanceProjectileAnimation(0, 2);
+    assert(n3d_projectiles[0].state == 2);
+    assert(n3d_projectiles[0].object.animation_frame == 1);
+    N3D_RE_AdvanceProjectileAnimation(0, 2);
+    assert(n3d_projectiles[0].state == 0);
+
+    for(int i = 0; i < N3D_MAX_PROJECTILES; ++i)
+        n3d_projectiles[i].state = 1;
+    assert(N3D_RE_FirstFreeProjectileSlot() == -1);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
