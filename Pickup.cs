@@ -164,6 +164,13 @@ namespace Nitemare3D
                     break;
             }
             
+            int mapX = (int)position.X;
+            int mapY = (int)position.Y;
+            if (mapX >= 0 && mapY >= 0 && mapX < 64 && mapY < 64)
+            {
+                Level.tilemap[mapX, mapY].objectID = 0;
+            }
+
             Entity.Remove(this);
             visible = false;
 
