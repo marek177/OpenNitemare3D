@@ -4,6 +4,7 @@
 #include "n3d_re_runtime.h"
 #include "g_think.h"
 #include "n3d_re_player.h"
+#include "n3d_re_definitions.h"
 
 
 bool G_GameIsDone()
@@ -29,7 +30,18 @@ void G_LoadEpisode(uint8_t episode)
 {
     printf("loading episode %d\n", episode);
     gameinfo.episode = episode;
-    
+
+    if(N3D_RE_LoadEpisodeDefinitions(episode))
+    {
+        printf("loaded definitions: %u WALLS, %u OBJECTS\n",
+               n3d_wall_definitions.count,
+               n3d_object_definitions.count);
+    }
+    else
+    {
+        printf("definition files WALLS.%u / OBJECTS.%u not fully available\n",
+               episode, episode);
+    }
 }
 
 
