@@ -1308,6 +1308,172 @@ int main(void)
             N3D_OBJECT_RUNTIME_PRESENT) == 0);
     (void)collision_empty_cell;
 
+    /*
+     * Remaining statically closed pickup classes can be tested directly by
+     * runtime class/subtype even when no supplied MAP currently instantiates
+     * that class.
+     */
+    N3D_RE_ResetRuntime();
+    N3D_RE_ResetPlayer();
+
+    n3d_object_count = 1;
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+
+    n3d_objects[0].object_class = 0x31;
+    n3d_player.score = 10;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_SCORE_ADDED);
+    assert(pickup_result.score_delta == 200);
+    assert(n3d_player.score == 210);
+    assert(pickup_result.accepted == 1);
+    assert((n3d_objects[0].flags & N3D_OBJECT_RUNTIME_PRESENT) == 0);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x33;
+    n3d_objects[0].variant = 0;
+    n3d_player.health = 99;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_HEALTH_ADDED);
+    assert(pickup_result.value_before == 99);
+    assert(pickup_result.value_after == 119);
+    assert(n3d_player.health == 119);
+    N3D_RE_ClampPlayerResourcesForHud();
+    assert(n3d_player.health == 100);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x33;
+    n3d_objects[0].variant = 1;
+    n3d_player.health = 80;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_HEALTH_ADDED);
+    assert(n3d_player.health == 90);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x33;
+    n3d_player.health = 100;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_HEALTH_AT_THRESHOLD);
+    assert(pickup_result.accepted == 0);
+    assert((n3d_objects[0].flags & N3D_OBJECT_RUNTIME_PRESENT) != 0);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x34;
+    n3d_player.health = 99;
+    n3d_player.score = 0;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_HEALTH_ADDED);
+    assert(n3d_player.health == 129);
+    assert(n3d_player.score == 250);
+    assert(pickup_result.score_delta == 250);
+    N3D_RE_ClampPlayerResourcesForHud();
+    assert(n3d_player.health == 100);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x35;
+    n3d_player.health = 12;
+    n3d_player.laser_ammo = 9;
+    n3d_player.score = 100;
+    n3d_player.pickup_counter_4c1e = 4;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_RESTORE_BONUS);
+    assert(n3d_player.health == 100);
+    assert(n3d_player.laser_ammo == 100);
+    assert(n3d_player.score == 600);
+    assert(n3d_player.pickup_counter_4c1e == 5);
+    assert(pickup_result.score_delta == 500);
+
+    for(uint8_t weapon = 0; weapon < N3D_WEAPON_COUNT; ++weapon)
+    {
+        memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+        n3d_objects[0].flags =
+            N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+        n3d_objects[0].object_class = 0x36;
+        n3d_objects[0].variant = weapon;
+
+        n3d_player.owned_weapons = 0;
+        n3d_player.queued_weapon = N3D_WEAPON_NONE;
+        n3d_player.weapon_ui_mode = 0;
+        n3d_player.silver_ammo = 1;
+        n3d_player.laser_ammo = 2;
+        n3d_player.wand_ammo = 3;
+
+        pickup_result = N3D_RE_ApplyPickupObject(0);
+        assert(pickup_result.kind == N3D_PICKUP_WEAPON_GRANTED);
+        assert(pickup_result.accepted == 1);
+        assert((n3d_player.owned_weapons & (1u << weapon)) != 0);
+        assert(n3d_player.queued_weapon == weapon);
+        assert(n3d_player.weapon_ui_mode ==
+               (weapon == N3D_WEAPON_SILVER_PISTOL ? 1 : 2));
+
+        if(weapon == N3D_WEAPON_MAGIC_WAND)
+            assert(n3d_player.wand_ammo == N3D_WEAPON_START_AMMO);
+        else if(weapon == N3D_WEAPON_SILVER_PISTOL)
+            assert(n3d_player.silver_ammo == N3D_WEAPON_START_AMMO);
+        else
+            assert(n3d_player.laser_ammo == N3D_WEAPON_START_AMMO);
+    }
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x38;
+    n3d_player.resource_4c21 = 99;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_RESOURCE_ADDED);
+    assert(n3d_player.resource_4c21 == 119);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x38;
+    n3d_player.resource_4c21 = 100;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_RESOURCE_AT_THRESHOLD);
+    assert(pickup_result.accepted == 0);
+    assert((n3d_objects[0].flags & N3D_OBJECT_RUNTIME_PRESENT) != 0);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x3A;
+    n3d_player.crystal_ball_charge = 99;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_CRYSTAL_CHARGE_ADDED);
+    assert(n3d_player.crystal_ball_charge == 119);
+    N3D_RE_ClampPlayerResourcesForHud();
+    assert(n3d_player.crystal_ball_charge == 100);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x3B;
+    n3d_player.magic_eye_charge = 99;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_EYE_CHARGE_ADDED);
+    assert(n3d_player.magic_eye_charge == 119);
+    N3D_RE_ClampPlayerResourcesForHud();
+    assert(n3d_player.magic_eye_charge == 100);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x32;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_DEFERRED);
+    assert((n3d_objects[0].flags & N3D_OBJECT_RUNTIME_PRESENT) != 0);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x37;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_DEFERRED);
+
+    memset(&n3d_objects[0], 0, sizeof(n3d_objects[0]));
+    n3d_objects[0].flags = N3D_OBJECT_RUNTIME_PRESENT | N3D_OBJECT_SPECIAL_TOUCH;
+    n3d_objects[0].object_class = 0x3D;
+    pickup_result = N3D_RE_ApplyPickupObject(0);
+    assert(pickup_result.kind == N3D_PICKUP_DEFERRED);
+
     /* Execute exact USE effects that are already closed by RE evidence. */
     uint8_t use_payload[N3D_MAP_LEVEL_BYTES] = {0};
     const int adjacent_cell = 10 * N3D_MAP_WIDTH + 11;
