@@ -26,6 +26,9 @@ namespace Nitemare3D
         public static readonly OriginalGuardWakeCache GuardWakeCache =
             new OriginalGuardWakeCache();
 
+        public static readonly OriginalObjectDefinitionCatalog ObjectDefinitions =
+            new OriginalObjectDefinitionCatalog();
+
         public static readonly OriginalProjectilePool ProjectilePool =
             new OriginalProjectilePool();
 
@@ -44,6 +47,7 @@ namespace Nitemare3D
             Array.Clear(Objects, 0, Objects.Length);
             Array.Clear(Guards, 0, Guards.Length);
             GuardWakeCache.Clear();
+            ObjectDefinitions.Clear();
             ProjectilePool.Clear();
             bindings.Clear();
             ObjectCount = 0;
@@ -173,6 +177,26 @@ namespace Nitemare3D
                 Guards,
                 GuardCount,
                 randomForGuard);
+        }
+
+        public static bool TryGetGuardPackedSequence(
+            Entity entity,
+            OriginalGuardState state,
+            out ushort packedSequence)
+        {
+            packedSequence = 0;
+
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.ObjectSlot < 0)
+            {
+                return false;
+            }
+
+            ref var obj = ref Objects[binding.ObjectSlot];
+            return ObjectDefinitions.TryGetSequence(
+                obj.DefinitionId,
+                state,
+                out packedSequence);
         }
 
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
