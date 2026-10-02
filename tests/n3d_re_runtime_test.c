@@ -1,4 +1,5 @@
 #include "../n3d_re_runtime.h"
+#include "../n3d_re_guard.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -77,6 +78,62 @@ int main(void)
     assert(!N3D_RE_RegisterGuardFromMap(140, 7, 8));
     assert(n3d_object_count == 3);
     assert(n3d_guard_count == 3);
+
+    n3d_guard_move_vector step = N3D_RE_GuardDirectionalStep(1, 0);
+    assert(step.dx == 8 && step.dy == 0);
+    step = N3D_RE_GuardDirectionalStep(1, 2);
+    assert(step.dx == 16 && step.dy == 0);
+    step = N3D_RE_GuardDirectionalStep(7, 0);
+    assert(step.dx == 0 && step.dy == -8);
+
+    assert(N3D_RE_State13InitialTimer(0) == 8);
+    assert(N3D_RE_State13InitialTimer(79) == 87);
+    assert(N3D_RE_State13InitialTimer(80) == 8);
+
+    n3d_state13_step_result s13 = N3D_RE_StepState13(9, 1);
+    assert(s13.next_timer == 8);
+    assert(s13.play_movement_sound);
+    assert(!s13.attempt_movement);
+
+    uint16_t timer = 8;
+    int move_attempts = 0;
+    for(int i = 0; i < 8; ++i)
+    {
+        s13 = N3D_RE_StepState13(timer, 0);
+        assert(s13.attempt_movement);
+        assert(!s13.commit_movement);
+        timer = s13.next_timer;
+        ++move_attempts;
+    }
+    assert(move_attempts == 8 && timer == 0);
+    s13 = N3D_RE_StepState13(0, 1);
+    assert(s13.clear_strategy_and_enter_state2);
+
+    uint8_t selector = 0;
+    assert(N3D_RE_DoorSelectorFromWallId(0x70, &selector) && selector == 0);
+    assert(N3D_RE_DoorSelectorFromWallId(0x77, &selector) && selector == 7);
+    assert(!N3D_RE_DoorSelectorFromWallId(0x78, &selector));
+    assert(N3D_RE_DoorSelectorFromWallId(0xAD, &selector) && selector == 61);
+    assert(N3D_RE_DoorSelectorFromWallId(0xAE, &selector) && selector == 62);
+
+    N3D_RE_ResetRuntime();
+    assert(N3D_RE_RegisterGuardFromMap(128, 1, 1));
+    assert(N3D_RE_RegisterGuardFromMap(132, 2, 2));
+    n3d_guards[0].definition_id = 5;
+    n3d_guards[1].definition_id = 5;
+    n3d_guards[0].state = N3D_GUARD_STATE_07;
+    n3d_guards[1].state = N3D_GUARD_STATE_08;
+    n3d_guards[0].strategy = 0;
+    n3d_guards[1].strategy = 0;
+
+    uint32_t rng_state = 1;
+    int woke = N3D_RE_WakeGuards(5, &rng_state);
+    assert(woke == 2);
+    assert(n3d_guards[0].state == N3D_GUARD_STATE_01);
+    assert(n3d_guards[1].state == N3D_GUARD_STATE_01);
+    assert(n3d_guards[0].timer >= 0 && n3d_guards[0].timer <= 7);
+    assert(n3d_guards[1].timer >= 0 && n3d_guards[1].timer <= 7);
+    assert(N3D_RE_WakeGuards(5, &rng_state) == 0);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
