@@ -44,14 +44,14 @@ namespace Nitemare3D
         {
             switch (selector)
             {
-                case 0: sequence = ReactionSequence0; return sequence != 0;
-                case 1: sequence = ReactionSequence1; return sequence != 0;
-                case 2: sequence = ReactionSequence2; return sequence != 0;
-                case 3: sequence = ReactionSequence3; return sequence != 0;
-                case 4: sequence = ReactionSequence4; return sequence != 0;
-                case 5: sequence = ReactionSequence5; return sequence != 0;
-                case 6: sequence = ReactionSequence6; return sequence != 0;
-                case 7: sequence = ReactionSequence7; return sequence != 0;
+                case 0: sequence = ReactionSequence0; return (sequence & 0xFF00) != 0;
+                case 1: sequence = ReactionSequence1; return (sequence & 0xFF00) != 0;
+                case 2: sequence = ReactionSequence2; return (sequence & 0xFF00) != 0;
+                case 3: sequence = ReactionSequence3; return (sequence & 0xFF00) != 0;
+                case 4: sequence = ReactionSequence4; return (sequence & 0xFF00) != 0;
+                case 5: sequence = ReactionSequence5; return (sequence & 0xFF00) != 0;
+                case 6: sequence = ReactionSequence6; return (sequence & 0xFF00) != 0;
+                case 7: sequence = ReactionSequence7; return (sequence & 0xFF00) != 0;
                 default:
                     sequence = 0;
                     return false;
@@ -62,14 +62,14 @@ namespace Nitemare3D
         {
             switch (selector)
             {
-                case 0: sequence = DeathSequence0; return sequence != 0;
-                case 1: sequence = DeathSequence1; return sequence != 0;
-                case 2: sequence = DeathSequence2; return sequence != 0;
-                case 3: sequence = DeathSequence3; return sequence != 0;
-                case 4: sequence = DeathSequence4; return sequence != 0;
-                case 5: sequence = DeathSequence5; return sequence != 0;
-                case 6: sequence = DeathSequence6; return sequence != 0;
-                case 7: sequence = DeathSequence7; return sequence != 0;
+                case 0: sequence = DeathSequence0; return (sequence & 0xFF00) != 0;
+                case 1: sequence = DeathSequence1; return (sequence & 0xFF00) != 0;
+                case 2: sequence = DeathSequence2; return (sequence & 0xFF00) != 0;
+                case 3: sequence = DeathSequence3; return (sequence & 0xFF00) != 0;
+                case 4: sequence = DeathSequence4; return (sequence & 0xFF00) != 0;
+                case 5: sequence = DeathSequence5; return (sequence & 0xFF00) != 0;
+                case 6: sequence = DeathSequence6; return (sequence & 0xFF00) != 0;
+                case 7: sequence = DeathSequence7; return (sequence & 0xFF00) != 0;
                 default:
                     sequence = 0;
                     return false;
