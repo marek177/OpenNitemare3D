@@ -15,14 +15,16 @@ namespace Nitemare3D
 
         Vec2 velocity = new Vec2();
         Direction direction;
+        readonly byte mapObjectId;
         float speed = 1f;
 
 
 
         
 
-        public DirectionalGuard(GuardType type, Direction dir)
+        public DirectionalGuard(GuardType type, Direction dir, byte mapObjectId = 0)
         {
+            this.mapObjectId = mapObjectId;
             switch (type)
             {
                 case GuardType.HumanGreen:
@@ -48,7 +50,7 @@ namespace Nitemare3D
 
         public override void Start()
         {
-            OriginalRuntimeState.RegisterGuard(this, type);
+            OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
         }
 
         GuardState state = GuardState.patrol;
