@@ -27,6 +27,26 @@ typedef struct n3d_use_target
     uint8_t mapped_object_type;
 } n3d_use_target;
 
+typedef enum n3d_use_execution_kind
+{
+    N3D_USE_EXEC_NONE = 0,
+    N3D_USE_EXEC_UNRESOLVED,
+    N3D_USE_EXEC_PANEL_ACTIVATED,
+    N3D_USE_EXEC_PUSH_STARTED,
+    N3D_USE_EXEC_PUSH_BLOCKED,
+    N3D_USE_EXEC_DOOR_DEFERRED,
+    N3D_USE_EXEC_WALL_DEFERRED,
+    N3D_USE_EXEC_OBJECT_DEFERRED
+} n3d_use_execution_kind;
+
+typedef struct n3d_use_execution
+{
+    n3d_use_execution_kind kind;
+    n3d_use_target target;
+    uint8_t event_id;
+    int runtime_slot;
+} n3d_use_execution;
+
 void N3D_RE_ResetUseLatch(void);
 int N3D_RE_UseRisingEdge(int use_down);
 
@@ -38,5 +58,6 @@ int N3D_RE_AdjacentUseCell(
     uint8_t* target_y);
 
 n3d_use_target N3D_RE_ClassifyUseTarget(uint8_t octant);
+n3d_use_execution N3D_RE_ExecuteUse(uint8_t octant);
 
 #endif
