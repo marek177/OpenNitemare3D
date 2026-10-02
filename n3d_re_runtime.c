@@ -3,6 +3,7 @@
 #include "n3d_re_door.h"
 #include "n3d_re_special_runtime.h"
 #include "n3d_re_use.h"
+#include "n3d_re_definitions.h"
 #include <string.h>
 
 n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
@@ -41,7 +42,19 @@ int N3D_RE_LoadMapPayload(const uint8_t* payload, size_t payload_size)
 
         const uint8_t x = (uint8_t)(cell % N3D_MAP_WIDTH);
         const uint8_t y = (uint8_t)(cell / N3D_MAP_WIDTH);
+
         N3D_RE_RegisterGuardFromMap(n3d_map[cell].object, x, y);
+
+        if(N3D_RE_WallPropertyKnown(n3d_map[cell].wall) &&
+           (n3d_wall_property_resolved[n3d_map[cell].wall] & 0x08))
+        {
+            /*
+             * Bind the cell to a door slot, but keep its runtime state unknown
+             * until the original 14A8..16D5 initialization writes are closed.
+             */
+            if(N3D_RE_RegisterDoorCell(x, y) < 0)
+                return 0;
+        }
     }
 
     return 1;
