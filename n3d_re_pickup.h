@@ -14,6 +14,7 @@ typedef enum n3d_pickup_result_kind
     N3D_PICKUP_PENTAGRAM_GRANTED,
     N3D_PICKUP_AMMO_ADDED,
     N3D_PICKUP_AMMO_AT_THRESHOLD,
+    N3D_PICKUP_INACTIVE,
     N3D_PICKUP_DEFERRED,
     N3D_PICKUP_UNRESOLVED
 } n3d_pickup_result_kind;
@@ -35,10 +36,21 @@ typedef struct n3d_pickup_result
     n3d_ammo_pool ammo_pool;
     uint8_t value_before;
     uint8_t value_after;
+    uint8_t accepted;
 } n3d_pickup_result;
 
+typedef struct n3d_pickup_touch_context
+{
+    n3d_pickup_result last_result;
+    uint32_t touch_calls;
+    uint32_t accepted_pickups;
+} n3d_pickup_touch_context;
+
 int N3D_RE_AddAmmoPickup(uint8_t* ammo);
+int N3D_RE_PickupResultAccepted(const n3d_pickup_result* result);
+void N3D_RE_DeactivateAcceptedPickup(uint16_t object_slot);
 n3d_pickup_result N3D_RE_ApplyPickupObject(uint16_t object_slot);
 n3d_pickup_result N3D_RE_ApplyPickupAtCell(uint8_t x, uint8_t y);
+void N3D_RE_PlayerPickupTouchCallback(uint8_t x, uint8_t y, void* user);
 
 #endif
