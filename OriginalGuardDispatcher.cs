@@ -469,6 +469,21 @@ namespace Nitemare3D
             return OriginalGuardHitTransition.DeathAnimation;
         }
 
+        public static void ApplyDraculaPhase2Reset(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            byte batDefinitionId)
+        {
+            obj.DefinitionId = batDefinitionId;
+            obj.ObjectClass = OriginalRuntime.DraculaBatPhase2Class;
+            obj.Runtime1A = 0x23;
+
+            guard.Strength = OriginalRuntime.GuardInitialStrength;
+            guard.State = (byte)OriginalGuardState.Move08;
+            guard.NextState = (byte)OriginalGuardState.Active02;
+            guard.Timer = 1;
+        }
+
         /// <summary>
         /// Exact state-0x15 pain scheduler. It advances to the final selected
         /// reaction frame, then returns through nextState.
