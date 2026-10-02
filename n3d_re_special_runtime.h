@@ -23,6 +23,13 @@ typedef struct n3d_panel_record
     uint8_t raw[N3D_PANEL_RECORD_SIZE];
 } n3d_panel_record;
 
+typedef struct n3d_panel_binding
+{
+    uint8_t used;
+    uint8_t cell_x;
+    uint8_t cell_y;
+} n3d_panel_binding;
+
 #pragma pack(push, 1)
 typedef struct n3d_push_record
 {
@@ -46,11 +53,16 @@ typedef struct n3d_push_direction
 } n3d_push_direction;
 
 extern n3d_panel_record n3d_panels[N3D_MAX_PANELS];
+extern n3d_panel_binding n3d_panel_bindings[N3D_MAX_PANELS];
 extern n3d_push_record n3d_pushes[N3D_MAX_PUSHES];
 extern uint16_t n3d_panel_count;
 extern uint16_t n3d_push_count;
 
 void N3D_RE_ResetPanelsAndPushes(void);
+int N3D_RE_RegisterPanelCell(uint8_t x, uint8_t y);
+int N3D_RE_FindPanelSlotByCell(uint8_t x, uint8_t y);
+int N3D_RE_RegisterPushObject(uint16_t object_index);
+int N3D_RE_FindPushSlotByObject(uint16_t object_index);
 
 uint8_t N3D_RE_PanelActivation(const n3d_panel_record* panel);
 void N3D_RE_SetPanelActivation(n3d_panel_record* panel, uint8_t value);
