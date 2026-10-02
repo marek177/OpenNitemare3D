@@ -389,27 +389,6 @@ namespace Nitemare3D
 
             }
 
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
-            {
-                var tileFacing = position + direction;
-                var tx = (int)tileFacing.X;
-                int ty = (int)tileFacing.Y;
-
-                foreach(var entity in Entity.entities)
-                {
-                    if((int)entity.position.X == tx && (int)entity.position.Y == ty)
-                    {
-                        entity.SendMessage("OnUse");
-                    }
-                }
-                
-
-            }
-
-
-
-
         }
 
 
@@ -456,6 +435,23 @@ namespace Nitemare3D
 
         }
         float fireTimer = 0;
+        bool useWasDown = false;
+
+        void MoveWithCollision(float amount)
+        {
+            var delta = direction * amount;
+            WorldCollision.MovePlayerWithSliding(this, delta);
+        }
+
+        void UpdateUse()
+        {
+            bool useDown = Input.IsKeyDown(KeyboardKey.Space);
+            if (useDown && !useWasDown)
+            {
+                UseDispatcher.TryUseAdjacent(this);
+            }
+            useWasDown = useDown;
+        }
 
         public void SetRotation(float angle)
         {
@@ -486,45 +482,20 @@ namespace Nitemare3D
 
             if (Input.IsKeyDown(KeyboardKey.Up))
             {
-                var x = (int)(position.X + direction.X);
-                var y = (int)position.Y;
-                if(Level.IsWalkable(x, y, this))
-                {
-                    position.X += direction.X * (Time.dt * walkSpeed);
-                }
-                
-                y = (int)(position.Y + direction.Y);
-                x = (int)position.X;
-
-                if(Level.IsWalkable(x, y, this))
-                {
-                    position.Y += direction.Y * (Time.dt * walkSpeed);
-                }
-
-            
+                MoveWithCollision(Time.dt * walkSpeed);
             }
 
             if (Input.IsKeyDown(KeyboardKey.Down))
             {
-                if(Level.tilemap[(int)(position.X - direction.X), (int)(position.Y)].textureID == -1)
-                {
-                    position.X -= direction.X * (Time.dt * walkSpeed);
-                }
-
-                if(Level.tilemap[(int)(position.X), (int)(position.Y - direction.Y)].textureID == -1)
-                {
-                    position.Y -= direction.Y * (Time.dt * walkSpeed);
-                }
-    
+                MoveWithCollision(-(Time.dt * walkSpeed));
             }
-
-            
 
             float oldPlaneX = plane.X;
 
             plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
             plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
 
+            UpdateUse();
             RenderRaycaster();
             RenderWeapon();
 
