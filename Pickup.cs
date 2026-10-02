@@ -107,21 +107,27 @@ namespace Nitemare3D
             switch (type)
             {
                 case PickupType.RedKey:
+                    Game.player.keyMask |= 0x01;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.GreenKey:
+                    Game.player.keyMask |= 0x02;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.BlueKey:
+                    Game.player.keyMask |= 0x04;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowKey:
+                    Game.player.keyMask |= 0x08;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedIDCard:
+                    Game.player.idCardMask |= 0x01;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.YellowIDCard:
+                    Game.player.idCardMask |= 0x02;
                     SoundEffect.PlaySound(SoundConsts.PICKUP_KEY);
                     break;
                 case PickupType.RedPotion:
