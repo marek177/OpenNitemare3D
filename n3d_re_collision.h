@@ -33,6 +33,12 @@ typedef struct n3d_post_move_result
     uint8_t entered_tile_event;
 } n3d_post_move_result;
 
+typedef struct n3d_resolved_collision_result
+{
+    int resolved;
+    int step;
+} n3d_resolved_collision_result;
+
 uint8_t N3D_RE_WallPropertiesForMappedType(uint8_t type);
 uint8_t N3D_RE_ObjectPropertiesForMappedType(uint8_t type);
 void N3D_RE_BuildWallProperties(const uint8_t mapped_types[256], n3d_byte_table* out);
@@ -52,6 +58,12 @@ int N3D_RE_TestLeadingEdgePair(
     int signed_step,
     const n3d_byte_table* wall_properties,
     const n3d_byte_table* object_properties,
+    const n3d_collision_callbacks* callbacks);
+
+n3d_resolved_collision_result N3D_RE_TestResolvedLeadingEdgePair(
+    uint8_t ax, uint8_t ay,
+    uint8_t bx, uint8_t by,
+    int signed_step,
     const n3d_collision_callbacks* callbacks);
 
 #endif
