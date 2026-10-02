@@ -1306,7 +1306,7 @@ int main(void)
 
     /* Known wall/object families without closed effects stay explicit deferred. */
     memset(use_payload, 0, sizeof(use_payload));
-    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x92;
+    use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x90; /* WARP_1 */
     assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
     n3d_player.tile_x = 10;
     n3d_player.tile_y = 10;
