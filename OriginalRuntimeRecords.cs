@@ -63,7 +63,9 @@ namespace Nitemare3D
         MoveThen03 = 0x06,
         Active07 = 0x07,
         Move08 = 0x08,
-        SpecialAction09 = 0x09,
+        DeathFinalize09 = 0x09,
+        // Compatibility alias kept for callers written before the state-09 closure.
+        SpecialAction09 = DeathFinalize09,
         NoLocalAction0A = 0x0A,
         LethalPlayerContact0B = 0x0B,
         NoLocalAction0B = LethalPlayerContact0B,
