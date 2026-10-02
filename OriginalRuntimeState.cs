@@ -23,6 +23,9 @@ namespace Nitemare3D
         public static readonly OriginalGuardRecord[] Guards =
             new OriginalGuardRecord[OriginalRuntime.MaxGuards];
 
+        public static readonly OriginalGuardWakeCache GuardWakeCache =
+            new OriginalGuardWakeCache();
+
         static readonly Dictionary<Entity, Binding> bindings =
             new Dictionary<Entity, Binding>();
 
@@ -37,6 +40,7 @@ namespace Nitemare3D
         {
             Array.Clear(Objects, 0, Objects.Length);
             Array.Clear(Guards, 0, Guards.Length);
+            GuardWakeCache.Clear();
             bindings.Clear();
             ObjectCount = 0;
             GuardCount = 0;
@@ -122,6 +126,17 @@ namespace Nitemare3D
             }
 
             WriteWorldPosition(ref Objects[binding.ObjectSlot], entity.position);
+        }
+
+        public static int WakeGuardsAfterPlayerFire(
+            byte selector,
+            Func<int, ushort> randomForGuard)
+        {
+            return GuardWakeCache.Wake(
+                selector,
+                Guards,
+                GuardCount,
+                randomForGuard);
         }
 
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
