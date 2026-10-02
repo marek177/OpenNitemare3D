@@ -280,6 +280,7 @@ namespace Nitemare3D
             NoRuntimeBinding,
             NoDamage,
             PainReaction,
+            SpecialReactionRequired,
             Killed,
             DraculaTransformed
         }
@@ -324,7 +325,26 @@ namespace Nitemare3D
 
             guard.Strength = (byte)(guard.Strength - damage);
             guard.ResultOctant = 8;
-            guard.NextState = guard.State;
+
+            // The recovered hit handler has separate paths for states 3, 4 and 0x0B,
+            // and for strategies 3/4/5. Preserve the HP/resoct writes that occur
+            // before that split, but do not invent their reaction transition.
+            if (guard.State == (byte)OriginalGuardState.Detection03 ||
+                guard.State == (byte)OriginalGuardState.DetectionAttack04 ||
+                guard.State == (byte)OriginalGuardState.NoLocalAction0B ||
+                guard.Strategy == 3 ||
+                guard.Strategy == 4 ||
+                guard.Strategy == 5)
+            {
+                return GuardHitResult.SpecialReactionRequired;
+            }
+
+            // Ordinary reaction path preserves the current state only when nonzero.
+            if (guard.State != 0)
+            {
+                guard.NextState = guard.State;
+            }
+
             guard.State = (byte)OriginalGuardState.Pain15;
             return GuardHitResult.PainReaction;
         }
