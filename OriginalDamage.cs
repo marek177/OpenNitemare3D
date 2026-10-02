@@ -5,7 +5,8 @@ namespace Nitemare3D
         SingleShotLaser = 0,
         MagicWand = 1,
         SilverPistol = 2,
-        ContinuousLaser = 3
+        ContinuousLaser = 3,
+        None = 0xFF
     }
 
     public struct OriginalDamageResult
@@ -18,93 +19,26 @@ namespace Nitemare3D
 
     /// <summary>
     /// Confirmed player-to-GUARD damage producer recovered from NITE3W 1.10.
-    /// The caller must supply the projected OBJECT baseline and RNG value from
-    /// the same frame/path; this is intentionally not a fixed weapon damage table.
+    /// The caller supplies the projected OBJECT baseline, RNG value and current
+    /// Hamerstein gate. Damage is not a fixed per-weapon integer.
     /// </summary>
     public static class OriginalDamage
     {
+        public const byte HamersteinGateRequiredValue = 3;
+        public const byte HamersteinBaseDamage = 3;
+
         public static OriginalDamageResult ComputePlayerToGuard(
             short projectedBaseRow,
             short viewportCenterY,
             byte objectClass,
             byte weaponSelector,
             byte difficulty,
-            byte episode,
+            byte hamersteinGateValue,
             ushort rngValue)
         {
             int raw = 8 * (projectedBaseRow - viewportCenterY) + (rngValue % 25);
-            int damage = raw;
-
-            switch (objectClass)
-            {
-                case 0x0C:
-                case 0x1D:
-                    damage >>= 3;
-                    break;
-
-                case 0x0D:
-                    damage = (weaponSelector == 1 || weaponSelector == 2)
-                        ? damage >> 1
-                        : damage >> 3;
-                    break;
-
-                case 0x0E:
-                case 0x11:
-                case 0x14:
-                    damage = weaponSelector == 2
-                        ? damage >> 1
-                        : damage >> 3;
-                    break;
-
-                case 0x0F:
-                case 0x10:
-                    damage = weaponSelector == 1 ? 0 : damage >> 8;
-                    break;
-
-                case 0x12:
-                case 0x13:
-                    damage = weaponSelector == 1 ? 0 : damage >> 2;
-                    break;
-
-                case 0x15:
-                    damage = 0;
-                    break;
-
-                case 0x16:
-                    damage = episode == 3 ? 3 : 0;
-                    break;
-
-                case 0x17:
-                    damage = weaponSelector == 1 ? damage >> 8 : damage >> 2;
-                    break;
-
-                case 0x18:
-                    if (weaponSelector == 1) damage >>= 8;
-                    else if (weaponSelector == 2) damage >>= 4;
-                    else damage >>= 3;
-                    break;
-
-                case 0x19:
-                    damage = 0;
-                    break;
-
-                case 0x1A:
-                    damage = weaponSelector == 1 ? damage >> 1 : 0;
-                    break;
-
-                case 0x1B:
-                case 0x1C:
-                    damage >>= 1;
-                    break;
-
-                case 0x1E:
-                    damage = weaponSelector == 1 ? 0 : damage >> 3;
-                    break;
-
-                case 0x1F:
-                    damage = weaponSelector == 1 ? 0 : damage >> 2;
-                    break;
-            }
+            int damage = ApplyClassWeaponTransform(
+                raw, objectClass, weaponSelector, hamersteinGateValue);
 
             int classTransformed = damage;
 
@@ -123,6 +57,75 @@ namespace Nitemare3D
                 DifficultyTransformed = damage,
                 StoredByte = unchecked((byte)damage)
             };
+        }
+
+        public static int ApplyClassWeaponTransform(
+            int rawDamage,
+            byte objectClass,
+            byte weaponSelector,
+            byte hamersteinGateValue = 0)
+        {
+            if (rawDamage <= 0)
+                return rawDamage;
+
+            bool wand = weaponSelector == (byte)OriginalWeaponSelector.MagicWand;
+            bool silver = weaponSelector == (byte)OriginalWeaponSelector.SilverPistol;
+
+            switch (objectClass)
+            {
+                case 0x0C:
+                case 0x1D:
+                    return rawDamage / 8;
+
+                case 0x0D:
+                    return wand ? rawDamage / 2 : rawDamage / 8;
+
+                case 0x0E:
+                case 0x11:
+                case 0x14:
+                    return (wand || silver) ? rawDamage / 2 : rawDamage / 8;
+
+                case 0x0F:
+                case 0x10:
+                    return wand ? rawDamage / 2 : rawDamage / 256;
+
+                case 0x12:
+                case 0x13:
+                    return rawDamage / 4;
+
+                case 0x15:
+                case 0x19:
+                    return 0;
+
+                case 0x16:
+                    return hamersteinGateValue == HamersteinGateRequiredValue
+                        ? HamersteinBaseDamage
+                        : 0;
+
+                case 0x17:
+                    return wand ? rawDamage / 256 : rawDamage / 4;
+
+                case 0x18:
+                    if (wand) return rawDamage / 256;
+                    if (silver) return rawDamage / 16;
+                    return rawDamage / 8;
+
+                case 0x1A:
+                    return wand ? rawDamage / 2 : 0;
+
+                case 0x1B:
+                case 0x1C:
+                    return rawDamage / 2;
+
+                case 0x1E:
+                    return wand ? 0 : rawDamage / 8;
+
+                case 0x1F:
+                    return wand ? 0 : rawDamage / 4;
+
+                default:
+                    return rawDamage;
+            }
         }
     }
 }
