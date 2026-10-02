@@ -1131,6 +1131,7 @@ namespace Nitemare3D
                 }
                 else
                 {
+                    tilemap[x, y].objectID = data[i];
                     SpawnMapObject(data[i], x, y);
 
                     x++;
