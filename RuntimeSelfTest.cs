@@ -16,6 +16,7 @@ namespace Nitemare3D
             TestRecordSizes();
             TestDelayState();
             TestState13Movement();
+            TestState07Decision();
             TestPainReturn();
             TestWakeCache();
 
@@ -108,6 +109,43 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "state 13 must clear strategy and return to state 02.");
+        }
+
+        static void TestState07Decision()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active07,
+                Strategy = 0
+            };
+
+            Assert(OriginalGuardDispatcher.ResolveState07Perception(
+                       ref guard, true, true, 0) ==
+                   OriginalGuardDispatchResult.Waiting,
+                "state 07 processing gate must suppress transition.");
+            Assert(guard.State == (byte)OriginalGuardState.Active07,
+                "state 07 must remain active when processing is gated.");
+
+            Assert(OriginalGuardDispatcher.ResolveState07Perception(
+                       ref guard, false, true, 0) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "state 07 successful perception should transition.");
+            Assert(guard.State == (byte)OriginalGuardState.Active02,
+                "ordinary state 07 perception must enter state 02.");
+
+            guard.State = (byte)OriginalGuardState.Active07;
+            guard.Strategy = 3;
+            guard.Octant = 3;
+
+            Assert(OriginalGuardDispatcher.ResolveState07Perception(
+                       ref guard, false, true, 1) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "strategy-3 state 07 should enter timed movement.");
+            Assert(guard.State == (byte)OriginalGuardState.Transition13 &&
+                   guard.Timer == 9 &&
+                   guard.MoveX == 0 &&
+                   guard.MoveY == 8,
+                "strategy-3 state 07 transition mismatch.");
         }
 
         static void TestPainReturn()
