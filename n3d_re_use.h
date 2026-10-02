@@ -35,6 +35,11 @@ typedef enum n3d_use_execution_kind
     N3D_USE_EXEC_PUSH_STARTED,
     N3D_USE_EXEC_PUSH_BLOCKED,
     N3D_USE_EXEC_DOOR_DEFERRED,
+    N3D_USE_EXEC_LEVEL_CHANGE_REQUEST,
+    N3D_USE_EXEC_KEY_GATE_PASSED,
+    N3D_USE_EXEC_KEY_GATE_BLOCKED,
+    N3D_USE_EXEC_PENTAGRAM_GATE_PASSED,
+    N3D_USE_EXEC_PENTAGRAM_GATE_BLOCKED,
     N3D_USE_EXEC_WALL_DEFERRED,
     N3D_USE_EXEC_OBJECT_DEFERRED
 } n3d_use_execution_kind;
@@ -44,6 +49,8 @@ typedef struct n3d_use_execution
     n3d_use_execution_kind kind;
     n3d_use_target target;
     uint8_t event_id;
+    uint8_t level_delta;
+    uint8_t required_inventory_bit;
     int runtime_slot;
 } n3d_use_execution;
 
