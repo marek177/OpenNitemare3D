@@ -412,6 +412,11 @@ namespace Nitemare3D
                 var tx = (int)tileFacing.X;
                 int ty = (int)tileFacing.Y;
 
+                if (tx >= 0 && ty >= 0 && tx < 64 && ty < 64)
+                {
+                    Level.tilemap[tx, ty]?.OnUse();
+                }
+
                 foreach(var entity in Entity.entities)
                 {
                     if((int)entity.position.X == tx && (int)entity.position.Y == ty)
@@ -522,12 +527,16 @@ namespace Nitemare3D
 
             if (Input.IsKeyDown(KeyboardKey.Down))
             {
-                if(Level.tilemap[(int)(position.X - direction.X), (int)(position.Y)].textureID == -1)
+                int x = (int)(position.X - direction.X);
+                int y = (int)position.Y;
+                if(Level.IsWalkable(x, y, this))
                 {
                     position.X -= direction.X * (Time.dt * walkSpeed);
                 }
 
-                if(Level.tilemap[(int)(position.X), (int)(position.Y - direction.Y)].textureID == -1)
+                x = (int)position.X;
+                y = (int)(position.Y - direction.Y);
+                if(Level.IsWalkable(x, y, this))
                 {
                     position.Y -= direction.Y * (Time.dt * walkSpeed);
                 }
