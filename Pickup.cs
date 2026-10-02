@@ -129,9 +129,17 @@ namespace Nitemare3D
                 case PickupType.BluePotion:
                     break;
                 case PickupType.Eyeball:
+                    if (!Automap.TryAddMagicEye())
+                    {
+                        return;
+                    }
                     SoundEffect.PlaySound(SoundConsts.PICKUP_EYE);
                     break;
                 case PickupType.CrystallBall:
+                    if (!Automap.TryAddCrystalBall())
+                    {
+                        return;
+                    }
                     SoundEffect.PlaySound(SoundConsts.PICKUP_GLASSBALL);
                     break;
                 case PickupType.PlasmaPistol:
