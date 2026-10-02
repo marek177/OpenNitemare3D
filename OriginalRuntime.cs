@@ -48,6 +48,10 @@ namespace Nitemare3D
         public const int ObjectDefinitionAlertSequenceOffset = 0x34;
         public const int ObjectDefinitionAttackSequenceOffset = 0x36;
         public const int ObjectDefinitionRecoverySequenceOffset = 0x38;
+        public const int ObjectDefinitionReactionSequenceOffset = 0x3A;
+        public const int ObjectDefinitionDeathSequenceOffset = 0x4A;
+        public const int ObjectDefinitionReactionSequenceCount = 8;
+        public const int ObjectDefinitionDeathSequenceCount = 8;
         public const int MaxGuards = 100;
         public const int GuardRuntimeStride = 26;
         public const int MaxProjectiles = 8;
@@ -155,8 +159,13 @@ namespace Nitemare3D
         public const int ImgWallDirectoryOffset = 0x0000;
         public const int ImgObjectDirectoryOffset = 0x0400;
         public const int ImgDirectoryEntries = 256;
+        public const int ImgDefinitionTableOffset = 0x0800;
+        public const int ImgWallDefinitionBankOffset = ImgDefinitionTableOffset;
+        public const int ImgObjectDefinitionBankOffset =
+            ImgDefinitionTableOffset + ImgDirectoryEntries * ObjectDefinitionBytes; // 0x6200
         public const int ImgFrameHeaderBytes = 10;
-        public const int ImgFirstFrameStreamOffset = 0xBC00;
+        public const int ImgFirstFrameStreamOffset =
+            ImgDefinitionTableOffset + 2 * ImgDirectoryEntries * ObjectDefinitionBytes; // 0xBC00
         public const byte HudImageObjectId = 0xFF;
         public const int HudImageFrameCount = 29;
         public const int UifDirectorySlots = 32;
