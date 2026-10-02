@@ -43,6 +43,77 @@ namespace Nitemare3D
             RuntimeState == DoorRuntimeState.Opening ||
             RuntimeState == DoorRuntimeState.Closing;
 
+        public bool TryIntersectRay(
+            Vec2 origin,
+            float rayDirX,
+            float rayDirY,
+            out float distance,
+            out float textureCoord)
+        {
+            distance = 0;
+            textureCoord = 0;
+
+            if (IsFullyOpen)
+                return false;
+
+            bool vertical = (WallClass & 1) != 0;
+            Automap.VecOrientation orientation;
+
+            if (vertical)
+            {
+                if (Math.Abs(rayDirX) < 0.000001f)
+                    return false;
+
+                float planeX = x + 0.5f;
+                distance = (planeX - origin.X) / rayDirX;
+                if (distance <= 0)
+                    return false;
+
+                float hitY = origin.Y + distance * rayDirY;
+                textureCoord = (hitY - y) * 64.0f;
+                orientation = rayDirX > 0
+                    ? Automap.VecOrientation.Left
+                    : Automap.VecOrientation.Right;
+            }
+            else
+            {
+                if (Math.Abs(rayDirY) < 0.000001f)
+                    return false;
+
+                float planeY = y + 0.5f;
+                distance = (planeY - origin.Y) / rayDirY;
+                if (distance <= 0)
+                    return false;
+
+                float hitX = origin.X + distance * rayDirX;
+                textureCoord = (hitX - x) * 64.0f;
+                orientation = rayDirY > 0
+                    ? Automap.VecOrientation.Top
+                    : Automap.VecOrientation.Bottom;
+            }
+
+            if (textureCoord < 0.0f || textureCoord > 64.0f)
+                return false;
+
+            float min = 0.0f;
+            float max = 64.0f;
+
+            // FUN_1010_1E00 shortens one endpoint by two units per update:
+            // orientation 0/2 retract their far endpoint, orientation 1/3
+            // advance their near endpoint.
+            if (orientation == Automap.VecOrientation.Top ||
+                orientation == Automap.VecOrientation.Right)
+            {
+                max -= openUnits;
+            }
+            else
+            {
+                min += openUnits;
+            }
+
+            return textureCoord >= min && textureCoord <= max;
+        }
+
         public Automap.VecOrientation AutomapOrientation =>
             (WallClass & 1) != 0
                 ? Automap.VecOrientation.Right
