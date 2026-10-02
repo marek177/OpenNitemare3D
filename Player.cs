@@ -223,16 +223,9 @@ namespace Nitemare3D
                     if (mapX < 0 || mapY < 0) { hit = 1; break; }
                     if (mapX > 63 || mapY > 63) { hit = 1; break; }
 
-                    var wall = Level.tilemap[mapX, mapY].textureID;
-                    if (wall <= 149 && wall > -1) { hit = 1; }
+                    var hitWall = Level.tilemap[mapX, mapY];
 
-                    if (hit == 1)
-                    {
-                        flipped = Level.tilemap[mapX, mapY].flip;
-
-                        var hitWall = Level.tilemap[mapX, mapY];
-
-                        Automap.VecOrientation mapOrientation;
+                    Automap.VecOrientation mapOrientation;
                         if (side == 0)
                         {
                             mapOrientation = step.X > 0
@@ -246,11 +239,25 @@ namespace Nitemare3D
                                 : Automap.VecOrientation.Bottom;
                         }
 
+                    bool fullyOpenDoor =
+                        hitWall is SlidingDoorTile slidingDoor &&
+                        slidingDoor.IsFullyOpen;
+
+                    if (!fullyOpenDoor)
+                    {
                         Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
-                        
+                    }
 
-                        
+                    var wall = hitWall.textureID;
+                    bool hasRenderableWall = wall <= 149 && wall > -1;
+                    if (hasRenderableWall && !fullyOpenDoor)
+                    {
+                        hit = 1;
+                    }
 
+                    if (hit == 1)
+                    {
+                        flipped = hitWall.flip;
                         this.wall = Img.current.entries[wall];
                         
 
@@ -405,8 +412,10 @@ namespace Nitemare3D
 
             }
 
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
+            // Handle USE only on the rising edge. Repeating the original 0x0200
+            // action every render frame would make door state oscillate 2 <-> 3.
+            bool useDown = Input.IsKeyDown(KeyboardKey.Space);
+            if (useDown && !previousUse)
             {
                 var tileFacing = position + direction;
                 var tx = (int)tileFacing.X;
@@ -425,9 +434,8 @@ namespace Nitemare3D
                     }
                 }
                 
-
             }
-
+            previousUse = useDown;
 
 
 
@@ -477,6 +485,7 @@ namespace Nitemare3D
 
         }
         float fireTimer = 0;
+        bool previousUse;
 
         public void SetRotation(float angle)
         {
