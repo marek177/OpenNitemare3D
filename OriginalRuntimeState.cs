@@ -246,8 +246,16 @@ namespace Nitemare3D
 
             switch ((OriginalGuardState)guard.State)
             {
+                case OriginalGuardState.AnimationTimer:
+                    return OriginalGuardDispatcher.TickAnimationTimer(
+                        ref guard, ref obj);
+
                 case OriginalGuardState.Delay:
                     return OriginalGuardDispatcher.TickDelay(ref guard);
+
+                case OriginalGuardState.WaitAnimation12:
+                    return OriginalGuardDispatcher.TickWaitAnimation12(
+                        ref guard, ref obj);
 
                 case OriginalGuardState.Transition13:
                 {
@@ -271,6 +279,10 @@ namespace Nitemare3D
 
                     return result;
                 }
+
+                case OriginalGuardState.Pain15:
+                    return OriginalGuardDispatcher.TickPainReaction(
+                        ref guard, ref obj);
 
                 default:
                     return OriginalGuardDispatchResult.NotHandled;
