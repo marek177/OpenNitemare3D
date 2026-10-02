@@ -234,6 +234,143 @@ namespace Nitemare3D
             }
         }
 
+        public static bool PackedSequenceHasFrames(ushort packedSequence)
+        {
+            return (packedSequence & 0xFF00) != 0;
+        }
+
+        static bool TrySelectSequence(
+            OriginalObjectDefinitionRecord definition,
+            bool death,
+            byte resultOctant,
+            Func<ushort> nextRandom,
+            out int selector,
+            out ushort packedSequence)
+        {
+            selector = 0;
+            packedSequence = 0;
+
+            ushort slot7;
+            bool slot7Valid = death
+                ? definition.TryGetDeathSequence(7, out slot7)
+                : definition.TryGetReactionSequence(7, out slot7);
+
+            if (resultOctant == 0 && slot7Valid)
+            {
+                selector = 7;
+                packedSequence = slot7;
+                return true;
+            }
+
+            if (nextRandom == null)
+                return false;
+
+            bool anyRandomSlot = false;
+            for (int i = 0; i < 7; i++)
+            {
+                ushort candidate;
+                bool valid = death
+                    ? definition.TryGetDeathSequence(i, out candidate)
+                    : definition.TryGetReactionSequence(i, out candidate);
+                if (valid)
+                {
+                    anyRandomSlot = true;
+                    break;
+                }
+            }
+
+            if (!anyRandomSlot)
+                return false;
+
+            while (true)
+            {
+                selector = nextRandom() % 7;
+                bool valid = death
+                    ? definition.TryGetDeathSequence(selector, out packedSequence)
+                    : definition.TryGetReactionSequence(selector, out packedSequence);
+                if (valid)
+                    return true;
+            }
+        }
+
+        public static bool TrySelectReactionSequence(
+            OriginalObjectDefinitionRecord definition,
+            byte resultOctant,
+            Func<ushort> nextRandom,
+            out int selector,
+            out ushort packedSequence)
+        {
+            return TrySelectSequence(
+                definition,
+                false,
+                resultOctant,
+                nextRandom,
+                out selector,
+                out packedSequence);
+        }
+
+        public static bool TrySelectDeathSequence(
+            OriginalObjectDefinitionRecord definition,
+            byte resultOctant,
+            Func<ushort> nextRandom,
+            out int selector,
+            out ushort packedSequence)
+        {
+            return TrySelectSequence(
+                definition,
+                true,
+                resultOctant,
+                nextRandom,
+                out selector,
+                out packedSequence);
+        }
+
+        public static OriginalGuardDispatchResult BeginDeathSequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort packedSequence)
+        {
+            byte state = obj.Runtime1A > 0
+                ? (byte)OriginalGuardState.WaitAnimation12
+                : (byte)OriginalGuardState.AnimationTimer;
+
+            return BeginPackedSequence(
+                ref guard,
+                ref obj,
+                packedSequence,
+                state,
+                (byte)OriginalGuardState.DeathFinalize09);
+        }
+
+        public static OriginalGuardDispatchResult BeginPainReaction15(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort packedSequence)
+        {
+            guard.DefinitionValue = packedSequence;
+            obj.Component03 = unchecked((sbyte)(byte)packedSequence);
+
+            if (guard.State != (byte)OriginalGuardState.AnimationTimer)
+                guard.NextState = guard.State;
+
+            guard.State = (byte)OriginalGuardState.Pain15;
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        public static OriginalGuardDispatchResult BeginReactionAnimation(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort packedSequence,
+            OriginalGuardState nextState)
+        {
+            return BeginPackedSequence(
+                ref guard,
+                ref obj,
+                packedSequence,
+                (byte)OriginalGuardState.AnimationTimer,
+                (byte)nextState);
+        }
+
         /// <summary>
         /// Exact state-0x15 pain scheduler. It advances to the final selected
         /// reaction frame, then returns through nextState.
