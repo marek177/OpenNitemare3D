@@ -29,6 +29,9 @@ namespace Nitemare3D
     public class Player : Entity
     {
         public int health = 100;
+        public byte coloredKeyMask;
+        public byte idCardMask;
+        readonly RecoveredUseRuntime useRuntime = new RecoveredUseRuntime();
 
 
         public Vec2 plane = new Vec2(0, .8f);
@@ -389,22 +392,21 @@ namespace Nitemare3D
 
             }
 
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
+            // Input is edge-triggered; the original USE selects one cardinal cell.
+            if (useRuntime.Press(Input.IsKeyDown(KeyboardKey.Space)))
             {
-                var tileFacing = position + direction;
-                var tx = (int)tileFacing.X;
-                int ty = (int)tileFacing.Y;
-
-                foreach(var entity in Entity.entities)
+                int octant = ((int)Math.Round(rotation / (Math.PI / 4)) + 2) % 8;
+                if (octant < 0) octant += 8;
+                if (RecoveredUseRuntime.TryTarget((int)position.X, (int)position.Y,
+                                                   octant, out int tx, out int ty))
                 {
-                    if((int)entity.position.X == tx && (int)entity.position.Y == ty)
+                    Level.tilemap[tx, ty]?.OnUse();
+                    foreach (var entity in Entity.entities)
                     {
-                        entity.SendMessage("OnUse");
+                        if ((int)entity.position.X == tx && (int)entity.position.Y == ty)
+                            entity.SendMessage("OnUse");
                     }
                 }
-                
-
             }
 
 

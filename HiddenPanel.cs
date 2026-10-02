@@ -4,6 +4,7 @@ namespace Nitemare3D
     {
         HiddenPanel neighbor = null;
         Tile current;
+        bool opened;
         public override void Start()
         {
             current = Level.tilemap[(int)position.X, (int)position.Y];
@@ -51,6 +52,8 @@ namespace Nitemare3D
 
         public void OnUse()
         {
+            if (opened || !RecoveredInventory.HasSecretPanelCredential(Game.player.idCardMask)) return;
+            opened = true; // Set before visiting the linked panel to break A -> B -> A.
             SoundEffect.PlaySound(SoundConsts.HIDDENPANEL_OPEN);
             Level.tilemap[(int)position.X, (int)position.Y].state = TileState.opening;
             current.obstacle = false;

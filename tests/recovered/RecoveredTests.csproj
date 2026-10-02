@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../OriginalRuntime.cs" />
+    <Compile Include="../../RecoveredUseRuntime.cs" />
+    <Compile Include="../../RecoveredInventory.cs" />
+    <Compile Include="../../RecoveredMapArchive.cs" />
+    <Compile Include="../../RecoveredDemoFile.cs" />
+    <Compile Include="../../RecoveredPlayerHealth.cs" />
+  </ItemGroup>
+</Project>

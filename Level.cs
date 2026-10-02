@@ -1040,7 +1040,7 @@ namespace Nitemare3D
         //TODO: make entity collision detection less garbage
         public static bool IsWalkable(int x, int y, Entity ent)
         {
-            if(x < 0 || x > 63 || y < 0 || y > 64){return false;}
+            if(x < 0 || x >= OriginalRuntime.MapWidth || y < 0 || y >= OriginalRuntime.MapHeight){return false;}
             bool isEntity = false;
             foreach(var entity in Entity.entities)
             {
@@ -1064,10 +1064,9 @@ namespace Nitemare3D
 
         public static void LoadMap(int id, int episode)
         {
-            var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
-
-            map.BaseStream.Position = 514;
-            var data = map.ReadBytes((int)map.BaseStream.Length);
+            var archive = new RecoveredMapArchive(File.ReadAllBytes("data/MAP." + episode));
+            var data = archive.GetLevel(id);
+            levelCount = archive.LevelCount;
 
             int x = 0, y = 0;
             int j = 0;
@@ -1080,7 +1079,7 @@ namespace Nitemare3D
                 }
             }
 
-            for (int i = id * 8192; i < (id * 8192) + 8192; i++)
+            for (int i = 0; i < data.Length; i++)
             {
 
 
@@ -1105,7 +1104,7 @@ namespace Nitemare3D
                 }
             }
 
-            map.BaseStream.Close();
+
         }
 
         public static void Update()
