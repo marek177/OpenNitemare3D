@@ -1105,6 +1105,7 @@ namespace Nitemare3D
                 }
                 else
                 {
+                    OriginalRuntimeState.RegisterMapObjectDefinition(data[i]);
                     SpawnMapObject(data[i], x, y);
 
                     x++;
