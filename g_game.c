@@ -3,6 +3,7 @@
 #include "m_obj.h"
 #include "n3d_re_runtime.h"
 #include "g_think.h"
+#include "n3d_re_player.h"
 
 
 bool G_GameIsDone()
@@ -37,15 +38,19 @@ void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 {
     if(id > 0 && id <= MT_StartpositionW)
     {
+        N3D_RE_InitPlayerAtTile(x, y);
+
         if(!p_player)
         {
             p_player = M_Spawn(id, x, y, id-1);
             p_player->player = malloc(sizeof(player_t));
-            p_player->health = 100;
         }
 
-        p_player->x = x;
-        p_player->y = y;
+        p_player->health = n3d_player.health;
+        p_player->x =
+            (float)n3d_player.world_x / (float)N3D_WORLD_UNITS_PER_TILE;
+        p_player->y =
+            (float)n3d_player.world_y / (float)N3D_WORLD_UNITS_PER_TILE;
         return;
     }
 
