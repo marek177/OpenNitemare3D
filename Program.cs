@@ -25,7 +25,7 @@ namespace Nitemare3D
 			GameWindow.Init();
 			Input.Init();
 
-			Img i = new Img("data/IMG.1");
+			Img.LoadEpisode(1);
 
 			Clock dt = new Clock();
 
