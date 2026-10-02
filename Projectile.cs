@@ -48,10 +48,11 @@ namespace Nitemare3D
             foreach(var entity in entities)
             {
                 if(entity.id == id || entity.id == Game.player.id){continue;}
-                if(entity.position.Rounded().Equals(position.Rounded()))
+                if(entity.position.Rounded().Equals(position.Rounded()) && entity.hasCollision)
                 {
-                    delete = entity.hasCollision;
                     entity.SendMessage("ShootPlasma");
+                    Entity.Remove(this);
+                    visible = false;
                     return;
                 }
             }
