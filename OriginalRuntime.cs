@@ -42,6 +42,12 @@ namespace Nitemare3D
         public const int PushRuntimeStride = 6;
         public const int MaxObjects = 350;
         public const int ObjectRuntimeStride = 28;
+        // Per-level object-definition blocks loaded/deduplicated by FUN_1010_4C8A.
+        public const int ObjectDefinitionBytes = 0x5A;
+        public const int MaxObjectDefinitions = 256; // OBJECT +0x04 is one byte.
+        public const int ObjectDefinitionAlertSequenceOffset = 0x34;
+        public const int ObjectDefinitionAttackSequenceOffset = 0x36;
+        public const int ObjectDefinitionRecoverySequenceOffset = 0x38;
         public const int MaxGuards = 100;
         public const int GuardRuntimeStride = 26;
         public const int MaxProjectiles = 8;
