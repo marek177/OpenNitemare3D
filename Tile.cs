@@ -14,6 +14,7 @@ namespace Nitemare3D
         public bool thin = false;
         public bool door = false;
         public byte wallID;
+        public byte objectID;
         public byte x,y;
         public bool flip = false;
         float openAmount = 0;
