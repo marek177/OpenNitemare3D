@@ -20,6 +20,7 @@ namespace Nitemare3D
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
             TestExactAnimationSchedulers();
+            TestHitTransitionRouting();
             TestAttackGate();
             TestProjectileRuntime();
             TestDelayState();
@@ -443,6 +444,199 @@ namespace Nitemare3D
                    OriginalGuardDispatchResult.Transitioned &&
                    guard.State == (byte)OriginalGuardState.Active07,
                 "state 15 must return through nextState at final frame.");
+        }
+
+        static void TestHitTransitionRouting()
+        {
+            var definition = new OriginalObjectDefinitionRecord
+            {
+                ReactionSequence0 = 0x0204,
+                DeathSequence0 = 0x0408,
+                DeathSequence7 = 0x020C
+            };
+
+            int rngCalls = 0;
+            Func<ushort> zeroRng = () =>
+            {
+                rngCalls++;
+                return 0;
+            };
+
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active02,
+                Strategy = 0,
+                ResultOctant = 3
+            };
+            var obj = new OriginalObjectRecord();
+
+            Assert(OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng,
+                       false) == OriginalGuardHitTransition.Pain15 &&
+                   guard.State == (byte)OriginalGuardState.Pain15 &&
+                   guard.NextState == (byte)OriginalGuardState.Active02 &&
+                   guard.DefinitionValue == 0x0204 &&
+                   unchecked((byte)obj.Component03) == 0x04 &&
+                   guard.ResultOctant == 8,
+                "ordinary hit must enter state 15 with selected reaction sequence.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active07,
+                Strategy = 0
+            };
+            obj = new OriginalObjectRecord();
+            Assert(OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng,
+                       true) == OriginalGuardHitTransition.AnimationTo05 &&
+                   guard.State == (byte)OriginalGuardState.AnimationTimer &&
+                   guard.NextState == (byte)OriginalGuardState.Transition05 &&
+                   guard.Unknown17 == 1,
+                "states 7/8/15 must animate through state 0 to state 5.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.MoveThen03,
+                Strategy = 2
+            };
+            obj = new OriginalObjectRecord();
+            Assert(OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng,
+                       false) == OriginalGuardHitTransition.AnimationTo08 &&
+                   guard.State == (byte)OriginalGuardState.AnimationTimer &&
+                   guard.NextState == (byte)OriginalGuardState.Move08,
+                "strategy 2 hit must animate through state 0 to state 8.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active02,
+                Strategy = 4
+            };
+            obj = new OriginalObjectRecord();
+            rngCalls = 0;
+            Assert(OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng,
+                       false) == OriginalGuardHitTransition.ReactionSkipped &&
+                   rngCalls == 0 &&
+                   guard.State == (byte)OriginalGuardState.Active02 &&
+                   guard.ResultOctant == 8,
+                "strategy 4 must skip the selector and reaction animation.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Detection03,
+                Strategy = 3
+            };
+            obj = new OriginalObjectRecord();
+            rngCalls = 0;
+            Assert(OriginalGuardDispatcher.BeginNonLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng,
+                       false) == OriginalGuardHitTransition.ReactionSkipped &&
+                   rngCalls == 1 &&
+                   guard.State == (byte)OriginalGuardState.Detection03,
+                "state 3 must consume reaction selector but skip local pain animation.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active07,
+                Strength = 50,
+                ResultOctant = 1
+            };
+            obj = new OriginalObjectRecord
+            {
+                Runtime1A = 0
+            };
+            Assert(OriginalGuardDispatcher.BeginLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng) == OriginalGuardHitTransition.DeathAnimation &&
+                   guard.Strength == 0 &&
+                   guard.State == (byte)OriginalGuardState.AnimationTimer &&
+                   guard.NextState == (byte)OriginalGuardState.DeathFinalize09 &&
+                   guard.DefinitionValue == 0x0408 &&
+                   guard.Timer == 3 &&
+                   unchecked((byte)obj.Component03) == 0x08,
+                "lethal hit without OBJECT+1A must use state 0 -> state 9.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Active07,
+                Strength = 50,
+                ResultOctant = 1
+            };
+            obj = new OriginalObjectRecord
+            {
+                Runtime1A = 10
+            };
+            Assert(OriginalGuardDispatcher.BeginLethalHitTransition(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       zeroRng) == OriginalGuardHitTransition.DeathAnimation &&
+                   guard.State == (byte)OriginalGuardState.WaitAnimation12 &&
+                   guard.NextState == (byte)OriginalGuardState.DeathFinalize09,
+                "lethal hit with OBJECT+1A must use state 12 -> state 9.");
+
+            rngCalls = 0;
+            Assert(OriginalGuardDispatcher.TrySelectDeathSequence(
+                       definition,
+                       0,
+                       zeroRng,
+                       out int deathSelector,
+                       out ushort deathSequence) &&
+                   deathSelector == 7 &&
+                   deathSequence == 0x020C &&
+                   rngCalls == 0,
+                "resoct zero must prefer valid death slot 7 without RNG.");
+
+            var lowByteOnly = new OriginalObjectDefinitionRecord
+            {
+                ReactionSequence0 = 0x00FF
+            };
+            Assert(!lowByteOnly.TryGetReactionSequence(0, out _),
+                "sequence validity must require a nonzero high/frame-count byte.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.DeathFinalize09,
+                Strength = 0
+            };
+            obj = new OriginalObjectRecord
+            {
+                ObjectClass = OriginalRuntime.DraculaPhase1Class,
+                DefinitionId = 9,
+                Runtime1A = 0
+            };
+
+            OriginalGuardDispatcher.ApplyDraculaPhase2Reset(
+                ref guard,
+                ref obj,
+                3);
+
+            Assert(obj.DefinitionId == 3 &&
+                   obj.ObjectClass == OriginalRuntime.DraculaBatPhase2Class &&
+                   obj.Runtime1A == 0x23 &&
+                   guard.Strength == OriginalRuntime.GuardInitialStrength &&
+                   guard.State == (byte)OriginalGuardState.Move08 &&
+                   guard.NextState == (byte)OriginalGuardState.Active02 &&
+                   guard.Timer == 1,
+                "Dracula phase reset must occur after state-09 finalization.");
         }
 
         static void TestAttackGate()
