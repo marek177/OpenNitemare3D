@@ -44,10 +44,33 @@ namespace Nitemare3D
 
             bool delete = false;
 
+            int projectileWorldX = (int)MathF.Round(
+                position.X * OriginalRuntime.WorldUnitsPerTile);
+            int projectileWorldY = (int)MathF.Round(
+                position.Y * OriginalRuntime.WorldUnitsPerTile);
+
+            if (OriginalRuntimeState.TryFindGuardHit(
+                    projectileWorldX,
+                    projectileWorldY,
+                    out Entity hitGuard))
+            {
+                hitGuard.SendMessage("ShootPlasma");
+                Entity.Remove(this);
+                visible = false;
+                return;
+            }
+
             
             foreach(var entity in entities)
             {
                 if(entity.id == id || entity.id == Game.player.id){continue;}
+                // Runtime-bound guards were already tested above using the
+                // original +/-9 world-unit proximity rule.
+                if (OriginalRuntimeState.TryGetGuardRecord(entity, out _))
+                {
+                    continue;
+                }
+
                 if(entity.position.Rounded().Equals(position.Rounded()) && entity.hasCollision)
                 {
                     entity.SendMessage("ShootPlasma");
