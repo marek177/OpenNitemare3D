@@ -110,6 +110,32 @@ namespace Nitemare3D
                    dy > RenderDistanceThreshold || dy < -RenderDistanceThreshold;
         }
 
+        public static bool TryAllocateAndInitialize(
+            OriginalProjectileRecord[] pool,
+            byte weaponSelector,
+            short worldX,
+            short worldY,
+            byte sequenceBase,
+            out int slotIndex)
+        {
+            slotIndex = FirstFreeSlot(pool);
+            if (slotIndex < 0)
+                return false;
+
+            if (!InitializeSpawn(
+                    ref pool[slotIndex],
+                    weaponSelector,
+                    worldX,
+                    worldY,
+                    sequenceBase))
+            {
+                slotIndex = -1;
+                return false;
+            }
+
+            return true;
+        }
+
         public static bool InitializeSpawn(
             ref OriginalProjectileRecord projectile,
             byte weaponSelector,
