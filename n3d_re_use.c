@@ -2,6 +2,7 @@
 
 #include "n3d_re_definitions.h"
 #include "n3d_re_runtime.h"
+#include "n3d_re_special_runtime.h"
 
 static uint8_t n3d_use_previous;
 
@@ -152,4 +153,147 @@ n3d_use_target N3D_RE_ClassifyUseTarget(uint8_t octant)
     }
 
     return target;
+}
+
+
+n3d_use_execution N3D_RE_ExecuteUse(uint8_t octant)
+{
+    n3d_use_execution execution = {0};
+    execution.runtime_slot = -1;
+    execution.target = N3D_RE_ClassifyUseTarget(octant);
+
+    switch(execution.target.kind)
+    {
+        case N3D_USE_NONE:
+            execution.kind = N3D_USE_EXEC_NONE;
+            return execution;
+
+        case N3D_USE_UNRESOLVED:
+            execution.kind = N3D_USE_EXEC_UNRESOLVED;
+            return execution;
+
+        case N3D_USE_DYNAMIC_DOOR:
+            /*
+             * Target and runtime slot are known, but the initial/ordinary door
+             * transition state machine is not fully closed yet.
+             */
+            execution.runtime_slot =
+                N3D_RE_FindDoorSlotByCell(
+                    execution.target.x,
+                    execution.target.y);
+            execution.kind =
+                execution.runtime_slot >= 0
+                    ? N3D_USE_EXEC_DOOR_DEFERRED
+                    : N3D_USE_EXEC_UNRESOLVED;
+            return execution;
+
+        case N3D_USE_PANEL:
+        {
+            const int panel_slot =
+                N3D_RE_FindPanelSlotByCell(
+                    execution.target.x,
+                    execution.target.y);
+            if(panel_slot < 0)
+            {
+                execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                return execution;
+            }
+
+            N3D_RE_ActivatePanelUse(&n3d_panels[panel_slot]);
+            execution.runtime_slot = panel_slot;
+            execution.event_id = N3D_PANEL_USE_EVENT;
+            execution.kind = N3D_USE_EXEC_PANEL_ACTIVATED;
+            return execution;
+        }
+
+        case N3D_USE_PUSH:
+        {
+            const int object_slot =
+                N3D_RE_FindObjectSlotByCell(
+                    execution.target.x,
+                    execution.target.y);
+            if(object_slot < 0)
+            {
+                execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                return execution;
+            }
+
+            const int push_slot =
+                N3D_RE_FindPushSlotByObject((uint16_t)object_slot);
+            if(push_slot < 0)
+            {
+                execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                return execution;
+            }
+
+            const n3d_push_direction direction =
+                N3D_RE_PushDirectionForOctant(octant);
+
+            const int dest_x =
+                (int)execution.target.x +
+                (direction.dx > 0 ? 1 : direction.dx < 0 ? -1 : 0);
+            const int dest_y =
+                (int)execution.target.y +
+                (direction.dy > 0 ? 1 : direction.dy < 0 ? -1 : 0);
+
+            if(dest_x < 0 || dest_y < 0 ||
+               dest_x >= N3D_MAP_WIDTH || dest_y >= N3D_MAP_HEIGHT)
+            {
+                execution.kind = N3D_USE_EXEC_PUSH_BLOCKED;
+                execution.runtime_slot = push_slot;
+                return execution;
+            }
+
+            const n3d_map_cell* destination =
+                N3D_RE_MapCell((uint8_t)dest_x, (uint8_t)dest_y);
+
+            if(!destination ||
+               !N3D_RE_WallPropertyKnown(destination->wall) ||
+               !N3D_RE_ObjectPropertyKnown(destination->object))
+            {
+                execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                execution.runtime_slot = push_slot;
+                return execution;
+            }
+
+            const uint8_t destination_flags =
+                (uint8_t)(
+                    n3d_wall_property_resolved[destination->wall] |
+                    n3d_object_property_resolved[destination->object]);
+
+            if(!N3D_RE_CanStartPush(
+                    &n3d_pushes[push_slot],
+                    destination_flags))
+            {
+                execution.kind = N3D_USE_EXEC_PUSH_BLOCKED;
+                execution.runtime_slot = push_slot;
+                return execution;
+            }
+
+            if(!N3D_RE_BeginPush(
+                    &n3d_pushes[push_slot],
+                    (uint16_t)object_slot,
+                    octant))
+            {
+                execution.kind = N3D_USE_EXEC_PUSH_BLOCKED;
+                execution.runtime_slot = push_slot;
+                return execution;
+            }
+
+            execution.runtime_slot = push_slot;
+            execution.kind = N3D_USE_EXEC_PUSH_STARTED;
+            return execution;
+        }
+
+        case N3D_USE_MAPPED_WALL:
+            execution.kind = N3D_USE_EXEC_WALL_DEFERRED;
+            return execution;
+
+        case N3D_USE_MAPPED_OBJECT:
+            execution.kind = N3D_USE_EXEC_OBJECT_DEFERRED;
+            return execution;
+    }
+
+    execution.kind = N3D_USE_EXEC_UNRESOLVED;
+    return execution;
 }
