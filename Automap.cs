@@ -170,14 +170,142 @@ namespace Nitemare3D
                    name.IndexOf("curtain", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        // Current OpenNitemare3D renderer is tile/DDA based, not the original VEC renderer.
-        // This records the visible hit cell with the correct original logical color.
-        public static void DiscoverWall(int x, int y, Tile tile)
+        public enum VecOrientation : byte
+        {
+            Top = 0,
+            Bottom = 1,
+            Right = 2,
+            Left = 3
+        }
+
+        static bool IsRendererWall(Tile tile)
+        {
+            return tile != null && tile.textureID >= 0 && tile.textureID <= 149;
+        }
+
+        static bool SameVecMaterial(Tile a, Tile b)
+        {
+            if (a == null || b == null)
+                return false;
+
+            return a.type.Equals(b.type) &&
+                   IsDynamicDoor(a) == IsDynamicDoor(b);
+        }
+
+        static bool IsFaceExposed(int x, int y, VecOrientation orientation)
+        {
+            int nx = x;
+            int ny = y;
+
+            switch (orientation)
+            {
+                case VecOrientation.Top:
+                    ny--;
+                    break;
+                case VecOrientation.Bottom:
+                    ny++;
+                    break;
+                case VecOrientation.Right:
+                    nx++;
+                    break;
+                case VecOrientation.Left:
+                    nx--;
+                    break;
+            }
+
+            if (!InsideMap(nx, ny))
+                return true;
+
+            return !IsRendererWall(Level.tilemap[nx, ny]);
+        }
+
+        static bool CanMergeVecCell(
+            int x,
+            int y,
+            VecOrientation orientation,
+            Tile material)
+        {
+            if (!InsideMap(x, y))
+                return false;
+
+            Tile tile = Level.tilemap[x, y];
+            return IsRendererWall(tile) &&
+                   SameVecMaterial(tile, material) &&
+                   IsFaceExposed(x, y, orientation);
+        }
+
+        static void DrawNormalVecRun(
+            int x,
+            int y,
+            VecOrientation orientation,
+            Tile material)
+        {
+            int start;
+            int end;
+
+            if (orientation == VecOrientation.Top ||
+                orientation == VecOrientation.Bottom)
+            {
+                start = x;
+                end = x;
+
+                while (CanMergeVecCell(start - 1, y, orientation, material))
+                    start--;
+
+                while (CanMergeVecCell(end + 1, y, orientation, material))
+                    end++;
+
+                int edgeY = orientation == VecOrientation.Bottom ? y + 1 : y;
+                byte color = ResolveLogicalColor(2);
+
+                for (int edgeX = start; edgeX <= end; edgeX++)
+                {
+                    if (InsideMap(edgeX, edgeY))
+                        cells[Index(edgeX, edgeY)] = color;
+                }
+            }
+            else
+            {
+                start = y;
+                end = y;
+
+                while (CanMergeVecCell(x, start - 1, orientation, material))
+                    start--;
+
+                while (CanMergeVecCell(x, end + 1, orientation, material))
+                    end++;
+
+                int edgeX = orientation == VecOrientation.Right ? x + 1 : x;
+                byte color = ResolveLogicalColor(2);
+
+                for (int edgeY = start; edgeY <= end; edgeY++)
+                {
+                    if (InsideMap(edgeX, edgeY))
+                        cells[Index(edgeX, edgeY)] = color;
+                }
+            }
+        }
+
+        // The original VEC builder encodes orientation as:
+        // 0 top, 1 bottom, 2 right, 3 left. Normal VECs use tile-boundary
+        // endpoints and B1A4 rasterizes the full merged run. Dynamic door VECs
+        // are centered in the tile and B1A4 stores one light-blue map cell.
+        public static void DiscoverWallHit(
+            int x,
+            int y,
+            VecOrientation orientation,
+            Tile tile)
         {
             if (!InsideMap(x, y) || tile == null)
                 return;
 
-            cells[Index(x, y)] = ResolveLogicalColor(IsDynamicDoor(tile) ? 9 : 2);
+            if (IsDynamicDoor(tile))
+            {
+                cells[Index(x, y)] = ResolveLogicalColor(9);
+                return;
+            }
+
+            DrawNormalVecRun(x, y, orientation, tile);
         }
 
         public static void DoorOpened(int x, int y)
