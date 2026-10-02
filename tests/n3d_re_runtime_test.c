@@ -1186,6 +1186,16 @@ int main(void)
         N3D_RE_ApplyPickupAtCell(1, 1);
     assert(pickup_result.kind == N3D_PICKUP_KEY_GRANTED);
     assert(pickup_result.variant_index == 0);
+    assert(N3D_RE_PickupResultAccepted(&pickup_result));
+    assert(n3d_player.colored_keys == 0x01);
+    int pickup_key_object_slot = N3D_RE_FindObjectSlotByCell(1, 1);
+    assert(pickup_key_object_slot >= 0);
+    assert((n3d_objects[pickup_key_object_slot].flags &
+            N3D_OBJECT_RUNTIME_PRESENT) == 0);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(1, 1);
+    assert(pickup_result.kind == N3D_PICKUP_INACTIVE);
+    assert(!N3D_RE_PickupResultAccepted(&pickup_result));
     assert(n3d_player.colored_keys == 0x01);
 
     pickup_result = N3D_RE_ApplyPickupAtCell(2, 2);
@@ -1203,14 +1213,30 @@ int main(void)
     assert(pickup_result.ammo_pool == N3D_AMMO_POOL_SILVER);
     assert(pickup_result.value_before == 99);
     assert(pickup_result.value_after == 119);
+    assert(pickup_result.accepted == 1);
     assert(n3d_player.silver_ammo == 119);
+    int silver_pickup_slot = N3D_RE_FindObjectSlotByCell(4, 4);
+    assert(silver_pickup_slot >= 0);
+    assert((n3d_objects[silver_pickup_slot].flags &
+            N3D_OBJECT_RUNTIME_PRESENT) == 0);
 
     pickup_result = N3D_RE_ApplyPickupAtCell(5, 5);
     assert(pickup_result.kind == N3D_PICKUP_AMMO_AT_THRESHOLD);
     assert(pickup_result.ammo_pool == N3D_AMMO_POOL_LASER);
     assert(pickup_result.value_before == 100);
     assert(pickup_result.value_after == 100);
+    assert(pickup_result.accepted == 0);
     assert(n3d_player.laser_ammo == 100);
+    int laser_pickup_slot = N3D_RE_FindObjectSlotByCell(5, 5);
+    assert(laser_pickup_slot >= 0);
+    assert((n3d_objects[laser_pickup_slot].flags &
+            N3D_OBJECT_RUNTIME_PRESENT) != 0);
+
+    pickup_result = N3D_RE_ApplyPickupAtCell(5, 5);
+    assert(pickup_result.kind == N3D_PICKUP_AMMO_AT_THRESHOLD);
+    assert(n3d_player.laser_ammo == 100);
+    assert((n3d_objects[laser_pickup_slot].flags &
+            N3D_OBJECT_RUNTIME_PRESENT) != 0);
 
     pickup_result = N3D_RE_ApplyPickupAtCell(6, 6);
     assert(pickup_result.kind == N3D_PICKUP_AMMO_ADDED);
@@ -1225,6 +1251,62 @@ int main(void)
 
     assert(N3D_RE_ApplyPickupAtCell(63, 63).kind ==
            N3D_PICKUP_UNRESOLVED);
+
+    /*
+     * The collision oracle may touch the same pickup on several one-unit
+     * substeps. Accepted pickup deactivation makes subsequent touches no-op.
+     */
+    uint8_t collision_pickup_payload[N3D_MAP_LEVEL_BYTES] = {0};
+    const int collision_pickup_cell = 8 * N3D_MAP_WIDTH + 8;
+    const int collision_empty_cell = 8 * N3D_MAP_WIDTH + 9;
+    collision_pickup_payload[
+        collision_pickup_cell * N3D_MAP_CELL_BYTES + 1] = 0x2A;
+
+    assert(N3D_RE_LoadMapPayload(
+        collision_pickup_payload,
+        sizeof(collision_pickup_payload)));
+
+    n3d_player.laser_ammo = 90;
+    n3d_pickup_touch_context pickup_touch_context = {0};
+    n3d_collision_callbacks pickup_collision_callbacks = {
+        N3D_RE_DoorCellPassableCallback,
+        NULL,
+        N3D_RE_PlayerPickupTouchCallback,
+        &pickup_touch_context
+    };
+
+    n3d_resolved_collision_result pickup_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(
+            8, 8, 9, 8, 1,
+            &pickup_collision_callbacks);
+
+    assert(pickup_collision.resolved);
+    assert(pickup_collision.step == 1);
+    assert(n3d_player.laser_ammo == 110);
+    assert(pickup_touch_context.touch_calls == 1);
+    assert(pickup_touch_context.accepted_pickups == 1);
+    assert(pickup_touch_context.last_result.kind ==
+           N3D_PICKUP_AMMO_ADDED);
+
+    pickup_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(
+            8, 8, 9, 8, 1,
+            &pickup_collision_callbacks);
+
+    assert(pickup_collision.resolved);
+    assert(pickup_collision.step == 1);
+    assert(n3d_player.laser_ammo == 110);
+    assert(pickup_touch_context.touch_calls == 2);
+    assert(pickup_touch_context.accepted_pickups == 1);
+    assert(pickup_touch_context.last_result.kind ==
+           N3D_PICKUP_INACTIVE);
+
+    const int collision_pickup_slot =
+        N3D_RE_FindObjectSlotByCell(8, 8);
+    assert(collision_pickup_slot >= 0);
+    assert((n3d_objects[collision_pickup_slot].flags &
+            N3D_OBJECT_RUNTIME_PRESENT) == 0);
+    (void)collision_empty_cell;
 
     /* Execute exact USE effects that are already closed by RE evidence. */
     uint8_t use_payload[N3D_MAP_LEVEL_BYTES] = {0};
