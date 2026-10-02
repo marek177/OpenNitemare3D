@@ -33,12 +33,6 @@ void G_LoadEpisode(uint8_t episode)
 //dear David P Gray, why?
 void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
 {
-    /*
-     * The historical C rewrite only logged most guard spawns. Keep its shell,
-     * but build the recovered original OBJECT/GUARD records in parallel.
-     */
-    N3D_RE_RegisterGuardFromMap(id, x, y);
-
     if(id > 0 && id <= MT_StartpositionW)
     {
         if(!p_player)
@@ -114,7 +108,13 @@ void G_LoadLevel(uint8_t level)
         return;
     }
 
-    N3D_RE_ResetRuntime();
+    if(!N3D_RE_LoadMapPayload(data, N3D_MAP_LEVEL_BYTES))
+    {
+        printf("failed to decode MAP payload\n");
+        fclose(file);
+        free(data);
+        return;
+    }
 
     for(int cell = 0; cell < N3D_MAP_WIDTH * N3D_MAP_HEIGHT; cell++)
     {
