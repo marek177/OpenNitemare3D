@@ -1037,6 +1037,13 @@ namespace Nitemare3D
                 case WallType.Genericexplodingwall:
                     break;
             }
+            byte wallClass = GetWallClass((byte)id);
+            if (wallClass >= 0x31 && wallClass <= 0x40)
+            {
+                // Runtime behavior is selected by MAP header class, not WallType name.
+                tile = new SlidingDoorTile(wallClass);
+            }
+
             tile.x = (byte)x;
             tile.y = (byte)y;
             tile.wallID = (byte)id;
@@ -1044,7 +1051,18 @@ namespace Nitemare3D
             tile.textureID = texture;
             tilemap[x,y] = tile;
             tilemap[x,y].Create();
-            if(tile.textureID == -1){tile.obstacle = false;}
+
+            // Original wall property bit 0x02 covers classes 0x01..0x40.
+            // Door collision is refined by SlidingDoorTile as its state changes.
+            if (wallClass >= 0x01 && wallClass <= 0x40)
+            {
+                tile.obstacle = true;
+            }
+            else if (tile.textureID == -1)
+            {
+                tile.obstacle = false;
+            }
+
             HandleFlip(x, y);
         }
 
@@ -1052,7 +1070,7 @@ namespace Nitemare3D
         //TODO: make entity collision detection less garbage
         public static bool IsWalkable(int x, int y, Entity ent)
         {
-            if(x < 0 || x > 63 || y < 0 || y > 64){return false;}
+            if(x < 0 || x > 63 || y < 0 || y > 63){return false;}
             bool isEntity = false;
             foreach(var entity in Entity.entities)
             {
@@ -1071,7 +1089,7 @@ namespace Nitemare3D
                 }
 
             }
-            return ((tilemap[x,y].textureID == -1)) && !isEntity;
+            return !tilemap[x,y].obstacle && !isEntity;
         }
 
         public static void LoadMap(int id, int episode)
