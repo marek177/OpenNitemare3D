@@ -183,18 +183,31 @@ namespace Nitemare3D
         public bool IsCurtain =>
             WallClass == 0x3F || WallClass == 0x40;
 
-        public bool CanManualUse =>
-            WallClass == 0x31 ||
-            WallClass == 0x32 ||
-            IsCurtain;
+        public int CredentialGroup => Level.GetWallClassVariant(this);
 
         public override void OnUse()
         {
-            // The original central USE dispatcher refuses ordinary manual activation
-            // for remote doors and gates locked/key-card classes before entering the
-            // common door activation handler.
-            if (!CanManualUse)
+            // Remote doors are command-driven and reject ordinary USE.
+            if (IsRemoteControlled)
                 return;
+
+            // Retail maps do not use 0x3D/0x3E. Their original common helper has
+            // an extra direction-selector condition, so keep them gated until that
+            // rare path is implemented rather than guessing.
+            if (WallClass == 0x3D || WallClass == 0x3E)
+                return;
+
+            if (RequiresKey &&
+                (Game.player == null || !Game.player.HasKeyGroup(CredentialGroup)))
+            {
+                return;
+            }
+
+            if (RequiresIdCard &&
+                (Game.player == null || !Game.player.HasIdCardGroup(CredentialGroup)))
+            {
+                return;
+            }
 
             ActivateCommon(true);
         }
