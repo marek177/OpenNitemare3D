@@ -53,6 +53,119 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Completed;
         }
 
+        /// <summary>
+        /// Exact FUN_1010_762C packed-sequence initializer. The sequence word packs
+        /// the first animation frame in its low byte and frame-count/timer data in
+        /// its high byte. State 0x02/0x03/0x04 use this with class-table offsets
+        /// +0x34/+0x36/+0x38 and next states 3/4/5 respectively.
+        /// </summary>
+        public static OriginalGuardDispatchResult BeginPackedSequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort sequenceValue,
+            byte state,
+            byte nextState)
+        {
+            guard.DefinitionValue = sequenceValue;
+            obj.Component03 = unchecked((sbyte)(byte)sequenceValue);
+            guard.Timer = (short)(((sequenceValue >> 8) & 0xFF) - 1);
+            guard.NextState = nextState;
+            guard.State = state;
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        public static OriginalGuardDispatchResult BeginState02AlertSequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort classSequence34)
+        {
+            if (guard.State != (byte)OriginalGuardState.Active02)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            // The original calls the class-specific alert SFX selector immediately
+            // before this sequence initializer.
+            return BeginPackedSequence(
+                ref guard,
+                ref obj,
+                classSequence34,
+                (byte)OriginalGuardState.AnimationTimer,
+                (byte)OriginalGuardState.Detection03);
+        }
+
+        public static OriginalGuardDispatchResult BeginState03AttackSequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort classSequence36)
+        {
+            if (guard.State != (byte)OriginalGuardState.Detection03)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            return BeginPackedSequence(
+                ref guard,
+                ref obj,
+                classSequence36,
+                (byte)OriginalGuardState.AnimationTimer,
+                (byte)OriginalGuardState.DetectionAttack04);
+        }
+
+        public static OriginalGuardDispatchResult BeginState04RecoverySequence(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort classSequence38)
+        {
+            if (guard.State != (byte)OriginalGuardState.DetectionAttack04)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            return BeginPackedSequence(
+                ref guard,
+                ref obj,
+                classSequence38,
+                (byte)OriginalGuardState.AnimationTimer,
+                (byte)OriginalGuardState.Transition05);
+        }
+
+        /// <summary>
+        /// Recovered FUN_1010_7594 decision tail. The helper caches LOS/perception
+        /// at +0x17 and one-tile proximity at +0x18. +0x16 selects which result is
+        /// used by states 0x03 and 0x04: 0 = one-tile proximity, 1/2 = perception.
+        /// Values above 2 are deliberately rejected instead of reproducing the
+        /// original uninitialized local-byte fallthrough.
+        /// </summary>
+        public static bool TryEvaluateAttackGate(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            bool perceptionSucceeded,
+            out bool attackEligible)
+        {
+            guard.Unknown17 = perceptionSucceeded ? (byte)1 : (byte)0;
+
+            int dx = playerWorldX - obj.WorldX;
+            int dy = playerWorldY - obj.WorldY;
+            bool withinOneTile =
+                Math.Abs(dx) <= OriginalRuntime.WorldUnitsPerTile &&
+                Math.Abs(dy) <= OriginalRuntime.WorldUnitsPerTile;
+
+            guard.Unknown18 = withinOneTile ? (byte)1 : (byte)0;
+
+            switch (guard.TransitionControl)
+            {
+                case 0:
+                    attackEligible = withinOneTile;
+                    return true;
+
+                case 1:
+                case 2:
+                    attackEligible = perceptionSucceeded;
+                    return true;
+
+                default:
+                    attackEligible = false;
+                    return false;
+            }
+        }
+
         // State 0x15: confirmed damage reaction return.
         // The original advances the selected reaction sequence first; callers invoke
         // this only when that sequence reaches its final frame.
