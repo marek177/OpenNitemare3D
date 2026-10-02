@@ -794,6 +794,72 @@ int main(void)
     assert(n3d_wall_mapped_type[255] == 0x2F);
     assert(n3d_wall_property_resolved[255] == 0x17);
 
+    /*
+     * Full map-object instantiation now follows OBJECTS class/property mapping:
+     * KEY -> OBJECT, PUSH -> OBJECT+PUSH, SECRET -> PANEL,
+     * GUARD1/GUARD26 -> OBJECT+GUARD.
+     */
+    uint8_t object_payload[N3D_MAP_LEVEL_BYTES] = {0};
+    const int key_cell = 2 * N3D_MAP_WIDTH + 2;
+    const int push_cell = 3 * N3D_MAP_WIDTH + 3;
+    const int panel_cell = 4 * N3D_MAP_WIDTH + 4;
+    const int bat_runtime_cell = 5 * N3D_MAP_WIDTH + 5;
+    const int dancers_cell = 6 * N3D_MAP_WIDTH + 6;
+
+    object_payload[key_cell * N3D_MAP_CELL_BYTES + 1] = 0x05;
+    object_payload[push_cell * N3D_MAP_CELL_BYTES + 1] = 0x18;
+    object_payload[panel_cell * N3D_MAP_CELL_BYTES + 1] = 0x62;
+    object_payload[bat_runtime_cell * N3D_MAP_CELL_BYTES + 1] = 0x80;
+    object_payload[dancers_cell * N3D_MAP_CELL_BYTES + 1] = 0x8C;
+
+    assert(N3D_RE_LoadMapPayload(object_payload, sizeof(object_payload)));
+    assert(n3d_object_count == 4);
+    assert(n3d_guard_count == 2);
+    assert(n3d_push_count == 1);
+    assert(n3d_panel_count == 1);
+
+    int key_object_slot = N3D_RE_FindObjectSlotByCell(2, 2);
+    int push_object_slot = N3D_RE_FindObjectSlotByCell(3, 3);
+    int bat_object_slot = N3D_RE_FindObjectSlotByCell(5, 5);
+    int dancers_object_slot = N3D_RE_FindObjectSlotByCell(6, 6);
+
+    assert(key_object_slot >= 0);
+    assert(push_object_slot >= 0);
+    assert(bat_object_slot >= 0);
+    assert(dancers_object_slot >= 0);
+    assert(N3D_RE_FindObjectSlotByCell(4, 4) == -1);
+
+    assert(n3d_objects[key_object_slot].object_class == 0x2F);
+    assert(n3d_objects[key_object_slot].flags == 0x05);
+    assert(n3d_objects[key_object_slot].world_x == 2 * 64 + 32);
+    assert(n3d_objects[key_object_slot].world_y == 2 * 64 + 32);
+
+    assert(n3d_objects[push_object_slot].object_class == 0x28);
+    assert(n3d_objects[push_object_slot].flags == 0x03);
+    int push_runtime_slot =
+        N3D_RE_FindPushSlotByObject((uint16_t)push_object_slot);
+    assert(push_runtime_slot >= 0);
+    assert(n3d_pushes[push_runtime_slot].object_index ==
+           (uint16_t)push_object_slot);
+    assert(n3d_pushes[push_runtime_slot].steps_remaining == 0);
+
+    int panel_runtime_slot = N3D_RE_FindPanelSlotByCell(4, 4);
+    assert(panel_runtime_slot >= 0);
+    assert(N3D_RE_PanelActivation(&n3d_panels[panel_runtime_slot]) == 0);
+
+    assert(n3d_objects[bat_object_slot].object_class == 0x08);
+    assert(n3d_objects[bat_object_slot].flags == 0x0B);
+    assert(n3d_guards[n3d_objects[bat_object_slot].guard_index].object_slot ==
+           (uint16_t)bat_object_slot);
+
+    assert(n3d_objects[dancers_object_slot].object_class == 0x21);
+    assert(n3d_objects[dancers_object_slot].flags == 0x0B);
+    const n3d_guard_record* dancers_guard =
+        &n3d_guards[n3d_objects[dancers_object_slot].guard_index];
+    assert(dancers_guard->object_slot == (uint16_t)dancers_object_slot);
+    assert(dancers_guard->state == 0);
+    assert(dancers_guard->next_state == 0);
+
     uint8_t door_payload[N3D_MAP_LEVEL_BYTES] = {0};
     const int doorv_cell = 5 * N3D_MAP_WIDTH + 4;
     const int doorvc_cell = 7 * N3D_MAP_WIDTH + 6;
