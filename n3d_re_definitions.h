@@ -26,6 +26,13 @@ typedef struct n3d_definition_table
     uint16_t count;
 } n3d_definition_table;
 
+typedef struct n3d_mapping_coverage
+{
+    uint16_t total;
+    uint16_t known;
+    uint16_t unknown;
+} n3d_mapping_coverage;
+
 extern n3d_definition_table n3d_wall_definitions;
 extern n3d_definition_table n3d_object_definitions;
 extern uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
@@ -59,6 +66,9 @@ int N3D_RE_KnownObjectMappedTypeForClass(
 void N3D_RE_RebuildKnownMappedTypes(void);
 int N3D_RE_WallMappingKnown(uint8_t raw_id);
 int N3D_RE_ObjectMappingKnown(uint8_t raw_id);
+n3d_mapping_coverage N3D_RE_WallMappingCoverage(void);
+n3d_mapping_coverage N3D_RE_ObjectMappingCoverage(void);
+void N3D_RE_DumpUnresolvedMappings(void);
 int N3D_RE_LoadEpisodeDefinitions(uint8_t episode);
 
 #endif
