@@ -3,6 +3,7 @@
 #include "n3d_re_definitions.h"
 #include "n3d_re_runtime.h"
 #include "n3d_re_special_runtime.h"
+#include "n3d_re_door.h"
 
 static uint8_t n3d_use_previous;
 
