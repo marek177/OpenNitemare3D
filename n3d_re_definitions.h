@@ -30,6 +30,11 @@ extern n3d_definition_table n3d_wall_definitions;
 extern n3d_definition_table n3d_object_definitions;
 extern uint8_t n3d_wall_mapped_type[N3D_DEFINITION_COUNT];
 extern uint8_t n3d_object_mapped_type[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_wall_mapping_known[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_object_mapping_known[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_wall_property_resolved[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_object_property_resolved[N3D_DEFINITION_COUNT];
+extern uint8_t n3d_definition_episode;
 
 void N3D_RE_ClearDefinitionTable(n3d_definition_table* table);
 int N3D_RE_ParseDefinitionLine(
@@ -48,6 +53,8 @@ int N3D_RE_KnownObjectMappedTypeForClass(
     uint8_t* mapped_type);
 
 void N3D_RE_RebuildKnownMappedTypes(void);
+int N3D_RE_WallMappingKnown(uint8_t raw_id);
+int N3D_RE_ObjectMappingKnown(uint8_t raw_id);
 int N3D_RE_LoadEpisodeDefinitions(uint8_t episode);
 
 #endif
