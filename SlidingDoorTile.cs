@@ -162,6 +162,36 @@ namespace Nitemare3D
             {
                 BeginOpening();
             }
+
+            PropagateStateToAdjacentDoors();
+        }
+
+        void ApplyPropagatedState(DoorRuntimeState state)
+        {
+            RuntimeState = state;
+
+            // Closing propagation immediately restores collision on both VEC sides.
+            if (state == DoorRuntimeState.Closing)
+                obstacle = true;
+        }
+
+        void PropagateStateToAdjacentDoors()
+        {
+            // FUN_1010_188A checks the two neighbouring MAP cells along the door axis.
+            int dx = (WallClass & 1) == 0 ? 1 : 0;
+            int dy = (WallClass & 1) != 0 ? 1 : 0;
+
+            SyncNeighbour(x + dx, y + dy);
+            SyncNeighbour(x - dx, y - dy);
+        }
+
+        void SyncNeighbour(int nx, int ny)
+        {
+            if (nx < 0 || ny < 0 || nx >= 64 || ny >= 64)
+                return;
+
+            if (Level.tilemap[nx, ny] is SlidingDoorTile neighbour)
+                neighbour.ApplyPropagatedState(RuntimeState);
         }
 
         void BeginOpening()
