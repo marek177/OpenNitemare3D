@@ -547,6 +547,51 @@ int main(void)
     assert(n3d_wall_mapped_type[255] == 0x2F);
     assert(n3d_wall_property_resolved[255] == 0x17);
 
+    N3D_RE_ResetRuntime();
+    n3d_map[0].wall = 0;
+    n3d_map[0].object = 0;
+    n3d_map[1].wall = 0;
+    n3d_map[1].object = 0;
+
+    n3d_resolved_collision_result resolved_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(0, 0, 1, 0, 1, NULL);
+    assert(resolved_collision.resolved);
+    assert(resolved_collision.step == 1);
+
+    n3d_map[0].wall = 0x70;
+    resolved_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(0, 0, 1, 0, 1, NULL);
+    assert(!resolved_collision.resolved);
+    assert(resolved_collision.step == 0);
+
+    n3d_map[0].wall = 184;
+    int resolved_touch_count = 0;
+    n3d_collision_callbacks resolved_callbacks = {
+        NULL,
+        test_touch,
+        NULL,
+        &resolved_touch_count
+    };
+    resolved_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(
+            0, 0, 1, 0, 1, &resolved_callbacks);
+    assert(resolved_collision.resolved);
+    assert(resolved_collision.step == 1);
+    assert(resolved_touch_count == 1);
+
+    n3d_map[0].wall = 0;
+    n3d_map[0].object = 0x18;
+    resolved_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(0, 0, 1, 0, 1, NULL);
+    assert(resolved_collision.resolved);
+    assert(resolved_collision.step == 0);
+
+    n3d_map[0].object = 0x80;
+    resolved_collision =
+        N3D_RE_TestResolvedLeadingEdgePair(0, 0, 1, 0, 1, NULL);
+    assert(resolved_collision.resolved);
+    assert(resolved_collision.step == 0);
+
     remove("WALLS.1");
     remove("OBJECTS.1");
 
