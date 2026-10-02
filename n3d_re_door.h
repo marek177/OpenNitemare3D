@@ -18,6 +18,9 @@ typedef struct n3d_door_record
     uint8_t raw[N3D_DOOR_RECORD_SIZE];
 } n3d_door_record;
 
+_Static_assert(sizeof(n3d_door_record) == N3D_DOOR_RECORD_SIZE,
+               "door runtime record must remain 22 bytes");
+
 extern n3d_door_record n3d_doors[N3D_MAX_DOORS];
 extern uint16_t n3d_door_count;
 
