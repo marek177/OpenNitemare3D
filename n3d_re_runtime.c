@@ -1,6 +1,7 @@
 #include "n3d_re_runtime.h"
 #include <string.h>
 
+n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
 n3d_object_record n3d_objects[N3D_MAX_OBJECTS];
 n3d_guard_record n3d_guards[N3D_MAX_GUARDS];
 n3d_projectile_record n3d_projectiles[N3D_MAX_PROJECTILES];
@@ -9,11 +10,41 @@ uint16_t n3d_guard_count;
 
 void N3D_RE_ResetRuntime(void)
 {
+    memset(n3d_map, 0, sizeof(n3d_map));
     memset(n3d_objects, 0, sizeof(n3d_objects));
     memset(n3d_guards, 0, sizeof(n3d_guards));
     memset(n3d_projectiles, 0, sizeof(n3d_projectiles));
     n3d_object_count = 0;
     n3d_guard_count = 0;
+}
+
+int N3D_RE_LoadMapPayload(const uint8_t* payload, size_t payload_size)
+{
+    if (!payload || payload_size < N3D_MAP_LEVEL_BYTES)
+        return 0;
+
+    N3D_RE_ResetRuntime();
+
+    for (int cell = 0; cell < N3D_MAP_WIDTH * N3D_MAP_HEIGHT; ++cell)
+    {
+        const size_t offset = (size_t)cell * N3D_MAP_CELL_BYTES;
+        n3d_map[cell].wall = payload[offset];
+        n3d_map[cell].object = payload[offset + 1];
+
+        const uint8_t x = (uint8_t)(cell % N3D_MAP_WIDTH);
+        const uint8_t y = (uint8_t)(cell / N3D_MAP_WIDTH);
+        N3D_RE_RegisterGuardFromMap(n3d_map[cell].object, x, y);
+    }
+
+    return 1;
+}
+
+const n3d_map_cell* N3D_RE_MapCell(uint8_t x, uint8_t y)
+{
+    if (x >= N3D_MAP_WIDTH || y >= N3D_MAP_HEIGHT)
+        return NULL;
+
+    return &n3d_map[(size_t)y * N3D_MAP_WIDTH + x];
 }
 
 int N3D_RE_GuardClassFromMapObject(uint8_t id, uint8_t* object_class)
