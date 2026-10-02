@@ -252,18 +252,26 @@ namespace Nitemare3D
                     {
                         if (!slidingDoor.IsFullyOpen)
                         {
-                            Automap.DiscoverWallHit(mapX, mapY, mapOrientation, hitWall);
+                            bool intersectsDoor = slidingDoor.TryIntersectRay(
+                                position,
+                                rayDirX,
+                                rayDirY,
+                                out slidingDoorDistance,
+                                out slidingDoorTextureCoord);
 
-                            if (hasRenderableWall &&
-                                slidingDoor.TryIntersectRay(
-                                    position,
-                                    rayDirX,
-                                    rayDirY,
-                                    out slidingDoorDistance,
-                                    out slidingDoorTextureCoord))
+                            if (intersectsDoor)
                             {
-                                hit = 1;
-                                hitSlidingDoor = true;
+                                Automap.DiscoverWallHit(
+                                    mapX,
+                                    mapY,
+                                    slidingDoor.FacingOrientation(rayDirX, rayDirY),
+                                    hitWall);
+
+                                if (hasRenderableWall)
+                                {
+                                    hit = 1;
+                                    hitSlidingDoor = true;
+                                }
                             }
                         }
                     }
@@ -333,7 +341,7 @@ namespace Nitemare3D
 
 
 
-                int texX = (int)(wallX * 64);
+                int texX = Math.Clamp((int)(wallX * 64), 0, 63);
 
                 if (flipped && wall.width > 64)
                 {
