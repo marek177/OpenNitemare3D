@@ -86,6 +86,28 @@ namespace Nitemare3D
 
         static void TestGuardToPlayerDamage()
         {
+            Assert(OriginalDamage.OriginalRoundedSqrt(0) == 0 &&
+                   OriginalDamage.OriginalRoundedSqrt(1) == 1 &&
+                   OriginalDamage.OriginalRoundedSqrt(2) == 2 &&
+                   OriginalDamage.OriginalRoundedSqrt(4) == 2 &&
+                   OriginalDamage.OriginalRoundedSqrt(5) == 3 &&
+                   OriginalDamage.OriginalRoundedSqrt(9) == 3 &&
+                   OriginalDamage.OriginalRoundedSqrt(11) == 4,
+                "original integer square-root rounding mismatch.");
+
+            Assert(OriginalDamage.ComputeGuardAttackDistanceMetric(
+                       64, 64, 128, 128) == 2,
+                "one-tile diagonal GUARD distance must round to 2.");
+            Assert(OriginalDamage.ComputeGuardAttackDistanceMetric(
+                       64, 64, 192, 128) == 3,
+                "2x1 tile GUARD distance must round to 3.");
+
+            var diagonal = OriginalDamage.ComputeGuardToPlayerFromWorld(
+                64, 64, 128, 128, 0x0C, 1, false, 0);
+            Assert(diagonal.DistanceSeed == 50 &&
+                   diagonal.DifficultyTransformed == 50,
+                "world-coordinate GUARD damage distance mismatch.");
+
             var normal = OriginalDamage.ComputeGuardToPlayer(
                 5, 0x0C, 1, false, 0);
             Assert(normal.DistanceSeed == 20 &&
