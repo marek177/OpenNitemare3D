@@ -151,3 +151,30 @@ int N3D_RE_StepPush(
     --push->steps_remaining;
     return 1;
 }
+
+int N3D_RE_StepPushObject(int push_slot, int* completed)
+{
+    if(completed)
+        *completed = 0;
+
+    if(push_slot < 0 || push_slot >= (int)n3d_push_count)
+        return 0;
+
+    n3d_push_record* push = &n3d_pushes[push_slot];
+    if(push->object_index >= n3d_object_count)
+        return 0;
+
+    int8_t dx = 0;
+    int8_t dy = 0;
+    if(!N3D_RE_StepPush(push, &dx, &dy))
+        return 0;
+
+    n3d_object_record* object = &n3d_objects[push->object_index];
+    object->world_x = (int16_t)(object->world_x + dx);
+    object->world_y = (int16_t)(object->world_y + dy);
+
+    if(completed && push->steps_remaining == 0)
+        *completed = 1;
+
+    return 1;
+}
