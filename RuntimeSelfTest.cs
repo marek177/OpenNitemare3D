@@ -24,6 +24,7 @@ namespace Nitemare3D
             TestOriginalRandom();
             TestDamageMatrix();
             TestScriptProgress51A6();
+            TestWeaponJamScriptBFD8();
             TestGuardSounds();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
@@ -693,6 +694,40 @@ namespace Nitemare3D
 
             // Restore neutral startup state for later tests.
             OriginalRuntimeState.GuardAttackClass16FullDamageOverride = false;
+        }
+
+        static void TestWeaponJamScriptBFD8()
+        {
+            OriginalRuntimeState.WeaponRuntime.ResetNewGame();
+
+            Assert(!OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       1, 8, 0x47) &&
+                   !OriginalRuntimeState.WeaponRuntime.Jammed,
+                "E1M8 class 0x47 must not set DAT_4C2E.");
+
+            Assert(OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       1, 9, 0x47) &&
+                   OriginalRuntimeState.WeaponRuntime.Jammed,
+                "E1M9 class 0x47 must set DAT_4C2E.");
+
+            Assert(!OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       1, 9, 0x47) &&
+                   OriginalRuntimeState.WeaponRuntime.Jammed,
+                "repeated E1M9 class 0x47 must not retrigger an already-set latch.");
+
+            Assert(!OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       2, 9, 0x48) &&
+                   OriginalRuntimeState.WeaponRuntime.Jammed,
+                "jam script must remain episode-1 specific.");
+
+            Assert(OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       1, 9, 0x48) &&
+                   !OriginalRuntimeState.WeaponRuntime.Jammed,
+                "E1M9 class 0x48 must clear DAT_4C2E.");
+
+            Assert(!OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                       1, 9, 0x48),
+                "repeated E1M9 class 0x48 must not retrigger a cleared latch.");
         }
 
         static void TestGuardSounds()
