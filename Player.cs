@@ -149,6 +149,169 @@ namespace Nitemare3D
             }
             return false;
         }
+        bool TryRenderExactOriginalSprite(
+            ISprite sprite,
+            IOriginalSpriteProjectionSource source,
+            BitmapImage frame)
+        {
+            // The recovered projection constants describe the original
+            // 320x200 viewport. Keep scaled-window configurations on the
+            // historical renderer until its viewport scaling is migrated too.
+            if (OriginalRuntimeState.ExactTrigQ10 == null ||
+                Math.Abs(GameWindow.scale - 1.0f) > 0.0001f ||
+                !source.TryGetOriginalProjectionObject(
+                    out OriginalObjectRecord runtimeObject))
+            {
+                return false;
+            }
+
+            short playerWorldX =
+                (short)MathF.Round(
+                    position.X *
+                    OriginalRuntime.WorldUnitsPerTile);
+
+            short playerWorldY =
+                (short)MathF.Round(
+                    position.Y *
+                    OriginalRuntime.WorldUnitsPerTile);
+
+            int angle =
+                OriginalProjectileRuntime.AngleFromDirection(
+                    direction.X,
+                    direction.Y);
+
+            if (!OriginalSpriteProjectionExact.TryProject(
+                    runtimeObject,
+                    frame,
+                    playerWorldX,
+                    playerWorldY,
+                    angle,
+                    OriginalRuntimeState.ExactTrigQ10,
+                    out var projected))
+            {
+                // Exact path was available; the original projection rejected
+                // the sprite, so do not fall back to a different geometry.
+                return true;
+            }
+
+            int firstX =
+                Math.Max(
+                    OriginalRendererCore.ViewLeft,
+                    projected.Left);
+
+            int lastXExclusive =
+                Math.Min(
+                    OriginalRendererCore.ViewRight + 1,
+                    projected.Right);
+
+            int firstY =
+                Math.Max(
+                    OriginalRendererCore.ViewTop,
+                    projected.Top);
+
+            int lastYExclusive =
+                Math.Min(
+                    OriginalRendererCore.ViewBottom + 1,
+                    projected.Bottom);
+
+            if (firstX >= lastXExclusive ||
+                firstY >= lastYExclusive)
+            {
+                return true;
+            }
+
+            double depthTiles =
+                projected.DepthQ10 /
+                (1024.0 *
+                 OriginalRuntime.WorldUnitsPerTile);
+
+            bool projectedVisible = false;
+
+            for (int screenX = firstX;
+                screenX < lastXExclusive;
+                screenX++)
+            {
+                int localX =
+                    screenX -
+                    OriginalRuntime.ViewportX;
+
+                if (localX < 0 ||
+                    localX >= zBuffer.Length ||
+                    depthTiles <= 0 ||
+                    depthTiles >= zBuffer[localX])
+                {
+                    continue;
+                }
+
+                int texX =
+                    (screenX - projected.Left) *
+                    frame.width /
+                    projected.Width;
+
+                if (texX < 0)
+                    texX = 0;
+                else if (texX >= frame.width)
+                    texX = frame.width - 1;
+
+                projectedVisible = true;
+
+                for (int screenY = firstY;
+                    screenY < lastYExclusive;
+                    screenY++)
+                {
+                    int texY =
+                        (screenY - projected.Top) *
+                        frame.height /
+                        projected.Height;
+
+                    if (texY < 0)
+                        texY = 0;
+                    else if (texY >= frame.height)
+                        texY = frame.height - 1;
+
+                    byte color =
+                        frame.data[texX, texY];
+
+                    if (color !=
+                        OriginalRuntime.TransparentPaletteIndex)
+                    {
+                        GameWindow.frameBuffer[
+                            screenX,
+                            screenY] = color;
+                    }
+                }
+            }
+
+            if (projectedVisible)
+            {
+                int cacheRow =
+                    Math.Max(
+                        short.MinValue,
+                        Math.Min(
+                            short.MaxValue,
+                            projected.BaselineRow));
+
+                source.RecordOriginalProjectedBaseRow(
+                    (short)cacheRow);
+
+                if (sprite is Entity runtimeEntity)
+                {
+                    bool overlapsAimCenter =
+                        projected.Left - 4 <
+                            OriginalRuntime.ViewportCenterX &&
+                        OriginalRuntime.ViewportCenterX <
+                            projected.Right + 4;
+
+                    OriginalRuntimeState.RecordGuardProjection(
+                        runtimeEntity,
+                        (short)cacheRow,
+                        overlapsAimCenter);
+                }
+            }
+
+            return true;
+        }
+
         public void RenderRaycaster()
         {
             OriginalRuntimeState.BeginRenderGeneration();
@@ -389,6 +552,15 @@ namespace Nitemare3D
                         Img.current.entries[sprite.spriteIndex];
                 }
 
+                if (sprite is IOriginalSpriteProjectionSource exactProjectionSource &&
+                    TryRenderExactOriginalSprite(
+                        sprite,
+                        exactProjectionSource,
+                        spriteFrame))
+                {
+                    continue;
+                }
+
                 var spriteW = spriteFrame.width;
                 var spriteH = spriteFrame.height;
 
@@ -439,7 +611,12 @@ namespace Nitemare3D
                         int texY = ((d * spriteH) / spriteHeight) / 256;
                         var color = spriteFrame.data[texX, texY];
 
-                        if(color != 31)
+                        byte transparentIndex =
+                            sprite is IOriginalSpriteFrameSource
+                            ? OriginalRuntime.TransparentPaletteIndex
+                            : (byte)31;
+
+                        if(color != transparentIndex)
                         {
                             GameWindow.frameBuffer[8 + stripe, 4 + y] = color;
                         }
@@ -472,6 +649,12 @@ namespace Nitemare3D
                     bool overlapsAimCenter =
                         rawDrawStartX - aimSlack < aimCenterLocal &&
                         rawDrawEndX + aimSlack > aimCenterLocal;
+
+                    if (sprite is IOriginalSpriteProjectionSource fallbackProjectionSource)
+                    {
+                        fallbackProjectionSource.RecordOriginalProjectedBaseRow(
+                            (short)projectedBaseRow);
+                    }
 
                     OriginalRuntimeState.RecordGuardProjection(
                         runtimeEntity,
