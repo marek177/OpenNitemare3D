@@ -30,6 +30,7 @@ namespace Nitemare3D
             TestDelayState();
             TestState13Movement();
             TestMovementPlanning();
+            TestMovementCell700A();
             TestMovementCollisionCore();
             TestDirectionalSequenceRefresh();
             TestGuardMapClassMapping();
@@ -1411,6 +1412,170 @@ namespace Nitemare3D
                    guard.MoveY == -8 &&
                    guard.Octant == 1,
                 "strategy 3+ must retain timer/vector through FUN_76FC common tail.");
+        }
+
+        static void TestMovementCell700A()
+        {
+            var definition = new OriginalObjectDefinitionRecord();
+            var guard = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                State = (byte)OriginalGuardState.MoveThen03
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100
+            };
+
+            var playerBlock =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    120,
+                    120,
+                    100,
+                    100,
+                    0,
+                    0,
+                    default,
+                    definition);
+            Assert(playerBlock.Blocked,
+                "FUN_700A player +/-41 box must block movement.");
+
+            var objectBlock =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    200,
+                    200,
+                    0,
+                    0,
+                    0,
+                    OriginalMapTables.ObjectBlocksMovementOrLos,
+                    default,
+                    definition);
+            Assert(objectBlock.Blocked,
+                "FUN_700A object property 0x02 must block movement.");
+
+            var openDoor = new OriginalDoorCollisionInfo
+            {
+                Exists = true,
+                State = 0,
+                RenderClass = 0x31
+            };
+            var pass =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    200,
+                    200,
+                    0,
+                    0,
+                    OriginalMapTables.WallDynamicDoor,
+                    0,
+                    openDoor,
+                    definition);
+            Assert(!pass.Blocked &&
+                   !pass.DoorToggleRequested,
+                "FUN_700A door state 0 must be passable.");
+
+            var movingDoor = openDoor;
+            movingDoor.State = 2;
+            var movingBlocked =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    200,
+                    200,
+                    0,
+                    0,
+                    OriginalMapTables.WallDynamicDoor,
+                    0,
+                    movingDoor,
+                    definition);
+            Assert(movingBlocked.Blocked &&
+                   !movingBlocked.DoorToggleRequested,
+                "FUN_700A door states 2/3 must block without activation.");
+
+            var restrictedDoor = openDoor;
+            restrictedDoor.State = 1;
+            restrictedDoor.RenderClass = 0x35;
+            var restricted =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    200,
+                    200,
+                    0,
+                    0,
+                    OriginalMapTables.WallDynamicDoor,
+                    0,
+                    restrictedDoor,
+                    definition);
+            Assert(restricted.Blocked &&
+                   !restricted.DoorToggleRequested,
+                "state-1 wall classes 0x33..0x3C must not be GUARD-activated.");
+
+            var activatable = openDoor;
+            activatable.State = 1;
+            activatable.RenderClass = 0x31;
+            var activated =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    200,
+                    200,
+                    0,
+                    0,
+                    OriginalMapTables.WallDynamicDoor,
+                    0,
+                    activatable,
+                    definition);
+            Assert(activated.Blocked &&
+                   activated.DoorToggleRequested &&
+                   activated.DoorLatchRequested &&
+                   !activated.EnteredRecoverMove11,
+                "ordinary state-1 door must request FUN_188A and block this frame.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 1,
+                State = (byte)OriginalGuardState.MoveThen03,
+                MoveX = 8,
+                MoveY = 8
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100
+            };
+            activatable.Orientation = 2;
+            activatable.TargetY = 160;
+
+            var fleeDoor =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    140,
+                    100,
+                    0,
+                    0,
+                    OriginalMapTables.WallDynamicDoor,
+                    0,
+                    activatable,
+                    definition);
+
+            Assert(fleeDoor.Blocked &&
+                   fleeDoor.DoorToggleRequested &&
+                   fleeDoor.DoorLatchRequested &&
+                   fleeDoor.EnteredRecoverMove11 &&
+                   guard.State == (byte)OriginalGuardState.RecoverMove11 &&
+                   guard.Timer == 0x20 &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == 0 &&
+                   obj.WorldY == 192,
+                "strategy-1 FUN_700A door interaction/state-11 transition mismatch.");
         }
 
         static void TestMovementCollisionCore()
