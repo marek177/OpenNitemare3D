@@ -17,6 +17,13 @@ namespace Nitemare3D
 				return;
 			}
 
+			foreach (string arg in args)
+			{
+				if (arg == "--n3d-original-guards")
+					OriginalRuntimeState.AutonomousGuardRuntimeEnabled = true;
+			}
+
+
 			XInitThreads();
 
 			Dat.Load();
