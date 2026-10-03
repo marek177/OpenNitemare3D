@@ -9,7 +9,9 @@ namespace Nitemare3D
         Transitioned,
         Moved,
         MovementBlocked,
-        SoundPoint,
+        MapTrigger,
+        // Compatibility alias retained for callers written before FUN_3876/392C closure.
+        SoundPoint = MapTrigger,
         Completed
     }
 
@@ -876,14 +878,18 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Advances confirmed state 0x13 control flow.
-        /// The occupancy callback receives candidate world coordinates and should
-        /// return true only when the candidate map cell/occupancy permits movement.
+        /// Advances exact FUN_1010_7A44 state-0x13 control flow.
+        /// The movement callback receives candidate world coordinates. For the
+        /// original behavior it must perform the MAP object-byte transfer when a
+        /// tile boundary is crossed and reject occupied/player destination cells.
+        /// The mapTrigger callback mirrors FUN_3876/FUN_392C at remaining timer 8:
+        /// it activates the matching ONE_SHOT wall VEC for the guard octant.
         /// </summary>
         public static OriginalGuardDispatchResult TickState13(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj,
-            Func<short, short, bool> canMoveTo)
+            Func<short, short, bool> tryCommitMapMove,
+            Action mapTrigger = null)
         {
             if (guard.State != (byte)OriginalGuardState.Transition13)
                 return OriginalGuardDispatchResult.NotHandled;
@@ -901,7 +907,8 @@ namespace Nitemare3D
 
             if (guard.Timer == 8)
             {
-                return OriginalGuardDispatchResult.SoundPoint;
+                mapTrigger?.Invoke();
+                return OriginalGuardDispatchResult.MapTrigger;
             }
 
             // nextTimer < 8 performs a movement attempt, including 1 -> 0.
@@ -911,8 +918,11 @@ namespace Nitemare3D
                 short candidateX = (short)(obj.WorldX + guard.MoveX);
                 short candidateY = (short)(obj.WorldY + guard.MoveY);
 
-                if (canMoveTo != null && !canMoveTo(candidateX, candidateY))
+                if (tryCommitMapMove != null &&
+                    !tryCommitMapMove(candidateX, candidateY))
+                {
                     return OriginalGuardDispatchResult.MovementBlocked;
+                }
 
                 obj.WorldX = candidateX;
                 obj.WorldY = candidateY;
@@ -920,6 +930,29 @@ namespace Nitemare3D
             }
 
             return OriginalGuardDispatchResult.Waiting;
+        }
+
+        /// <summary>
+        /// FUN_1018_3876 orientation filter used by state 0x13 when selecting
+        /// the ONE_SHOT wall VEC to activate.
+        /// </summary>
+        public static bool State13TriggerOrientationMatches(
+            byte vecOrientation,
+            byte guardOctant)
+        {
+            int octant = guardOctant & 7;
+
+            switch (vecOrientation & 3)
+            {
+                case 0:
+                    return octant == 0 || octant == 7;
+                case 1:
+                    return octant == 3 || octant == 4;
+                case 2:
+                    return octant == 1 || octant == 2;
+                default:
+                    return octant == 5 || octant == 6;
+            }
         }
 
         public static byte ComputePlayerOctant(
