@@ -9,6 +9,6 @@ namespace Nitemare3D
         public bool hasWeapon = false;
 
 
-        public abstract void Fire();
+        public abstract bool Fire();
     }
 }
