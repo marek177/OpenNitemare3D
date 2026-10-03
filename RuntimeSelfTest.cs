@@ -17,6 +17,7 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestFrameCalibration();
+            TestExactSpriteProjection();
             TestGuardLogicClock();
             TestWeaponRuntime();
             TestPickupRuntime();
@@ -106,6 +107,108 @@ namespace Nitemare3D
             // Restore the portable/default effective 40-ms profile for all
             // subsequent runtime tests.
             OriginalRuntimeState.ConfigureFrameCalibration(40);
+        }
+
+        static void TestExactSpriteProjection()
+        {
+            string path = Path.GetTempFileName();
+
+            try
+            {
+                byte[] table =
+                    new byte[OriginalTrigQ10.FileSize];
+
+                void WriteInt16(int offset, short value)
+                {
+                    ushort raw = unchecked((ushort)value);
+                    table[offset + 0] = (byte)raw;
+                    table[offset + 1] = (byte)(raw >> 8);
+                }
+
+                // Minimal exact-table fixture covering loader sanity anchors and
+                // the cardinal projections exercised below.
+                WriteInt16(0 * 2, 0);
+                WriteInt16(45 * 2, 724);
+                WriteInt16(90 * 2, 1024);
+                WriteInt16(180 * 2, 0);
+                WriteInt16(270 * 2, -1024);
+
+                int cosBase = 720;
+                WriteInt16(cosBase + 0 * 2, 1024);
+                WriteInt16(cosBase + 45 * 2, 724);
+                WriteInt16(cosBase + 90 * 2, 0);
+                WriteInt16(cosBase + 180 * 2, -1024);
+                WriteInt16(cosBase + 270 * 2, 0);
+
+                File.WriteAllBytes(path, table);
+
+                OriginalTrigQ10 trig =
+                    OriginalTrigQ10.Load(path);
+
+                Assert(OriginalProjectionExact.ProjectPoint(
+                           0,
+                           0,
+                           64,
+                           0,
+                           trig,
+                           out var point) &&
+                       point.ScreenX == OriginalRendererCore.CenterX &&
+                       point.ProjectedYQ4 == 2526 &&
+                       point.DepthQ10 == 65536,
+                    "E5D8 north/cardinal point projection mismatch.");
+
+                var frame = new BitmapImage
+                {
+                    width = 32,
+                    height = 32,
+                    data = new byte[32, 32]
+                };
+
+                var obj = new OriginalObjectRecord
+                {
+                    Flags = 0x01,
+                    WorldX = 100,
+                    WorldY = 36,
+                    Runtime1A = 5
+                };
+
+                Assert(OriginalSpriteProjectionExact.TryProject(
+                           obj,
+                           frame,
+                           100,
+                           100,
+                           0,
+                           trig,
+                           out var projected) &&
+                       projected.BaselineRow == 157 &&
+                       projected.Height == 77 &&
+                       projected.Width == 77 &&
+                       projected.Left == 122 &&
+                       projected.Right == 199 &&
+                       projected.Top == 67 &&
+                       projected.Bottom == 144,
+                    "CC7C 32x32 object-sprite projection mismatch.");
+
+                obj.WorldX = 164;
+                obj.WorldY = 100;
+
+                Assert(OriginalSpriteProjectionExact.TryProject(
+                           obj,
+                           frame,
+                           100,
+                           100,
+                           90,
+                           trig,
+                           out var eastProjected) &&
+                       eastProjected.BaselineRow == projected.BaselineRow &&
+                       eastProjected.Left == projected.Left &&
+                       eastProjected.Right == projected.Right,
+                    "E5D8 east/cardinal projection must match equal-depth north geometry.");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
         }
 
         static void TestGuardLogicClock()
