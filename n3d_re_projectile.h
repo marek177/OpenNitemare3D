@@ -3,6 +3,7 @@
 
 #include "n3d_re_player.h"
 #include "n3d_re_runtime.h"
+#include "n3d_re_movement.h"
 
 #include <stdint.h>
 
@@ -37,6 +38,17 @@ int N3D_RE_InitializeProjectile(
     int16_t world_x,
     int16_t world_y,
     uint8_t sequence_base);
+
+int N3D_RE_InitializeProjectileFromAngle(
+    int slot,
+    uint8_t weapon_selector,
+    int16_t world_x,
+    int16_t world_y,
+    uint8_t sequence_base,
+    int angle_degrees);
+
+int N3D_RE_AdvanceProjectileLineSubstep(int slot);
+int N3D_RE_AdvanceProjectileLineSteps(int slot, uint16_t substeps);
 
 int N3D_RE_EnterProjectileImpact(
     int slot,
