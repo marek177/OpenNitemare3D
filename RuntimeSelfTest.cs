@@ -495,6 +495,11 @@ namespace Nitemare3D
                        3, 0, true, (x, y) => true),
                 "class-2A object must use D50A LOS pass-through exception.");
 
+            Assert(tables.IsPlayerObjectBlocked84F4(2, 0),
+                "ordinary object property 0x02 must block player collision.");
+            Assert(tables.IsPlayerObjectBlocked84F4(3, 0),
+                "84F4 player collision must ignore the D50A class-2A LOS exception.");
+
             Assert(!tables.IsPerceptionIntermediateBlocked(
                        2, 0, false, (x, y) => true),
                 "secondary-cell disabled mode must ignore object blocker.");
@@ -563,6 +568,9 @@ namespace Nitemare3D
                    door.Runtime.Latch == 0,
                 "FUN_14A8 paired-wall controller initialization mismatch.");
 
+            Assert(map.IsPlayerPrimaryWallBlocked84F4(1, 1, walls),
+                "closed state-1 dynamic door must block 84F4 player collision.");
+
             Assert(!walls.DoorAllowsSight(1, 1),
                 "closed state-1 door must block D50A sight.");
 
@@ -577,7 +585,8 @@ namespace Nitemare3D
             Assert(walls.ForceState(1, 1, 0) &&
                    door.State == 0 &&
                    door.Runtime.State == 0 &&
-                   walls.DoorAllowsSight(1, 1),
+                   walls.DoorAllowsSight(1, 1) &&
+                   !map.IsPlayerPrimaryWallBlocked84F4(1, 1, walls),
                 "paired-wall state 0 force/passability mismatch.");
 
             Assert(walls.SetLatchedPassable(1, 1) &&
