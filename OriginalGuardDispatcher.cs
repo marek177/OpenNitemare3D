@@ -257,6 +257,87 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Exact stepping core of FUN_1010_D50A. The callback is invoked only for
+        /// intermediate cells, never for the destination cell, matching the original
+        /// target comparison order. Returning true from isIntermediateBlocked aborts
+        /// the trace. maxSteps is 8 for GUARD perception.
+        /// </summary>
+        public static bool TraceGuardGridLine(
+            int startX,
+            int startY,
+            int deltaX,
+            int deltaY,
+            int maxSteps,
+            bool secondaryCellChecks,
+            Func<int, int, bool, bool> isIntermediateBlocked)
+        {
+            int stepX = deltaX > 0 ? 1 : -1;
+            int stepY = deltaY > 0 ? 1 : -1;
+
+            int targetX = startX + deltaX;
+            int targetY = startY + deltaY;
+
+            int absX = Math.Abs(deltaX);
+            int absY = Math.Abs(deltaY);
+
+            bool xMajor = absY < absX;
+            int error;
+            int straightAdjust;
+            int diagonalAdjust;
+
+            if (xMajor)
+            {
+                error = 2 * absY - absX;
+                straightAdjust = 2 * absY;
+                diagonalAdjust = 2 * (absY - absX);
+            }
+            else
+            {
+                error = 2 * absX - absY;
+                straightAdjust = 2 * absX;
+                diagonalAdjust = 2 * (absX - absY);
+            }
+
+            int x = startX;
+            int y = startY;
+
+            if (maxSteps <= 0)
+                return false;
+
+            for (int step = 0; step < maxSteps; step++)
+            {
+                if (xMajor)
+                    x += stepX;
+                else
+                    y += stepY;
+
+                if (error < 0)
+                {
+                    error += straightAdjust;
+                }
+                else
+                {
+                    error += diagonalAdjust;
+                    if (xMajor)
+                        y += stepY;
+                    else
+                        x += stepX;
+                }
+
+                if (x == targetX && y == targetY)
+                    return true;
+
+                if (isIntermediateBlocked != null &&
+                    isIntermediateBlocked(x, y, secondaryCellChecks))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Executable-backed FUN_1010_7494 wrapper with the D50A map trace supplied
         /// by the caller. The trace callback receives start tile, signed deltas,
         /// the fixed maximum of 8 steps and the original secondary-cell flag.
