@@ -460,10 +460,8 @@ namespace Nitemare3D
                 // Render/runtime fallback only for non-GUARD world objects.
                 // GUARD-linked classes must get a real AI implementation rather
                 // than being silently replaced by inert scenery.
-                if ((propertyFlags &
-                        OriginalMapTables.ObjectRuntimePresent) != 0 &&
-                    (propertyFlags &
-                        OriginalMapTables.ObjectCreatesGuard) == 0)
+                if (OriginalWorldObjectRuntime.ShouldUseGenericShell(
+                        propertyFlags))
                 {
                     ent =
                         new OriginalMapObjectSprite(
