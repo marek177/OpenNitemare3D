@@ -45,6 +45,7 @@ namespace Nitemare3D
         AnimationHandler anim = new AnimationHandler();
         GuardType type;
         readonly byte mapObjectId;
+        bool originalRuntimeRegistered;
         GuardState state = GuardState.idle;
         byte health = (byte)OriginalRuntime.GuardInitialStrength;
         const int SPRITE_FRANKENSTEIN_START = 322;
@@ -128,7 +129,8 @@ namespace Nitemare3D
 
         public override void Start()
         {
-            OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
+            originalRuntimeRegistered =
+                OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
         }
 
         float roarTimer = 0;
@@ -357,24 +359,29 @@ namespace Nitemare3D
 
         public override void Update()
         {
-            bool runtimeOwnsGuard = false;
+            bool runtimeOwnsGuard =
+                OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
+                originalRuntimeRegistered;
 
-            if (OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
-                OriginalRuntimeState.TryGetGuardRuntimeState(
-                    this,
-                    out OriginalGuardState runtimeState,
-                    out OriginalGuardState nextRuntimeState) &&
-                OriginalRuntimeState.IsConfirmedAutonomousState(runtimeState))
+            OriginalGuardState runtimeState = default;
+            OriginalGuardState nextRuntimeState = default;
+
+            if (runtimeOwnsGuard)
             {
-                runtimeOwnsGuard = true;
+                bool haveState =
+                    OriginalRuntimeState.TryGetGuardRuntimeState(
+                        this,
+                        out runtimeState,
+                        out nextRuntimeState);
 
-                if (OriginalRuntimeState.GuardLogicTickDue)
+                if (haveState &&
+                    OriginalRuntimeState.GuardLogicTickDue)
                 {
-                    var result =
-                        OriginalRuntimeState.TickConfirmedAutonomousState(this);
-
-                    if (result == OriginalGuardDispatchResult.NotHandled)
-                        runtimeOwnsGuard = false;
+                    // A registered original-runtime GUARD never silently falls
+                    // back to the legacy AI. NotHandled now means "hold the
+                    // recovered state" so missing evidence remains visible
+                    // instead of changing gameplay semantics.
+                    OriginalRuntimeState.TickConfirmedAutonomousState(this);
 
                     OriginalRuntimeState.TryGetGuardRuntimeState(
                         this,
@@ -382,26 +389,39 @@ namespace Nitemare3D
                         out nextRuntimeState);
                 }
 
-                if (runtimeOwnsGuard)
+                if (haveState)
+                {
                     ApplyOriginalRuntimeAnimationBridge(
                         runtimeState,
                         nextRuntimeState);
+                }
+                else
+                {
+                    PlayAnim(GuardAnimation.idle);
+                }
             }
-
-            if (!runtimeOwnsGuard)
+            else
+            {
                 UpdateState();
+            }
 
             anim.Update();
             spriteIndex = anim.index;
             spritePosition = position;
-            
-    
-            if(type == GuardType.Bat && state != GuardState.idle)
+
+            if (type == GuardType.Bat)
             {
-                yOffset += (32 - yOffset) * Time.dt;
+                bool batActive = runtimeOwnsGuard
+                    ? runtimeState != OriginalGuardState.Active07 &&
+                      runtimeState != OriginalGuardState.Delay
+                    : state != GuardState.idle;
+
+                if (batActive)
+                    yOffset += (32 - yOffset) * Time.dt;
             }
 
             OriginalRuntimeState.SyncGuardPosition(this);
         }
+
     }
 }
