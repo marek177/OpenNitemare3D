@@ -9,8 +9,13 @@ namespace Nitemare3D
             fireSound = SoundConsts.WEAPON_PLASMA;
         }
 
-        public override void Fire()
+        public override bool Fire()
         {
+            return Projectile.TrySpawn(
+                Game.player.direction,
+                ProjectileType.Plasma,
+                OriginalWeaponSelector.ContinuousLaser,
+                Game.player.position);
         }
     }
 }

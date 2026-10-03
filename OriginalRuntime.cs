@@ -16,11 +16,23 @@ namespace Nitemare3D
         public const int MapHeaderBytes = 514;
         public const int MapLevelBytes = MapWidth * MapHeight * MapCellBytes; // 8192
         public const int WorldUnitsPerTile = 64;
+
+        // NITE3W 1.10 normalized DS offsets for the loaded MAP.N header/runtime.
+        public const ushort MapHeaderGlobal = 0x8194;
+        public const ushort WallClassTableGlobal = 0x8196;
+        public const ushort ObjectClassTableGlobal = 0x8296;
+        public const ushort WallPropertyTableGlobal = 0x7E94;
+        public const ushort ObjectPropertyTableGlobal = 0x7F94;
+        public const ushort MapCellBufferGlobal = 0xA69E;
         public const int TileCenterOffset = 32;
 
         // Player.
         public const int PlayerMaxHealth = 100;
         public const int PlayerCollisionHalfExtent = 27;
+        public const byte DifficultyEasy = 0;
+        public const byte DifficultyNormal = 1;
+        public const byte DifficultyHard = 2;
+        public const byte DefaultDifficulty = DifficultyNormal;
 
         // Input mask recovered from DEMO/runtime handling.
         public const ushort InputForward = 0x0002;
@@ -42,8 +54,25 @@ namespace Nitemare3D
         public const int PushRuntimeStride = 6;
         public const int MaxObjects = 350;
         public const int ObjectRuntimeStride = 28;
+        // Per-level object resource tables loaded/deduplicated by FUN_1010_4C8A/4B86.
+        // 0x5A is the temporary on-disk header size. FUN_4B86 returns a separately
+        // allocated table of 10-byte decoded entries; OBJECT +0x04 indexes those
+        // per-level tables through the pointer metadata rooted at DS:4748.
+        public const int ObjectResourceHeaderBytes = 0x5A;
+        public const int ObjectDefinitionBytes = ObjectResourceHeaderBytes;
+        public const int ObjectResourceEntryBytes = 10;
+        public const int MaxObjectDefinitions = 256; // OBJECT +0x04 is one byte.
+        public const int GuardState02ResourceWordOffset = 0x34;
+        public const int GuardState03ResourceWordOffset = 0x36;
+        public const int GuardState04ResourceWordOffset = 0x38;
+        public const int ObjectDefinitionReactionSequenceOffset = 0x3A;
+        public const int ObjectDefinitionDeathSequenceOffset = 0x4A;
+        public const int ObjectDefinitionReactionSequenceCount = 8;
+        public const int ObjectDefinitionDeathSequenceCount = 8;
         public const int MaxGuards = 100;
         public const int GuardRuntimeStride = 26;
+        public const int MaxProjectiles = 8;
+        public const int ProjectileRuntimeStride = 42;
         public const int MaxVectors = 1000;
         public const int VectorRuntimeStride = 28;
         public const int VectorListOrientations = 4;
@@ -128,6 +157,8 @@ namespace Nitemare3D
         public const int GuardState13MoveYOffset = 0x14;
         public const byte DraculaPhase1Class = 0x11;
         public const byte DraculaBatPhase2Class = 0x14;
+        public const byte PenelopeClass = 0x15;
+        public const byte DrHamersteinClass = 0x16;
 
         // Renderer global arrays/counters recovered from NITE3W 1.10 DS.
         public const ushort WallOwnerTableGlobal = 0x53FE;
@@ -145,8 +176,19 @@ namespace Nitemare3D
         public const int ImgWallDirectoryOffset = 0x0000;
         public const int ImgObjectDirectoryOffset = 0x0400;
         public const int ImgDirectoryEntries = 256;
-        public const int ImgFrameHeaderBytes = 10;
-        public const int ImgFirstFrameStreamOffset = 0xBC00;
+        public const int ImgDirectoryBankBytes = ImgDirectoryEntries * 4; // 0x400
+        public const int ImgDirectoryBytes = 2 * ImgDirectoryBankBytes; // 0x800
+        public const int ImgResourceHeadersOffset = 0x0800;
+        public const int ImgResourceHeaderBanks = 2;
+        public const int ImgDefinitionTableOffset = ImgResourceHeadersOffset;
+        public const int ImgWallDefinitionBankOffset = ImgDefinitionTableOffset;
+        public const int ImgObjectDefinitionBankOffset =
+            ImgDefinitionTableOffset +
+            ImgDirectoryEntries * ObjectResourceHeaderBytes; // 0x6200
+        public const int ImgFrameHeaderBytes = ObjectResourceEntryBytes;
+        public const int ImgFirstFrameStreamOffset =
+            ImgDefinitionTableOffset +
+            2 * ImgDirectoryEntries * ObjectResourceHeaderBytes; // 0xBC00
         public const byte HudImageObjectId = 0xFF;
         public const int HudImageFrameCount = 29;
         public const int UifDirectorySlots = 32;

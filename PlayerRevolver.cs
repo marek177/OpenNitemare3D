@@ -9,8 +9,11 @@ namespace Nitemare3D
             fireTime = .5f;
         }
 
-        public override void Fire()
+        public override bool Fire()
         {
+            OriginalRuntimeState.FireHitscan(
+                OriginalWeaponSelector.SilverPistol);
+            return true;
         }
     }
 }

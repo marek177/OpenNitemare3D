@@ -13,10 +13,38 @@ namespace Nitemare3D
 
         public static Tile[,] tilemap = new Tile[64, 64];
 
+        // Raw MAP ids plus original header translation/property tables.
+        public static OriginalMapTables originalMap;
+        public static List<OriginalRendererCore.Vec> originalVectors =
+            new List<OriginalRendererCore.Vec>();
+        public static OriginalWallRuntime originalWalls;
+        public static OriginalImgWallRuntime originalWallImages;
+
         static void SpawnMapObject(int id, int x, int y)
         {
             if(id == 0){return;}
             var position = new Vec2(x, y) + .5f;
+
+            // MAP.N class/property tables are episode-specific and therefore
+            // authoritative over the legacy global ObjectType enum. Route every
+            // actor-linked object directly into the recovered GUARD runtime
+            // before the historical switch can reinterpret an overlapping raw ID.
+            if (originalMap != null)
+            {
+                byte rawId =
+                    unchecked((byte)id);
+                byte propertyFlags =
+                    originalMap.ObjectProperty[rawId];
+
+                if ((propertyFlags &
+                        OriginalMapTables.ObjectCreatesGuard) != 0)
+                {
+                    Entity.Add(
+                        new OriginalMapGuard(rawId),
+                        position);
+                    return;
+                }
+            }
 
             var type = (ObjectType)id;
             Entity ent = null;
@@ -43,44 +71,46 @@ namespace Nitemare3D
                     Game.player.SetRotation(180);
                     break;
                 case ObjectType.Key1red:
-                    ent = new Pickup(PickupType.RedKey);
+                    ent = new Pickup(PickupType.RedKey, (byte)id);
                     break;
                 case ObjectType.Key2green:
-                    ent = new Pickup(PickupType.GreenKey);
+                    ent = new Pickup(PickupType.GreenKey, (byte)id);
                     break;
                 case ObjectType.Key3blue:
-                    ent = new Pickup(PickupType.BlueKey);
+                    ent = new Pickup(PickupType.BlueKey, (byte)id);
                     break;
                 case ObjectType.Key4yellow:
-                    ent = new Pickup(PickupType.YellowKey);
+                    ent = new Pickup(PickupType.YellowKey, (byte)id);
                     break;
                 case ObjectType.Idcard1red:
-                    ent = new Pickup(PickupType.RedIDCard);
+                    ent = new Pickup(PickupType.RedIDCard, (byte)id);
                     break;
                 case ObjectType.Idcard2yellow:
-                    ent = new Pickup(PickupType.YellowIDCard);
+                    ent = new Pickup(PickupType.YellowIDCard, (byte)id);
                     break;
                 case ObjectType.Officedesk:
 
                     break;
                 case ObjectType.Diningroomtable:
-                    ent = new DumbObject(199);
+                    ent = new DumbObject(199, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Globeceilinglamp:
-                    ent = new DumbObject(200, true, false);
+                    ent = new DumbObject(200, true, false, (byte)id);
                     break;
                 case ObjectType.Chandelierceilinglamp:
-                    ent = new DumbObject(201, true, false);
+                    ent = new DumbObject(201, true, false, (byte)id);
                     break;
                 case ObjectType.Livingroomstandardlamp:
-                    ent = new DumbObject(202);
+                    ent = new DumbObject(202, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Hallstandardlamp:
-                    ent = new DumbObject(203);
+                    ent = new DumbObject(203, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Redpotionfullstrength:
+                    ent = new Pickup(PickupType.RedPotion, (byte)id);
                     break;
                 case ObjectType.Bluepotionhalfstrength:
+                    ent = new Pickup(PickupType.BluePotion, (byte)id);
                     break;
                 case ObjectType.Tombstonewithgrass:
                     break;
@@ -91,48 +121,55 @@ namespace Nitemare3D
                 case ObjectType.Tombstonepushable:
                     break;
                 case ObjectType.Magiceye:
-                    ent = new Pickup(PickupType.Eyeball);
+                    ent = new Pickup(PickupType.Eyeball, (byte)id);
                     break;
                 case ObjectType.Crystalball:
-                    ent = new Pickup(PickupType.CrystallBall);
+                    ent = new Pickup(PickupType.CrystallBall, (byte)id);
                     break;
                 case ObjectType.Couch:
-                    ent = new DumbObject(227);
+                    ent = new DumbObject(227, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Easychair:
-                    ent = new DumbObject(228);
+                    ent = new DumbObject(228, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Bedsideview:
-                    ent = new DumbObject(229);
+                    ent = new DumbObject(229, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Bedfrontview:
-                    ent = new DumbObject(230);
+                    ent = new DumbObject(230, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Pentagramred:
+                    ent = new Pickup(PickupType.PentagramRed, (byte)id);
                     break;
                 case ObjectType.Pentagramgreen:
+                    ent = new Pickup(PickupType.PentagramGreen, (byte)id);
                     break;
                 case ObjectType.Pentagramblue:
+                    ent = new Pickup(PickupType.PentagramBlue, (byte)id);
                     break;
                 case ObjectType.Pentagramyellow:
+                    ent = new Pickup(PickupType.PentagramYellow, (byte)id);
                     break;
                 case ObjectType.Singleboltplasmagun:
-                    ent = new Pickup(PickupType.PlasmaPistol);
+                    ent = new Pickup(PickupType.PlasmaPistol, (byte)id);
                     break;
                 case ObjectType.Magicwand:
-                    ent = new Pickup(PickupType.MagicWand);
+                    ent = new Pickup(PickupType.MagicWand, (byte)id);
                     break;
                 case ObjectType.Pistol:
-                    ent = new Pickup(PickupType.Pistol);
+                    ent = new Pickup(PickupType.Pistol, (byte)id);
                     break;
                 case ObjectType.Multiboltplasmagun:
-                    ent = new Pickup(PickupType.AutoPlasmaPistol);
+                    ent = new Pickup(PickupType.AutoPlasmaPistol, (byte)id);
                     break;
                 case ObjectType.Silverbullets:
+                    ent = new Pickup(PickupType.SilverBullets, (byte)id);
                     break;
                 case ObjectType.Plasmapowercell:
+                    ent = new Pickup(PickupType.PlasmaPowerCell, (byte)id);
                     break;
                 case ObjectType.Spellbookwandpower:
+                    ent = new Pickup(PickupType.SpellbookWandPower, (byte)id);
                     break;
                 case ObjectType.Scroll01532:
                     break;
@@ -214,54 +251,54 @@ namespace Nitemare3D
                     ent = new HiddenPanel();
                     break;
                 case ObjectType.BatN:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatE:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatS:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.BatW:
-                    ent = new Guard(GuardType.Bat);
+                    ent = new Guard(GuardType.Bat, (byte)id);
                     break;
                 case ObjectType.FrankensteinN:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinE:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinS:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.FrankensteinW:
-                    ent = new Guard(GuardType.Frankenstein);
+                    ent = new Guard(GuardType.Frankenstein, (byte)id);
                     break;
                 case ObjectType.MummyN:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyE:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyS:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.MummyW:
-                    ent = new Guard(GuardType.Mummy);
+                    ent = new Guard(GuardType.Mummy, (byte)id);
                     break;
                 case ObjectType.Dancers:
                     break;
                 case ObjectType.SkeletonN:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonE:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonS:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.SkeletonW:
-                    ent = new Guard(GuardType.Skeleton);
+                    ent = new Guard(GuardType.Skeleton, (byte)id);
                     break;
                 case ObjectType.MrsHN:
                     break;
@@ -288,52 +325,52 @@ namespace Nitemare3D
                 case ObjectType.VampiraW:
                     break;
                 case ObjectType.Baddie1NBluecoat:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie1E:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie1S:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie1W:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie1MN:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie1ME:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie1MS:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie1MW:
-                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanBlue, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie2NGreencoat:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie2E:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie2S:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie2W:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West, (byte)id);
                     break;
                 case ObjectType.Baddie2MN:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.North, (byte)id);
                     break;
                 case ObjectType.Baddie2ME:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.East, (byte)id);
                     break;
                 case ObjectType.Baddie2MS:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.South, (byte)id);
                     break;
                 case ObjectType.Baddie2MW:
-                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West);
+                    ent = new DirectionalGuard(GuardType.HumanGreen, Direction.West, (byte)id);
                     break;
                 case ObjectType.DraculaN:
                     break;
@@ -434,6 +471,25 @@ namespace Nitemare3D
                 case ObjectType.Missileexplodingspellstars:
                     break;
             }
+            if (ent == null &&
+                originalMap != null)
+            {
+                byte propertyFlags =
+                    originalMap.ObjectProperty[
+                        (byte)id];
+
+                // Render/runtime fallback only for non-GUARD world objects.
+                // GUARD-linked classes must get a real AI implementation rather
+                // than being silently replaced by inert scenery.
+                if (OriginalWorldObjectRuntime.ShouldUseGenericShell(
+                        propertyFlags))
+                {
+                    ent =
+                        new OriginalMapObjectSprite(
+                            (byte)id);
+                }
+            }
+
             if (ent != null)
             {
                 Entity.Add(ent, position);
@@ -1037,75 +1093,448 @@ namespace Nitemare3D
         }
 
 
-        //TODO: make entity collision detection less garbage
-        public static bool IsWalkable(int x, int y, Entity ent)
+        /// <summary>
+        /// Bridges the recovered D50A cell semantics to the current port.
+        /// Static wall/object blocking is executable-exact. Until the original
+        /// 22-byte DOOR runtime is integrated, a dynamic door allows sight only
+        /// when the current Tile has become non-obstructing.
+        /// </summary>
+        public static bool TryCommitOriginalState13MapMove(
+            int sourceTileX,
+            int sourceTileY,
+            int targetTileX,
+            int targetTileY,
+            int playerTileX,
+            int playerTileY)
         {
-            if(x < 0 || x > 63 || y < 0 || y > 64){return false;}
-            bool isEntity = false;
-            foreach(var entity in Entity.entities)
-            {
-                var ex = (int)MathF.Round(entity.position.X);
-                var ey = (int)MathF.Round(entity.position.Y);
-                if(entity.id == ent.id){continue;} //dont want to check collision on ourselves!
+            if (originalMap == null)
+                return false;
 
-                
-                if (x == ex && ey == y)
+            return originalMap.TryTransferState13ObjectCell(
+                sourceTileX,
+                sourceTileY,
+                targetTileX,
+                targetTileY,
+                playerTileX,
+                playerTileY);
+        }
+
+        /// <summary>
+        /// FUN_1018_3876 + FUN_1018_392C used by GUARD state 0x13.
+        /// Finds the ONE_SHOT VEC in the guard's current cell whose orientation
+        /// matches the guard octant, then changes animation frame +03 from 0 to 1.
+        /// </summary>
+        public static bool TriggerOriginalState13OneShot(
+            int tileX,
+            int tileY,
+            byte guardOctant)
+        {
+            if (originalVectors == null)
+                return false;
+
+            foreach (OriginalRendererCore.Vec vec in originalVectors)
+            {
+                if (vec.SourceTileX != tileX ||
+                    vec.SourceTileY != tileY ||
+                    vec.RenderClass != (byte)OriginalWallSemanticClass.OneShot ||
+                    !OriginalGuardDispatcher.State13TriggerOrientationMatches(
+                        vec.Orientation,
+                        guardOctant))
                 {
-                    if(entity.hasCollision)
-                    {
-                        isEntity = true;
-                        break;
-                    }
+                    continue;
                 }
 
+                if (vec.AnimationFrame == 0)
+                    vec.AnimationFrame = 1;
+
+                return true;
             }
-            return ((tilemap[x,y].textureID == -1)) && !isEntity;
+
+            return false;
+        }
+
+        public static bool OriginalPerceptionIntermediateBlocked(
+            int x,
+            int y,
+            bool secondaryCellChecks)
+        {
+            if (originalMap == null)
+                return true;
+
+            return originalMap.IsPerceptionIntermediateBlocked(
+                x,
+                y,
+                secondaryCellChecks,
+                originalWalls);
+        }
+
+        public static bool TryGetOriginalDoorCollisionInfo(
+            int x,
+            int y,
+            out OriginalDoorCollisionInfo info)
+        {
+            info = default;
+            var door = originalWalls?.FindPairedWall(x, y);
+            if (door == null || door.First == null)
+                return false;
+
+            info = new OriginalDoorCollisionInfo
+            {
+                Exists = true,
+                State = door.State,
+                RenderClass = door.First.RenderClass,
+                Orientation = door.First.Orientation,
+                TargetX = door.TargetX,
+                TargetY = door.TargetY
+            };
+            return true;
+        }
+
+        public static bool TryResolveOriginalMovementCell(
+            int x,
+            int y,
+            out byte wallFlags,
+            out byte objectFlags,
+            out OriginalDoorCollisionInfo door)
+        {
+            wallFlags = 0;
+            objectFlags = 0;
+            door = default;
+
+            if (originalMap == null ||
+                x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            wallFlags = originalMap.WallPropertyAt(x, y);
+            objectFlags = originalMap.ObjectPropertyAt(x, y);
+            TryGetOriginalDoorCollisionInfo(x, y, out door);
+            return true;
+        }
+
+        public static void ApplyOriginalGuardDoorInteraction(
+            int x,
+            int y,
+            bool setLatch,
+            byte guardOctant)
+        {
+            var door = originalWalls?.FindPairedWall(x, y);
+            if (door == null)
+                return;
+
+            if (setLatch)
+                door.Latch = 1;
+
+            // FUN_700A already handled its own latch decision. FUN_188A receives
+            // the guard octant but must not unconditionally set the latch again.
+            originalWalls.TogglePairedWall(
+                x,
+                y,
+                guardOctant,
+                false);
+        }
+
+        public static bool OriginalDoorAllowsSight(int x, int y)
+        {
+            return originalWalls != null &&
+                   originalWalls.DoorAllowsSight(x, y);
+        }
+
+        public static bool TryGetNearestRetreatDoorTarget(
+            int startTileX,
+            int startTileY,
+            out short targetX,
+            out short targetY)
+        {
+            targetX = 0;
+            targetY = 0;
+
+            if (originalMap == null || originalWalls == null)
+                return false;
+
+            if (!originalMap.TryFindNearestReachableDoor(
+                    startTileX,
+                    startTileY,
+                    originalWalls,
+                    out int doorX,
+                    out int doorY))
+            {
+                return false;
+            }
+
+            var door = originalWalls.FindPairedWall(doorX, doorY);
+            if (door == null)
+                return false;
+
+            targetX = door.TargetX;
+            targetY = door.TargetY;
+            return true;
+        }
+
+        public static bool OriginalPerceptionLineTrace(
+            int startX,
+            int startY,
+            int deltaX,
+            int deltaY,
+            int maxSteps,
+            bool secondaryCellChecks)
+        {
+            return OriginalGuardDispatcher.TraceGuardGridLine(
+                startX,
+                startY,
+                deltaX,
+                deltaY,
+                maxSteps,
+                secondaryCellChecks,
+                OriginalPerceptionIntermediateBlocked);
+        }
+
+        // Cell-level collision query used by legacy actor movement.
+        // Player movement uses WorldCollision for the recovered 27-unit AABB.
+        public static bool IsWalkable(int x, int y, Entity ent)
+        {
+            if (x < 0 || x >= OriginalRuntime.MapWidth ||
+                y < 0 || y >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            var tile = tilemap[x, y];
+            if (tile == null || tile.obstacle)
+            {
+                return false;
+            }
+
+            foreach (var entity in Entity.entities)
+            {
+                if (ReferenceEquals(entity, ent) || !entity.hasCollision)
+                {
+                    continue;
+                }
+
+                var ex = (int)MathF.Floor(entity.position.X);
+                var ey = (int)MathF.Floor(entity.position.Y);
+                if (x == ex && y == ey)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool TryBeginOriginalExplodingWall(
+            int x,
+            int y,
+            uint nowMs)
+        {
+            if (originalMap == null ||
+                originalWallImages == null ||
+                originalVectors == null ||
+                x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            byte sourceClass = originalMap.WallClassAt(x, y);
+            if (sourceClass != 0x2E &&
+                sourceClass != 0x2F)
+            {
+                return false;
+            }
+
+            byte explosionCache = 0;
+            if (sourceClass == 0x2E)
+            {
+                byte explosionWallId =
+                    originalMap.FindWallIdByClass(0x2D, 0);
+
+                if (!originalWallImages.TryGetCacheIndexForWallId(
+                        explosionWallId,
+                        out explosionCache))
+                {
+                    return false;
+                }
+            }
+
+            bool found = false;
+
+            foreach (OriginalRendererCore.Vec vec
+                in originalVectors)
+            {
+                if (vec.SourceTileX != x ||
+                    vec.SourceTileY != y ||
+                    (vec.RenderClass != sourceClass &&
+                     vec.RenderClass != 0x2D))
+                {
+                    continue;
+                }
+
+                originalWallImages.BeginExplodingWall(
+                    vec,
+                    sourceClass,
+                    explosionCache,
+                    nowMs);
+
+                found = true;
+            }
+
+            if (found)
+                SoundEffect.PlayOriginalEvent(0x29);
+
+            return found;
+        }
+
+        static void SyncLegacyTilesFromOriginalMap()
+        {
+            if (originalMap == null)
+                return;
+
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
+            {
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
+                {
+                    if (originalMap.WallId[x, y] != 0)
+                        continue;
+
+                    Tile tile = tilemap[x, y];
+                    if (tile == null)
+                        continue;
+
+                    tile.obstacle = false;
+                    tile.textureID = -1;
+                }
+            }
+        }
+
+        public static void UpdateOriginalExplodingWallVisibleAt(
+            int x,
+            int y,
+            uint nowMs)
+        {
+            if (originalMap == null ||
+                originalWallImages == null ||
+                originalVectors == null)
+            {
+                return;
+            }
+
+            foreach (OriginalRendererCore.Vec vec
+                in originalVectors)
+            {
+                if (vec.SourceTileX != x ||
+                    vec.SourceTileY != y ||
+                    vec.RenderClass != 0x2D)
+                {
+                    continue;
+                }
+
+                originalWallImages.UpdateAfterVisibleSpan(
+                    vec,
+                    nowMs,
+                    null,
+                    completed =>
+                    {
+                        originalWallImages.CompleteExplodingWall(
+                            completed,
+                            originalMap,
+                            originalVectors);
+                        SyncLegacyTilesFromOriginalMap();
+                    });
+            }
         }
 
         public static void LoadMap(int id, int episode)
         {
-            var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
+            OriginalRuntimeState.Reset();
 
-            map.BaseStream.Position = 514;
-            var data = map.ReadBytes((int)map.BaseStream.Length);
+            // MAP.N and IMG.N are episode-coupled in the original runtime.
+            Img.LoadEpisode(episode);
 
-            int x = 0, y = 0;
-            int j = 0;
+            // Exact CC7C/E5D8 sprite projection is opt-in by data presence.
+            // The extractor under tools/ creates this table from the checked
+            // original Win16 executable. Missing data keeps the legacy visual
+            // projection as a compatibility fallback.
+            if (OriginalRuntimeState.ExactTrigQ10 == null)
+                OriginalRuntimeState.TryLoadExactTrigQ10();
 
-            for(int tx = 0; tx < 64; tx++)
+            // The four projectile resources are runtime sequence-cache entries,
+            // not ordinary map spawns. Load them explicitly so flight/impact
+            // selectors and deadlines come from IMG.N instead of placeholder IDs.
+            if (!OriginalRuntimeState.RegisterProjectileDefinitions())
             {
-                for(int ty = 0; ty < 64; ty++)
+                throw new InvalidDataException(
+                    "IMG projectile resources 0xFB..0xFE could not be registered.");
+            }
+
+            string mapPath = "data/MAP." + episode;
+            originalMap = OriginalMapTables.Load(mapPath, id);
+            levelCount = originalMap.LevelCount;
+
+            for (int tx = 0; tx < OriginalRuntime.MapWidth; tx++)
+            {
+                for (int ty = 0; ty < OriginalRuntime.MapHeight; ty++)
                 {
-                    tilemap[tx,ty] = new Tile();
+                    tilemap[tx, ty] = new Tile();
                 }
             }
 
-            for (int i = id * 8192; i < (id * 8192) + 8192; i++)
+            // Pass 1: preserve raw wall IDs and build the legacy Tile bridge.
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
             {
-
-
-                if (i % 2 == 0)
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
                 {
-                    int mx = j % 64;
-                    int my = j / 64;
-                    //tilemap[mx,my] = data[i];
-                    CreateTile(mx, my, data[i]);
-                    j++;
-                }
-                else
-                {
-                    SpawnMapObject(data[i], x, y);
-
-                    x++;
-                    if (x == 64)
-                    {
-                        x = 0;
-                        y++;
-                    }
+                    CreateTile(x, y, originalMap.WallId[x, y]);
                 }
             }
 
-            map.BaseStream.Close();
+            // Original renderer/runtime geometry. FUN_14A8 builds the 22-byte
+            // paired-wall/DOOR controllers from this VEC list.
+            originalVectors = originalMap.BuildVectors(
+                (x, y) =>
+                {
+                    var tile = tilemap[x, y];
+                    return tile != null ? tile.textureID : -1;
+                });
+
+            // 4C8A wall-side IMG cache: deduplicate by wall frame-stream
+            // offset and write the byte cache selector into each VEC.
+            originalWallImages = new OriginalImgWallRuntime(
+                "data/IMG." + episode,
+                originalVectors);
+
+            // FUN_22E8(0x2D): the generic exploding-wall sequence cache is
+            // loaded explicitly even when no class-0x2D VEC is present yet.
+            byte explosionWallId =
+                originalMap.FindWallIdByClass(0x2D, 0);
+            if (!originalWallImages.EnsureWallIdCached(
+                    explosionWallId,
+                    out _))
+            {
+                throw new InvalidDataException(
+                    "IMG generic exploding-wall resource is missing.");
+            }
+
+            originalWalls = new OriginalWallRuntime(
+                originalMap,
+                originalVectors);
+
+            // Pass 2: object IDs remain raw for directional spawn identity while
+            // OriginalRuntimeState consumes the parallel class/property tables.
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
+            {
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
+                {
+                    byte rawObjectId = originalMap.ObjectId[x, y];
+                    OriginalRuntimeState.RegisterMapObjectDefinition(rawObjectId);
+                    SpawnMapObject(rawObjectId, x, y);
+                }
+            }
         }
 
         public static void Update()

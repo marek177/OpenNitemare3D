@@ -8,9 +8,13 @@ namespace Nitemare3D
             fireTime = .3f;
             fireSound = SoundConsts.WEAPON_MAGICWAND;
         }
-        public override void Fire()
+        public override bool Fire()
         {
-
+            return Projectile.TrySpawn(
+                Game.player.direction,
+                ProjectileType.Magic,
+                OriginalWeaponSelector.MagicWand,
+                Game.player.position);
         }
     }
 }

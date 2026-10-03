@@ -15,14 +15,17 @@ namespace Nitemare3D
 
         Vec2 velocity = new Vec2();
         Direction direction;
+        readonly byte mapObjectId;
         float speed = 1f;
 
 
 
         
 
-        public DirectionalGuard(GuardType type, Direction dir)
+        public DirectionalGuard(GuardType type, Direction dir, byte mapObjectId = 0)
         {
+            this.type = type;
+            this.mapObjectId = mapObjectId;
             switch (type)
             {
                 case GuardType.HumanGreen:
@@ -45,6 +48,11 @@ namespace Nitemare3D
         }
 
         int texOffset;
+
+        public override void Start()
+        {
+            OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
+        }
 
         GuardState state = GuardState.patrol;
         /*
@@ -143,20 +151,48 @@ namespace Nitemare3D
 
         public override void Update()
         {
-            //todo calculate direction from velocity
+            // Keep the historical patrol path only for states that are not yet
+            // owned by the recovered 22-state runtime.
             HandleAnimation();
-            UpdateGuard();
 
+            bool runtimeOwnsGuard = false;
 
+            if (OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
+                OriginalRuntimeState.TryGetGuardRuntimeState(
+                    this,
+                    out OriginalGuardState runtimeState,
+                    out _) &&
+                OriginalRuntimeState.IsConfirmedAutonomousState(runtimeState))
+            {
+                runtimeOwnsGuard = true;
 
-            position += velocity * speed * Time.dt;
+                if (OriginalRuntimeState.GuardLogicTickDue)
+                {
+                    // Match Guard/OriginalMapGuard ownership semantics:
+                    // NotHandled means the recovered state is held until more
+                    // evidence is available. Never resurrect the legacy patrol
+                    // path for an entity already owned by the original runtime.
+                    OriginalRuntimeState.TickConfirmedAutonomousState(this);
+                }
 
+                if (runtimeOwnsGuard &&
+                    OriginalRuntimeState.TryGetGuardRecord(
+                        this,
+                        out var runtimeGuard))
+                {
+                    direction = (Direction)(runtimeGuard.Octant & 7);
+                }
+            }
+
+            if (!runtimeOwnsGuard)
+            {
+                UpdateGuard();
+                position += velocity * speed * Time.dt;
+            }
 
             spritePosition = position;
-
             spriteIndex = texOffset + (int)direction * 4;
-
-
+            OriginalRuntimeState.SyncGuardPosition(this);
         }
     }
 }

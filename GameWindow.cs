@@ -27,6 +27,9 @@ namespace Nitemare3D
             width = uint.Parse(config[0]);
             uint fps = uint.Parse(config[1]);
 
+            if (OriginalRendererStage4.ForceNativeResolution)
+                width = 320;
+
             height = (uint)(width / 1.6f);
 
             //to simulate tall pixels
@@ -52,6 +55,9 @@ namespace Nitemare3D
             BinaryReader reader = new BinaryReader(File.OpenRead("data/GAME.PAL"));
             reader.BaseStream.Position = 1156;
             pal = reader.ReadBytes(768);
+
+            OriginalRuntimeState.ConfigureShadePalette(
+                pal);
 
             reader.BaseStream.Close();
 

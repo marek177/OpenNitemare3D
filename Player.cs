@@ -36,6 +36,8 @@ namespace Nitemare3D
         float walkSpeed = 3;
         float runSpeed = 5;
         public float rotation = 0;
+        // DAT_1048_4C1C: persistent AREA id from wall class 0x44 markers.
+        public byte areaWakeSelector = 0;
 
         const int weaponCount = 4;
         public int weaponIndex = -1;
@@ -68,7 +70,13 @@ namespace Nitemare3D
 
         public override void Start()
         {
-            weapons[0].hasWeapon = true;
+            // FUN_BA16 clears the player gameplay block, leaving no active or
+            // owned weapon and zeroing all three ammo pools.
+            OriginalRuntimeState.WeaponRuntime.ResetNewGame();
+            OriginalRuntimeState.PickupRuntime.ResetNewGame();
+            weaponIndex = -1;
+            for (int i = 0; i < weapons.Length; i++)
+                weapons[i].hasWeapon = false;
 
             RayWidth  = (int)(RayWidth * GameWindow.scale);
             RayHeight  = (int)(RayHeight * GameWindow.scale);
@@ -77,10 +85,50 @@ namespace Nitemare3D
             hasCollision = false;
         }
 
+        public bool AcquireWeapon(OriginalWeaponSelector selector)
+        {
+            int index = (int)selector;
+            if (index < 0 || index >= weapons.Length)
+                return false;
+
+            OriginalRuntimeState.WeaponRuntime.GrantWeapon(selector);
+            weapons[index].hasWeapon = true;
+            weaponIndex = index;
+            return true;
+        }
+
         ISprite[] sprites = new ISprite[maxSprites];        
         int[] spriteOrder = new int[maxSprites];
         float[] spriteDistance = new float[maxSprites];
         float[] zBuffer;
+
+        // Win16 0x58FE: 320 WORD per-column wall visibility values. While the
+        // legacy DDA still draws walls, populate this buffer in the original
+        // Q4 projection domain so runtime-backed sprites can use the recovered
+        // CC7C/3F80 wall tests instead of float zBuffer comparisons.
+        readonly ushort[] originalWallVisibilityQ4 =
+            new ushort[OriginalRendererCore.ScreenWidth];
+
+        sealed class OriginalSpriteQueueEntry
+        {
+            public ISprite Sprite;
+            public Entity RuntimeEntity;
+            public IOriginalSpriteProjectionSource ProjectionSource;
+            public BitmapImage Frame;
+            public OriginalObjectRecord RuntimeObject;
+            public OriginalSpriteProjectionExact.ProjectedSprite Projected;
+        }
+
+        readonly OriginalSpriteQueueEntry[] originalSpriteQueue =
+            new OriginalSpriteQueueEntry[
+                OriginalProjectedSpriteQueue.SlotCount];
+
+        readonly bool[] originalSpriteQueueOccupied =
+            new bool[
+                OriginalProjectedSpriteQueue.SlotCount];
+
+        readonly bool[] originalSpriteHandled =
+            new bool[maxSprites];
 
 
         class DecendingComparer<TKey>: IComparer<float>
@@ -129,16 +177,351 @@ namespace Nitemare3D
             }
             return false;
         }
+        bool ExactOriginalSpriteQueueEnabled =>
+            OriginalRendererStage4.Enabled &&
+            OriginalRuntimeState.ExactTrigQ10 != null &&
+            Math.Abs(GameWindow.scale - 1.0f) <= 0.0001f;
+
+        void BuildOriginalSpriteQueue()
+        {
+            Array.Clear(
+                originalSpriteQueue,
+                0,
+                originalSpriteQueue.Length);
+
+            Array.Clear(
+                originalSpriteQueueOccupied,
+                0,
+                originalSpriteQueueOccupied.Length);
+
+            Array.Clear(
+                originalSpriteHandled,
+                0,
+                originalSpriteHandled.Length);
+
+            if (!ExactOriginalSpriteQueueEnabled ||
+                Img.current == null)
+            {
+                return;
+            }
+
+            short playerWorldX =
+                (short)MathF.Round(
+                    position.X *
+                    OriginalRuntime.WorldUnitsPerTile);
+
+            short playerWorldY =
+                (short)MathF.Round(
+                    position.Y *
+                    OriginalRuntime.WorldUnitsPerTile);
+
+            int angle =
+                OriginalProjectileRuntime.AngleFromDirection(
+                    direction.X,
+                    direction.Y);
+
+            for (int i = 0; i < spriteCount; i++)
+            {
+                ISprite sprite = sprites[i];
+
+                if (sprite == null ||
+                    !sprite.visible)
+                {
+                    continue;
+                }
+
+                Entity runtimeEntity =
+                    sprite as Entity;
+
+                IOriginalSpriteProjectionSource projectionSource =
+                    sprite as IOriginalSpriteProjectionSource;
+
+                OriginalObjectRecord runtimeObject;
+                BitmapImage frame;
+
+                if (projectionSource != null)
+                {
+                    // Runtime projectile semantics include the original +/-20
+                    // projection-call threshold inside TryGetOriginalSpriteFrame.
+                    originalSpriteHandled[i] = true;
+
+                    if (!projectionSource.TryGetOriginalProjectionObject(
+                            out runtimeObject) ||
+                        !projectionSource.TryGetOriginalSpriteFrame(
+                            out frame))
+                    {
+                        continue;
+                    }
+                }
+                else if (runtimeEntity != null &&
+                         OriginalRuntimeState.TryGetObjectRecord(
+                             runtimeEntity,
+                             out runtimeObject))
+                {
+                    int frameIndex =
+                        runtimeObject.Component03;
+
+                    if (frameIndex < 0 ||
+                        !OriginalRuntimeState.ObjectDefinitions
+                            .TryGetBitmapFrame(
+                                runtimeObject.DefinitionId,
+                                frameIndex,
+                                Img.current.rawData,
+                                out frame))
+                    {
+                        // Keep the old visual path if this entity has not yet
+                        // been fully migrated to an original IMG sequence.
+                        continue;
+                    }
+
+                    originalSpriteHandled[i] = true;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (!OriginalSpriteProjectionExact.TryProject(
+                        runtimeObject,
+                        frame,
+                        playerWorldX,
+                        playerWorldY,
+                        angle,
+                        OriginalRuntimeState.ExactTrigQ10,
+                        out var projected))
+                {
+                    continue;
+                }
+
+                if (!OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
+                        originalWallVisibilityQ4,
+                        projected.Left,
+                        projected.CenterX,
+                        projected.Right,
+                        projected.ProjectedYQ4))
+                {
+                    continue;
+                }
+
+                int slot =
+                    OriginalProjectedSpriteQueue.FindFreeSlot(
+                        originalSpriteQueueOccupied,
+                        projected.BaselineRow);
+
+                if (slot < 0)
+                {
+                    throw new InvalidOperationException(
+                        "Too many original projected sprites on screen.");
+                }
+
+                originalSpriteQueueOccupied[slot] = true;
+                originalSpriteQueue[slot] =
+                    new OriginalSpriteQueueEntry
+                    {
+                        Sprite = sprite,
+                        RuntimeEntity = runtimeEntity,
+                        ProjectionSource = projectionSource,
+                        Frame = frame,
+                        RuntimeObject = runtimeObject,
+                        Projected = projected
+                    };
+
+                short cacheRow =
+                    (short)Math.Max(
+                        short.MinValue,
+                        Math.Min(
+                            short.MaxValue,
+                            projected.BaselineRow));
+
+                if (projectionSource != null)
+                {
+                    projectionSource.RecordOriginalProjectedBaseRow(
+                        cacheRow);
+                }
+
+                if (runtimeEntity != null)
+                {
+                    // CC7C writes OBJECT+0x18 for every successfully projected
+                    // world OBJECT. GUARDs additionally receive the current
+                    // aim/render-generation stamp when they overlap center.
+                    OriginalRuntimeState.RecordObjectProjection(
+                        runtimeEntity,
+                        cacheRow);
+
+                    bool overlapsAimCenter =
+                        projected.Left - 4 <
+                            OriginalRuntime.ViewportCenterX &&
+                        OriginalRuntime.ViewportCenterX <
+                            projected.Right + 4;
+
+                    OriginalRuntimeState.RecordGuardProjection(
+                        runtimeEntity,
+                        cacheRow,
+                        overlapsAimCenter);
+
+                    // The general OBJECT animator runs from the visible object
+                    // projection path, not from a global off-screen timer.
+                    // Projectile animation has its own 8-slot updater and is
+                    // excluded by the projection-source branch.
+                    OriginalRuntimeState.TickBoundWorldObjectPresentation(
+                        runtimeEntity);
+                }
+            }
+        }
+
+        void DrawOriginalSpriteQueue()
+        {
+            if (!ExactOriginalSpriteQueueEnabled)
+                return;
+
+            for (int slot = 0;
+                slot < originalSpriteQueue.Length;
+                slot++)
+            {
+                OriginalSpriteQueueEntry entry =
+                    originalSpriteQueue[slot];
+
+                if (entry == null ||
+                    entry.Frame == null)
+                {
+                    continue;
+                }
+
+                var projected =
+                    entry.Projected;
+
+                BitmapImage frame =
+                    entry.Frame;
+
+                int firstX =
+                    Math.Max(
+                        OriginalRendererCore.ViewLeft,
+                        projected.Left);
+
+                int lastX =
+                    Math.Min(
+                        OriginalRendererCore.ViewRight,
+                        projected.Right);
+
+                int firstY =
+                    Math.Max(
+                        OriginalRendererCore.ViewTop,
+                        projected.Top);
+
+                int lastY =
+                    Math.Min(
+                        OriginalRendererCore.ViewBottom,
+                        projected.Bottom);
+
+                int screenHeight =
+                    projected.Bottom -
+                    projected.Top +
+                    1;
+
+                if (firstX > lastX ||
+                    firstY > lastY ||
+                    screenHeight <= 0)
+                {
+                    continue;
+                }
+
+                uint sourceStep16_16 =
+                    OriginalProjectedSpriteQueue
+                        .SpriteSourceStep16_16(
+                            frame.height,
+                            projected.Top,
+                            projected.Bottom);
+
+                bool bypassWall =
+                    (entry.RuntimeObject.Flags & 0x10) != 0;
+
+                for (int screenX = firstX;
+                    screenX <= lastX;
+                    screenX++)
+                {
+                    if (!OriginalProjectedSpriteQueue.ColumnPassesWall(
+                            originalWallVisibilityQ4,
+                            screenX,
+                            projected.ProjectedYQ4,
+                            bypassWall))
+                    {
+                        continue;
+                    }
+
+                    int texX =
+                        OriginalProjectedSpriteQueue
+                            .SpriteSourceCoordinate(
+                                screenX,
+                                projected.Left,
+                                sourceStep16_16);
+
+                    if (texX < 0 ||
+                        texX >= frame.width)
+                    {
+                        continue;
+                    }
+
+                    for (int screenY = firstY;
+                        screenY <= lastY;
+                        screenY++)
+                    {
+                        int texY =
+                            OriginalProjectedSpriteQueue
+                                .SpriteSourceCoordinate(
+                                    screenY,
+                                    projected.Top,
+                                    sourceStep16_16);
+
+                        if (texY < 0 ||
+                            texY >= frame.height)
+                        {
+                            continue;
+                        }
+
+                        byte color =
+                            frame.data[
+                                texX,
+                                texY];
+
+                        if (color !=
+                            OriginalRuntime.TransparentPaletteIndex)
+                        {
+                            GameWindow.frameBuffer[
+                                screenX,
+                                screenY] = color;
+                        }
+                    }
+                }
+            }
+        }
+
         public void RenderRaycaster()
         {
+            OriginalRuntimeState.BeginRenderGeneration();
+            Array.Clear(
+                originalWallVisibilityQ4,
+                0,
+                originalWallVisibilityQ4.Length);
+
+            bool originalWallsRendered =
+                OriginalRendererStage4.TryRenderWalls(this);
+
+            if (originalWallsRendered)
+            {
+                OriginalRendererStage4.CopyWallVisibilityQ4(
+                    originalWallVisibilityQ4);
+            }
+
             //var direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
 
 
 
 
 
-            bool flipped = false; 
+            bool flipped = false;
 
+            if (!originalWallsRendered)
+            {
             for (int x = 0; x < RayWidth; x++)
             {
                 float cameraX = 2 * x / (float)RayWidth - 1; 
@@ -228,6 +611,15 @@ namespace Nitemare3D
 
                     if (hit == 1)
                     {
+                        // FUN_66B0 -> 65A6 updates animated/exploding VECs only
+                        // after a visible wall span. The legacy DDA renderer is
+                        // still the presentation path, so use its visible hit as
+                        // the equivalent trigger for the recovered 0x2D lifecycle.
+                        Level.UpdateOriginalExplodingWallVisibleAt(
+                            mapX,
+                            mapY,
+                            OriginalRuntimeState.RuntimeClockMs);
+
                         flipped = Level.tilemap[mapX, mapY].flip;
 
                         var hitWall = Level.tilemap[mapX, mapY];
@@ -313,8 +705,27 @@ namespace Nitemare3D
 
                 zBuffer[x] = perpWallDist;
 
+                if (Math.Abs(GameWindow.scale - 1.0f) <= 0.0001f &&
+                    perpWallDist > 0)
+                {
+                    int screenColumn =
+                        OriginalRuntime.ViewportX + x;
+
+                    if (screenColumn >= 0 &&
+                        screenColumn < originalWallVisibilityQ4.Length)
+                    {
+                        originalWallVisibilityQ4[screenColumn] =
+                            OriginalProjectedSpriteQueue
+                                .WallVisibilityQ4FromPerpendicularDistance(
+                                    perpWallDist);
+                    }
+                }
+
 
             }
+            }
+
+            BuildOriginalSpriteQueue();
             
             for(int i = 0; i < spriteCount; i++)
             {
@@ -332,8 +743,49 @@ namespace Nitemare3D
                 var sprite = sprites[spriteOrder[i]];
                 if(!sprite.visible){continue;}
 
-                var spriteW = Img.current.entries[sprite.spriteIndex].width;
-                var spriteH = Img.current.entries[sprite.spriteIndex].height;
+                // Do not mix the original VEC/visibility wall renderer with
+                // the historical float-z sprite path. Stage 4 currently draws
+                // only sprites that can enter the recovered 18-byte queue.
+                if (originalWallsRendered)
+                    continue;
+
+                int originalSpriteIndex =
+                    spriteOrder[i];
+
+                if (ExactOriginalSpriteQueueEnabled &&
+                    originalSpriteHandled[originalSpriteIndex])
+                {
+                    continue;
+                }
+
+                BitmapImage spriteFrame = null;
+
+                if (sprite is IOriginalSpriteFrameSource originalFrameSource)
+                {
+                    // Runtime-backed sprites deliberately do not fall back to
+                    // the historical flat spriteIndex list. A false return can
+                    // mean "not projected this frame" in the original engine.
+                    if (!originalFrameSource.TryGetOriginalSpriteFrame(
+                            out spriteFrame))
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    if (Img.current == null ||
+                        sprite.spriteIndex < 0 ||
+                        sprite.spriteIndex >= Img.current.entries.Count)
+                    {
+                        continue;
+                    }
+
+                    spriteFrame =
+                        Img.current.entries[sprite.spriteIndex];
+                }
+
+                var spriteW = spriteFrame.width;
+                var spriteH = spriteFrame.height;
 
                 float invDet = 1.0f / (plane.X * direction.Y - direction.X * plane.Y);
 
@@ -350,66 +802,93 @@ namespace Nitemare3D
 
                 int spriteHeight = (int)(MathF.Abs(RayHeight / transformY) / vDiv);
 
-                int drawStartY = -spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int rawDrawStartY = -spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int rawDrawEndY = spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int drawStartY = rawDrawStartY;
                 if(drawStartY < 0) drawStartY = 0;
-                int drawEndY = spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int drawEndY = rawDrawEndY;
                 if(drawEndY >= RayHeight) drawEndY = RayHeight - 1;
 
 
                 int spriteWidth = (int)(MathF.Abs(RayHeight / transformY) / uDiv);
-                int drawStartX = -spriteWidth / 2 + spriteScreenX;
+                int rawDrawStartX = -spriteWidth / 2 + spriteScreenX;
+                int rawDrawEndX = spriteWidth / 2 + spriteScreenX;
+                int drawStartX = rawDrawStartX;
                 if(drawStartX < 0) drawStartX = 0;
-                int drawEndX = spriteWidth / 2 + spriteScreenX;
+                int drawEndX = rawDrawEndX;
                 if(drawEndX >= RayWidth) drawEndX = RayWidth - 1; 
 
 
-                
+                bool projectedVisible = false;
                 for(int stripe = drawStartX; stripe < drawEndX; stripe++)
                 {
                     int texX = (int)(256 * (stripe - (-spriteWidth / 2 + spriteScreenX)) * spriteW / spriteWidth) / 256;
 
 
                     if(transformY > 0 && stripe > 0 && stripe < RayWidth && transformY < zBuffer[stripe])
+                    {
+                    projectedVisible = true;
                     for(int y = drawStartY; y < drawEndY; y++) //for every pixel of the current stripe
                     {
                         int d = (y-vMoveScreen) * 256 - RayHeight * 128 + spriteHeight * 128;
                         int texY = ((d * spriteH) / spriteHeight) / 256;
-                        var color = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+                        var color = spriteFrame.data[texX, texY];
 
-                        if(color != 31)
+                        byte transparentIndex =
+                            sprite is IOriginalSpriteFrameSource
+                            ? OriginalRuntime.TransparentPaletteIndex
+                            : (byte)31;
+
+                        if(color != transparentIndex)
                         {
-                            GameWindow.frameBuffer[8 + stripe, 4 + y] = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+                            GameWindow.frameBuffer[8 + stripe, 4 + y] = color;
                         }
 
                         
 
                     }
-                }
-                
-
-            }
-
-            //handle tile use
-            if (Input.IsKeyDown(KeyboardKey.Space))
-            {
-                var tileFacing = position + direction;
-                var tx = (int)tileFacing.X;
-                int ty = (int)tileFacing.Y;
-
-                foreach(var entity in Entity.entities)
-                {
-                    if((int)entity.position.X == tx && (int)entity.position.Y == ty)
-                    {
-                        entity.SendMessage("OnUse");
                     }
                 }
+
+                if (projectedVisible && sprite is Entity runtimeEntity)
+                {
+                    float scale = GameWindow.scale > 0 ? GameWindow.scale : 1f;
+
+                    // The renderer works in a scaled viewport-local coordinate
+                    // system; OBJECT+0x18 stores the original absolute screen row.
+                    int projectedBaseRow =
+                        OriginalRuntime.ViewportY +
+                        (int)MathF.Round(rawDrawEndY / scale);
+
+                    if (projectedBaseRow < short.MinValue)
+                        projectedBaseRow = short.MinValue;
+                    else if (projectedBaseRow > short.MaxValue)
+                        projectedBaseRow = short.MaxValue;
+
+                    int aimCenterLocal = RayWidth / 2;
+                    int aimSlack = Math.Max(
+                        1,
+                        (int)MathF.Round(4f * scale));
+                    bool overlapsAimCenter =
+                        rawDrawStartX - aimSlack < aimCenterLocal &&
+                        rawDrawEndX + aimSlack > aimCenterLocal;
+
+                    if (sprite is IOriginalSpriteProjectionSource fallbackProjectionSource)
+                    {
+                        fallbackProjectionSource.RecordOriginalProjectedBaseRow(
+                            (short)projectedBaseRow);
+                    }
+
+                    OriginalRuntimeState.RecordGuardProjection(
+                        runtimeEntity,
+                        (short)projectedBaseRow,
+                        overlapsAimCenter);
+                }
                 
 
             }
 
-
-
-
+            DrawOriginalSpriteQueue();
         }
 
 
@@ -417,37 +896,73 @@ namespace Nitemare3D
 
         void RenderWeapon()
         {
-            if(weaponIndex == -1){return;} //empty hand
-            GameWindow.DrawImg(weapons[weaponIndex].texture, ImageConsts.UI_WEAPONPOSITION);
+            bool playerInteractive =
+                OriginalRuntimeState.GameplayState46B4 != 2 &&
+                OriginalRuntimeState.GameplayState46B4 != 3;
 
-            GameWindow.DrawImg(ImageConsts.UI_FACE_START, ImageConsts.UI_FACEPOSITION);
+            bool fireDown =
+                playerInteractive &&
+                Input.IsKeyDown(KeyboardKey.LControl);
+            bool fireEdge = fireDown && !fireWasDown;
+            fireWasDown = fireDown;
 
-            var input = Input.GetNumberInput();
-            int oldWeaponIndex = weaponIndex;
+            var input =
+                playerInteractive
+                    ? Input.GetNumberInput()
+                    : 0;
             if (input > 0 && input <= weaponCount)
             {
-                fireTimer = 0;
-                weaponIndex = input - 1;
+                var requested =
+                    (OriginalWeaponSelector)(input - 1);
 
-                if(!weapons[weaponIndex].hasWeapon)
-                {
-                    weaponIndex = oldWeaponIndex;
-                }
+                if (OriginalRuntimeState.WeaponRuntime.TrySelect(requested))
+                    weaponIndex = input - 1;
             }
 
-            fireTimer += Time.dt;
-            if (Input.IsKeyDown(KeyboardKey.LControl))
-            {
-                if (fireTimer > weapons[weaponIndex].fireTime)
-                {
-                    fireTimer = 0;
-                    weapons[weaponIndex].Fire();
-                    SoundEffect.PlaySound(weapons[weaponIndex].fireSound);
-                }
+            if (weaponIndex == -1)
+                return; // original new-game state: empty hand
 
+            GameWindow.DrawImg(
+                weapons[weaponIndex].texture,
+                ImageConsts.UI_WEAPONPOSITION);
+            GameWindow.DrawImg(
+                ImageConsts.UI_FACE_START,
+                ImageConsts.UI_FACEPOSITION);
+
+            if (!playerInteractive)
+                return;
+
+            var selector = (OriginalWeaponSelector)weaponIndex;
+            if (!OriginalRuntimeState.WeaponRuntime.TryAcceptFireAttempt(
+                    selector,
+                    fireEdge,
+                    fireDown))
+            {
+                return;
+            }
+
+            // Shot acceptance is deliberately after the cadence gate.
+            // A rejected attempt keeps the original AA90 counter-reset behavior.
+            if (OriginalRuntimeState.WeaponRuntime.Jammed)
+                return;
+
+            if (OriginalProjectileRuntime.WeaponUsesProjectile(
+                    (byte)selector) &&
+                OriginalRuntimeState.ProjectilePool.FirstFreeSlot() < 0)
+            {
+                return;
+            }
+
+            if (!OriginalRuntimeState.WeaponRuntime.ConsumeAmmo(selector))
+                return;
+
+            if (weapons[weaponIndex].Fire())
+            {
+                SoundEffect.PlaySound(weapons[weaponIndex].fireSound);
+                OriginalRuntimeState.WakeGuardsAfterPlayerFire(
+                    areaWakeSelector);
             }
         }
-
 
 
         public Player()
@@ -455,7 +970,49 @@ namespace Nitemare3D
 
 
         }
-        float fireTimer = 0;
+        bool fireWasDown = false;
+        bool useWasDown = false;
+
+        void MoveWithCollision(float amount)
+        {
+            var delta = direction * amount;
+            WorldCollision.MovePlayerWithSliding(this, delta);
+        }
+
+        void UpdateAreaWakeSelector()
+        {
+            int tileX = (int)MathF.Floor(position.X);
+            int tileY = (int)MathF.Floor(position.Y);
+
+            if (Level.originalMap == null ||
+                tileX < 0 || tileY < 0 ||
+                tileX >= OriginalRuntime.MapWidth ||
+                tileY >= OriginalRuntime.MapHeight)
+            {
+                return;
+            }
+
+            byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+            if (Level.originalMap.TryGetWallClassVariant(
+                    rawWallId,
+                    0x44,
+                    out byte areaId))
+            {
+                // FUN_247A/8A20 preserve the previous AREA id off marker cells.
+                areaWakeSelector = areaId;
+                OriginalRuntimeState.SetPlayerAreaSelector(areaId);
+            }
+        }
+
+        void UpdateUse()
+        {
+            bool useDown = Input.IsKeyDown(KeyboardKey.Space);
+            if (useDown && !useWasDown)
+            {
+                UseDispatcher.TryUseAdjacent(this);
+            }
+            useWasDown = useDown;
+        }
 
         public void SetRotation(float angle)
         {
@@ -471,64 +1028,56 @@ namespace Nitemare3D
         public override void Update()
         {
             direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
-            
-            float oldRot = rotation;
 
-            if (Input.IsKeyDown(KeyboardKey.Right))
+            bool deathCameraActive =
+                OriginalRuntimeState.GameplayState46B4 == 2;
+
+            if (deathCameraActive)
             {
-                rotation += 3 * Time.dt;
+                // FUN_D8FC owns view rotation while the player is dying.
+                OriginalRuntimeState.TickPlayerDeathCamera(this);
             }
-
-            if (Input.IsKeyDown(KeyboardKey.Left))
+            else if (OriginalRuntimeState.GameplayState46B4 == 3)
             {
-                rotation -= 3 * Time.dt;
+                // FUN_33D6/3B7C mode 4: one visible red-palette step per
+                // vertical-refresh-equivalent host frame.
+                OriginalRuntimeState.TickPlayerDeathRedFade();
             }
-
-            if (Input.IsKeyDown(KeyboardKey.Up))
+            else
             {
-                var x = (int)(position.X + direction.X);
-                var y = (int)position.Y;
-                if(Level.IsWalkable(x, y, this))
-                {
-                    position.X += direction.X * (Time.dt * walkSpeed);
-                }
-                
-                y = (int)(position.Y + direction.Y);
-                x = (int)position.X;
+                float oldRot = rotation;
 
-                if(Level.IsWalkable(x, y, this))
+                if (Input.IsKeyDown(KeyboardKey.Right))
                 {
-                    position.Y += direction.Y * (Time.dt * walkSpeed);
+                    rotation += 3 * Time.dt;
                 }
 
-            
-            }
-
-            if (Input.IsKeyDown(KeyboardKey.Down))
-            {
-                if(Level.tilemap[(int)(position.X - direction.X), (int)(position.Y)].textureID == -1)
+                if (Input.IsKeyDown(KeyboardKey.Left))
                 {
-                    position.X -= direction.X * (Time.dt * walkSpeed);
+                    rotation -= 3 * Time.dt;
                 }
 
-                if(Level.tilemap[(int)(position.X), (int)(position.Y - direction.Y)].textureID == -1)
+                if (Input.IsKeyDown(KeyboardKey.Up))
                 {
-                    position.Y -= direction.Y * (Time.dt * walkSpeed);
+                    MoveWithCollision(Time.dt * walkSpeed);
                 }
-    
+
+                if (Input.IsKeyDown(KeyboardKey.Down))
+                {
+                    MoveWithCollision(-(Time.dt * walkSpeed));
+                }
+
+                float oldPlaneX = plane.X;
+
+                plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
+                plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
+
+                UpdateAreaWakeSelector();
+                UpdateUse();
             }
-
-            
-
-            float oldPlaneX = plane.X;
-
-            plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
-            plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
 
             RenderRaycaster();
             RenderWeapon();
-
-
         }
     }
 }

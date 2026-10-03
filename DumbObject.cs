@@ -8,9 +8,16 @@ namespace Nitemare3D
         public bool visible{get;set;} = true;
         public float yOffset{get;set;}
         public bool raised = false;
-        public DumbObject(int index, bool raised = false, bool hasCollision = true)
+        readonly byte rawObjectId;
+
+        public DumbObject(
+            int index,
+            bool raised = false,
+            bool hasCollision = true,
+            byte rawObjectId = 0)
         {
             spriteIndex = index;
+            this.rawObjectId = rawObjectId;
             Game.player.AddSprite(this);
             this.raised = raised;
 
@@ -21,6 +28,16 @@ namespace Nitemare3D
             this.hasCollision = hasCollision;
         }
 
+
+        public override void Start()
+        {
+            if (rawObjectId != 0)
+            {
+                OriginalRuntimeState.RegisterWorldObject(
+                    this,
+                    rawObjectId);
+            }
+        }
 
         public override void Update()
         {

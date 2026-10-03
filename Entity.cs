@@ -54,13 +54,18 @@ namespace Nitemare3D
         public static T Create<T>(float x, float y) where T : Entity
         {
             var entity = Activator.CreateInstance<T>();
-            entity.position = new Vec2(x, y) - .5f;
+            // Map-owned entities are created with tile coordinates by Level.CreateTile.
+            // Do not shift them by half a tile: their Start/USE logic indexes the map
+            // directly from this position.
+            entity.position = new Vec2(x, y);
             entityQueue.Add(entity);
             return entity;
         }
 
         public static void UpdateEntites()
         {
+            OriginalRuntimeState.BeginFrame(Time.dt);
+
             foreach (var entity in entities)
             {
                 entity.Update();

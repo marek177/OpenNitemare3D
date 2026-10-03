@@ -22,6 +22,7 @@ namespace Nitemare3D
 			songid = music[1];
 			pcx = hud;
 
+			Img.LoadEpisode(episode);
 			player = Entity.Create<Player>();
 
 			Level.LoadMap(level, episode);

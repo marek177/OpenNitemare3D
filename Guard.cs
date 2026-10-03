@@ -44,6 +44,8 @@ namespace Nitemare3D
 
         AnimationHandler anim = new AnimationHandler();
         GuardType type;
+        readonly byte mapObjectId;
+        bool originalRuntimeRegistered;
         GuardState state = GuardState.idle;
         byte health = (byte)OriginalRuntime.GuardInitialStrength;
         const int SPRITE_FRANKENSTEIN_START = 322;
@@ -85,9 +87,10 @@ namespace Nitemare3D
 
 
 
-        public Guard(GuardType type)
+        public Guard(GuardType type, byte mapObjectId = 0)
         {
             this.type = type;
+            this.mapObjectId = mapObjectId;
             PlayAnim(GuardAnimation.idle);
             Game.player.AddSprite(this);
 
@@ -122,6 +125,12 @@ namespace Nitemare3D
 
             attackTimer = attackTime;
 
+        }
+
+        public override void Start()
+        {
+            originalRuntimeRegistered =
+                OriginalRuntimeState.RegisterGuard(this, type, mapObjectId);
         }
 
         float roarTimer = 0;
@@ -238,7 +247,13 @@ namespace Nitemare3D
 
         public void ShootPlasma()
         {
-            state = GuardState.dead;
+            // Compatibility entrypoint retained for older callers. Route it
+            // through the recovered player->GUARD damage producer/receiver
+            // instead of the historical port's unconditional instant kill.
+            OriginalRuntimeState.ApplyPlayerWeaponDamage(
+                this,
+                OriginalWeaponSelector.SingleShotLaser,
+                false);
         }
 
         void UpdateAttack()
@@ -305,18 +320,113 @@ namespace Nitemare3D
             }
         }
 
+        void ApplyOriginalRuntimeAnimationBridge(
+            OriginalGuardState runtimeState,
+            OriginalGuardState nextState)
+        {
+            switch (runtimeState)
+            {
+                case OriginalGuardState.MoveThen03:
+                case OriginalGuardState.Move08:
+                case OriginalGuardState.Transition05:
+                case OriginalGuardState.Transition13:
+                case OriginalGuardState.RecoverMove11:
+                    PlayAnim(GuardAnimation.walk);
+                    break;
+
+                case OriginalGuardState.DetectionAttack04:
+                    PlayAnim(GuardAnimation.attack);
+                    break;
+
+                case OriginalGuardState.AnimationTimer:
+                    if (nextState == OriginalGuardState.Detection03)
+                        PlayAnim(GuardAnimation.roar);
+                    else if (nextState == OriginalGuardState.DetectionAttack04)
+                        PlayAnim(GuardAnimation.attack);
+                    else
+                        PlayAnim(GuardAnimation.idle);
+                    break;
+
+                case OriginalGuardState.DeathFinalize09:
+                case OriginalGuardState.WaitAnimation12:
+                    PlayAnim(GuardAnimation.die);
+                    break;
+
+                case OriginalGuardState.Pain15:
+                    PlayAnim(GuardAnimation.roar);
+                    break;
+
+                default:
+                    PlayAnim(GuardAnimation.idle);
+                    break;
+            }
+        }
+
         public override void Update()
         {
-            UpdateState();
+            bool runtimeOwnsGuard =
+                OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
+                originalRuntimeRegistered;
+
+            OriginalGuardState runtimeState = default;
+            OriginalGuardState nextRuntimeState = default;
+
+            if (runtimeOwnsGuard)
+            {
+                bool haveState =
+                    OriginalRuntimeState.TryGetGuardRuntimeState(
+                        this,
+                        out runtimeState,
+                        out nextRuntimeState);
+
+                if (haveState &&
+                    OriginalRuntimeState.GuardLogicTickDue)
+                {
+                    // A registered original-runtime GUARD never silently falls
+                    // back to the legacy AI. NotHandled now means "hold the
+                    // recovered state" so missing evidence remains visible
+                    // instead of changing gameplay semantics.
+                    OriginalRuntimeState.TickConfirmedAutonomousState(this);
+
+                    OriginalRuntimeState.TryGetGuardRuntimeState(
+                        this,
+                        out runtimeState,
+                        out nextRuntimeState);
+                }
+
+                if (haveState)
+                {
+                    ApplyOriginalRuntimeAnimationBridge(
+                        runtimeState,
+                        nextRuntimeState);
+                }
+                else
+                {
+                    PlayAnim(GuardAnimation.idle);
+                }
+            }
+            else
+            {
+                UpdateState();
+            }
+
             anim.Update();
             spriteIndex = anim.index;
             spritePosition = position;
-            
-    
-            if(type == GuardType.Bat && state != GuardState.idle)
+
+            if (type == GuardType.Bat)
             {
-                yOffset += (32 - yOffset) * Time.dt;
+                bool batActive = runtimeOwnsGuard
+                    ? runtimeState != OriginalGuardState.Active07 &&
+                      runtimeState != OriginalGuardState.Delay
+                    : state != GuardState.idle;
+
+                if (batActive)
+                    yOffset += (32 - yOffset) * Time.dt;
             }
+
+            OriginalRuntimeState.SyncGuardPosition(this);
         }
+
     }
 }

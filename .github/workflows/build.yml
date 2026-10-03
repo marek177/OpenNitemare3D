@@ -1,0 +1,28 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 5
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 5.0.x
+
+      - name: Restore
+        run: dotnet restore Nitemare3D.csproj
+
+      - name: Build
+        run: dotnet build Nitemare3D.csproj --configuration Release --no-restore
+
+      - name: Runtime self-test
+        run: dotnet run --project Nitemare3D.csproj --configuration Release --no-build -- --self-test

@@ -11,6 +11,24 @@ namespace Nitemare3D
 		extern public static int XInitThreads();
 		static void Main(string[] args)
 		{
+			if (args.Length > 0 && args[0] == "--self-test")
+			{
+				RuntimeSelfTest.Run();
+				return;
+			}
+
+			OriginalRendererStage4.Initialize(args);
+
+			foreach (string arg in args)
+			{
+				// Recovered GUARD runtime is the production default now.
+				// Keep an explicit legacy switch for A/B behavior comparison.
+				if (arg == "--legacy-guards")
+					OriginalRuntimeState.AutonomousGuardRuntimeEnabled = false;
+				else if (arg == "--n3d-original-guards")
+					OriginalRuntimeState.AutonomousGuardRuntimeEnabled = true;
+			}
+
 
 			XInitThreads();
 
@@ -20,7 +38,13 @@ namespace Nitemare3D
 			GameWindow.Init();
 			Input.Init();
 
-			Img i = new Img("data/IMG.1");
+			Img.LoadEpisode(1);
+
+			// Enable the recovered CC7C/E5D8 sprite/projectile projection only
+			// when the exact 360-degree Q10 table extracted from NITE3W is
+			// available. Missing data deliberately keeps the renderer on the
+			// explicit fallback path instead of silently substituting Math.Sin.
+			OriginalRuntimeState.TryLoadExactTrigQ10();
 
 			Clock dt = new Clock();
 
