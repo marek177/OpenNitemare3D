@@ -1221,6 +1221,38 @@ namespace Nitemare3D
             return false;
         }
 
+        public static void ApplyDeathRedFadeStep(
+            byte[] basePalette,
+            byte[] destinationPalette,
+            int step)
+        {
+            if (basePalette == null ||
+                destinationPalette == null ||
+                basePalette.Length < 768 ||
+                destinationPalette.Length < 768)
+            {
+                throw new ArgumentException(
+                    "A 256-entry RGB palette is required.");
+            }
+
+            if (step < 1 || step > 49)
+                throw new ArgumentOutOfRangeException(nameof(step));
+
+            for (int color = 0; color < 256; color++)
+            {
+                int offset = color * 3;
+                int red = basePalette[offset];
+                int faded =
+                    red + ((255 - red) * step) / 50;
+
+                destinationPalette[offset] = (byte)faded;
+                destinationPalette[offset + 1] =
+                    basePalette[offset + 1];
+                destinationPalette[offset + 2] =
+                    basePalette[offset + 2];
+            }
+        }
+
         /// <summary>
         /// Portable one-retrace step of FUN_33D6 mode 4. The original loops
         /// steps 1..49 and waits for VGA vertical retrace (FUN_3AC2) between
@@ -1241,21 +1273,11 @@ namespace Nitemare3D
                 return true;
 
             PlayerDeathRedFadeStep++;
-            int step = PlayerDeathRedFadeStep;
 
-            for (int color = 0; color < 256; color++)
-            {
-                int offset = color * 3;
-                int red = playerDeathBasePalette[offset];
-                int faded =
-                    red + ((255 - red) * step) / 50;
-
-                GameWindow.pal[offset] = (byte)faded;
-                GameWindow.pal[offset + 1] =
-                    playerDeathBasePalette[offset + 1];
-                GameWindow.pal[offset + 2] =
-                    playerDeathBasePalette[offset + 2];
-            }
+            ApplyDeathRedFadeStep(
+                playerDeathBasePalette,
+                GameWindow.pal,
+                PlayerDeathRedFadeStep);
 
             return PlayerDeathRedFadeStep >= 49;
         }
