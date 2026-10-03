@@ -47,6 +47,7 @@ namespace Nitemare3D
         // allocated table of 10-byte decoded entries; OBJECT +0x04 indexes those
         // per-level tables through the pointer metadata rooted at DS:4748.
         public const int ObjectResourceHeaderBytes = 0x5A;
+        public const int ObjectDefinitionBytes = ObjectResourceHeaderBytes;
         public const int ObjectResourceEntryBytes = 10;
         public const int MaxObjectDefinitions = 256; // OBJECT +0x04 is one byte.
         public const int GuardState02ResourceWordOffset = 0x34;
