@@ -2278,8 +2278,9 @@ namespace Nitemare3D
             Assert(obj.WorldX == 164 && obj.WorldY == 100,
                 "state 13 total displacement must be 64 world units.");
             Assert(guard.Strategy == 0 &&
-                   guard.State == (byte)OriginalGuardState.Active02,
-                "state 13 must clear strategy and return to state 02.");
+                   guard.State == (byte)OriginalGuardState.Active02 &&
+                   guard.Timer == -1,
+                "state 13 must post-decrement through zero, clear strategy and return to state 02.");
 
             guard = new OriginalGuardRecord
             {
@@ -2310,8 +2311,9 @@ namespace Nitemare3D
             Assert(obj.WorldX == 100 && obj.WorldY == 100,
                 "blocked state 13 must not commit coordinates.");
             Assert(guard.Strategy == 0 &&
-                   guard.State == (byte)OriginalGuardState.Active02,
-                "blocked state 13 must still terminate normally.");
+                   guard.State == (byte)OriginalGuardState.Active02 &&
+                   guard.Timer == -1,
+                "blocked state 13 must still terminate with original post-decrement semantics.");
         }
 
         static void TestState13MapCellTransfer()
