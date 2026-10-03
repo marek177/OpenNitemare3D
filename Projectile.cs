@@ -23,7 +23,6 @@ namespace Nitemare3D
         public Vec2 spritePosition{get;set;} = new Vec2();
         public float yOffset{get;set;}
 
-        const float speed = 4;
         ProjectileType type;
         readonly OriginalWeaponSelector weaponSelector;
         readonly int runtimeSlotIndex;
@@ -113,59 +112,113 @@ namespace Nitemare3D
             visible = false;
         }
 
-        public override void Update()
+        bool RuntimeCollisionAt(int worldX, int worldY)
         {
-            anim.Update();
-            position += direction * speed * Time.dt;
-            spritePosition = position;
-            spriteIndex = anim.index;
-
-            bool delete = false;
-
-            int projectileWorldX = (int)MathF.Round(
-                position.X * OriginalRuntime.WorldUnitsPerTile);
-            int projectileWorldY = (int)MathF.Round(
-                position.Y * OriginalRuntime.WorldUnitsPerTile);
-
             if (OriginalRuntimeState.TryFindGuardHit(
-                    projectileWorldX,
-                    projectileWorldY,
+                    worldX,
+                    worldY,
                     out Entity hitGuard))
             {
+                // Projectile damage deliberately does NOT require the current
+                // render-generation stamp; the original collision route can
+                // consume the cached OBJECT+0x18 projection row.
                 OriginalRuntimeState.ApplyPlayerWeaponDamage(
                     hitGuard,
                     weaponSelector,
                     false);
-                RemoveProjectile();
+                return true;
+            }
+
+            int tileX = worldX >> 6;
+            int tileY = worldY >> 6;
+
+            if (Level.originalMap == null ||
+                tileX < 0 || tileY < 0 ||
+                tileX >= OriginalRuntime.MapWidth ||
+                tileY >= OriginalRuntime.MapHeight)
+            {
+                return true;
+            }
+
+            byte wallFlags =
+                Level.originalMap.WallPropertyAt(tileX, tileY);
+
+            if ((wallFlags & OriginalMapTables.WallHardBlock) != 0)
+                return true;
+
+            if ((wallFlags & OriginalMapTables.WallDynamicDoor) != 0)
+            {
+                if (!Level.TryGetOriginalDoorCollisionInfo(
+                        tileX,
+                        tileY,
+                        out OriginalDoorCollisionInfo door))
+                {
+                    return true;
+                }
+
+                if (door.State != 0 && door.State != 4)
+                    return true;
+            }
+
+            byte objectFlags =
+                Level.originalMap.ObjectPropertyAt(tileX, tileY);
+
+            // GUARDs were resolved above with the exact +/-9 test. Any other
+            // runtime-present blocking object remains an impact surface until
+            // the class-specific projectile-touch side effects are bridged.
+            return (objectFlags & OriginalMapTables.ObjectBlocksMovementOrLos) != 0;
+        }
+
+        public override void Update()
+        {
+            anim.Update();
+            spriteIndex = anim.index;
+
+            if (runtimeSlotIndex < 0 ||
+                runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length)
+            {
+                // Compatibility-only constructor: no recovered slot is bound.
+                spritePosition = position;
                 return;
             }
 
-            
-            foreach(var entity in entities)
-            {
-                if(entity.id == id || entity.id == Game.player.id){continue;}
-                // Runtime-bound guards were already tested above using the
-                // original +/-9 world-unit proximity rule.
-                if (OriginalRuntimeState.TryGetGuardRecord(entity, out _))
-                {
-                    continue;
-                }
+            ref var runtime =
+                ref OriginalRuntimeState.ProjectilePool.Slots[runtimeSlotIndex];
 
-                if(entity.position.Rounded().Equals(position.Rounded()) && entity.hasCollision)
+            if (runtime.State == (byte)OriginalProjectileState.Free)
+            {
+                Entity.Remove(this);
+                visible = false;
+                return;
+            }
+
+            if (runtime.State == (byte)OriginalProjectileState.Flying &&
+                OriginalRuntimeState.ProjectileLogicTickDue)
+            {
+                bool collided =
+                    OriginalProjectileRuntime.AdvanceTrajectoryAndCollide(
+                        ref runtime,
+                        OriginalRuntimeState.ProjectileSubstepsPerTick,
+                        RuntimeCollisionAt);
+
+                position.X =
+                    (float)runtime.RenderObject.WorldX /
+                    OriginalRuntime.WorldUnitsPerTile;
+                position.Y =
+                    (float)runtime.RenderObject.WorldY /
+                    OriginalRuntime.WorldUnitsPerTile;
+
+                if (collided)
                 {
-                    entity.SendMessage("ShootPlasma");
+                    // The movement/collision source of truth is now the recovered
+                    // 42-byte slot. Impact presentation still uses the legacy
+                    // shell until projectile IMG sequence timing is bridged.
                     RemoveProjectile();
                     return;
                 }
             }
 
-            if(!Level.IsWalkable((int)position.X, (int)position.Y, this))
-            {
-                delete = true;
-            }
-
-            if(delete){RemoveProjectile();}
-
+            spritePosition = position;
         }
     }
 }
