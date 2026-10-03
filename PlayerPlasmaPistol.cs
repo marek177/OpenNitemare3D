@@ -8,13 +8,13 @@ namespace Nitemare3D
             fireTime = .3f;
             fireSound = SoundConsts.WEAPON_PLASMA;
         }
-        public override void Fire()
+        public override bool Fire()
         {
-            var p = new Projectile(
+            return Projectile.TrySpawn(
                 Game.player.direction,
                 ProjectileType.Plasma,
-                OriginalWeaponSelector.SingleShotLaser);
-            Entity.Add(p, Game.player.position);
+                OriginalWeaponSelector.SingleShotLaser,
+                Game.player.position);
         }
     }
 }
