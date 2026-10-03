@@ -1867,14 +1867,17 @@ int main(void)
     assert(use_execution.runtime_slot ==
            N3D_RE_FindDoorSlotByCell(11, 10));
 
-    /* Known wall/object families without closed effects stay explicit deferred. */
+    /* WARP_1 is now resolved to the verified 0x0D..0x14 climb-menu family. */
     memset(use_payload, 0, sizeof(use_payload));
     use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x90; /* WARP_1 */
     assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
     n3d_player.tile_x = 10;
     n3d_player.tile_y = 10;
     use_execution = N3D_RE_ExecuteUse(1);
-    assert(use_execution.kind == N3D_USE_EXEC_WALL_DEFERRED);
+    assert(use_execution.kind == N3D_USE_EXEC_CLIMB_MENU_REQUEST);
+    assert(use_execution.menu_first_wall_type == 0x0D);
+    assert(use_execution.menu_last_wall_type == 0x14);
+    assert(use_execution.menu_variant_index == 0);
 
     memset(use_payload, 0, sizeof(use_payload));
     use_payload[adjacent_cell * N3D_MAP_CELL_BYTES + 1] = 0x05;
@@ -1945,14 +1948,17 @@ int main(void)
     use_execution = N3D_RE_ExecuteUse(1);
     assert(use_execution.kind == N3D_USE_EXEC_PENTAGRAM_GATE_PASSED);
 
-    /* WARP_S2 remains a known class with intentionally deferred effect. */
+    /* WARP_S2 is part of the verified Other Side / mirror family. */
     memset(use_payload, 0, sizeof(use_payload));
     use_payload[adjacent_cell * N3D_MAP_CELL_BYTES] = 0x93;
     assert(N3D_RE_LoadMapPayload(use_payload, sizeof(use_payload)));
     n3d_player.tile_x = 10;
     n3d_player.tile_y = 10;
     use_execution = N3D_RE_ExecuteUse(1);
-    assert(use_execution.kind == N3D_USE_EXEC_WALL_DEFERRED);
+    assert(use_execution.kind == N3D_USE_EXEC_OTHER_SIDE_REQUEST);
+    assert(use_execution.menu_first_wall_type == 0x15);
+    assert(use_execution.menu_last_wall_type == 0x18);
+    assert(use_execution.menu_variant_index == 1);
 
     /*
      * Player movement kernel: one-unit axis attempts with 28-unit leading
