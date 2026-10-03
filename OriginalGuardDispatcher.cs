@@ -2026,8 +2026,9 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Recovered state 0x0E. FUN_7B56 refreshes the normal directional
-        /// sequence, then enters 0x0F with timer 0 only while DAT_1048_51A5 is set.
+        /// Recovered Cannon state 0x0E. FUN_7B56 refreshes the normal directional
+        /// sequence, then enters 0x0F with timer 0 only while the
+        /// "Enable remote cannons" flag DAT_1048_51A5 is set.
         /// </summary>
         public static OriginalGuardDispatchResult TickState0E(
             ref OriginalGuardRecord guard,
@@ -2035,7 +2036,7 @@ namespace Nitemare3D
             OriginalObjectDefinitionRecord definition,
             short playerWorldX,
             short playerWorldY,
-            bool global51A5)
+            bool remoteCannonsEnabled)
         {
             if (guard.State != (byte)OriginalGuardState.Conditional0E)
                 return OriginalGuardDispatchResult.NotHandled;
@@ -2048,7 +2049,7 @@ namespace Nitemare3D
                 playerWorldY,
                 false);
 
-            if (!global51A5)
+            if (!remoteCannonsEnabled)
                 return refresh == OriginalGuardDispatchResult.Transitioned
                     ? refresh
                     : OriginalGuardDispatchResult.Waiting;
@@ -2059,7 +2060,7 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Recovered state 0x0F. The original uses post-decrement semantics:
+        /// Recovered Cannon state 0x0F. The original uses post-decrement semantics:
         /// oldTimer is tested after Timer has already been decremented.
         /// On expiry it selects the state-0x10 directional sequence, then enters
         /// state 0 animation with nextState=0x10 and Timer=sequence high byte.
@@ -2070,7 +2071,7 @@ namespace Nitemare3D
             OriginalObjectDefinitionRecord definition,
             short playerWorldX,
             short playerWorldY,
-            bool global51A5,
+            bool remoteCannonsEnabled,
             bool sameArea,
             out bool attackSoundRequested)
         {
@@ -2087,7 +2088,7 @@ namespace Nitemare3D
                 playerWorldY,
                 false);
 
-            if (!global51A5)
+            if (!remoteCannonsEnabled)
             {
                 guard.State = (byte)OriginalGuardState.Conditional0E;
                 return OriginalGuardDispatchResult.Transitioned;
@@ -2121,7 +2122,7 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// First half of recovered state 0x10. Refreshes directional state and
+        /// First half of recovered Cannon state 0x10. Refreshes directional state and
         /// performs the original post-decrement timer test. True means the attack
         /// eligibility/damage call must run this tick.
         /// </summary>
@@ -2149,7 +2150,7 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Recovered state-0x10 tail after the optional damage commit.
+        /// Recovered Cannon state-0x10 tail after the optional damage commit.
         /// Timer becomes 8, state becomes 0x0F, then FUN_6EE0(force=1)
         /// refreshes the state-0x0F directional bank.
         /// </summary>
