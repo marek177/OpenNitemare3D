@@ -157,6 +157,9 @@ namespace Nitemare3D
             ref var guard = ref Guards[guardSlot];
             guard.ObjectSlot = (ushort)objectSlot;
             guard.Strength = OriginalRuntime.GuardInitialStrength;
+            // FUN_847E initializes +0x0E to FF. FUN_247A later updates it only
+            // while the actor is on wall class 0x44 AREA markers.
+            guard.DefinitionLookup = 0xFF;
 
             var profile = OriginalGuardProfiles.ForObjectClass(objectClass);
             guard.Strategy = profile.Strategy;
@@ -182,6 +185,15 @@ namespace Nitemare3D
                     ref guard,
                     variant,
                     wallClass);
+
+                byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+                if (Level.originalMap.TryGetWallClassVariant(
+                        rawWallId,
+                        0x44,
+                        out byte areaId))
+                {
+                    guard.DefinitionLookup = areaId;
+                }
             }
 
             bindings[entity] = new Binding
@@ -230,16 +242,20 @@ namespace Nitemare3D
                 int tileX = obj.WorldX >> 6;
                 int tileY = obj.WorldY >> 6;
 
-                if (tileX >= 0 && tileY >= 0 &&
+                if (Level.originalMap != null &&
+                    tileX >= 0 && tileY >= 0 &&
                     tileX < OriginalRuntime.MapWidth &&
                     tileY < OriginalRuntime.MapHeight)
                 {
-                    var tile = Level.tilemap[tileX, tileY];
-                    if (tile != null &&
-                        OriginalDoorSelector.TryGet((byte)tile.type, out byte selector))
+                    byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+                    if (Level.originalMap.TryGetWallClassVariant(
+                            rawWallId,
+                            0x44,
+                            out byte areaId))
                     {
-                        // Non-DOOR cells intentionally do not clear this field.
-                        Guards[binding.GuardSlot].DefinitionLookup = selector;
+                        // FUN_247A/71DC deliberately preserve the previous area
+                        // when the new cell is not a class-44 marker.
+                        Guards[binding.GuardSlot].DefinitionLookup = areaId;
                     }
                 }
             }
