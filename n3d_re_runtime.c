@@ -202,6 +202,7 @@ int N3D_RE_InstantiateMapObject(
         guard->strategy = profile.strategy;
         guard->state = profile.state;
         guard->next_state = profile.next_state;
+        guard->transition_flag = profile.perception_mode;
         guard->strength = 0xFF;
 
         N3D_RE_UpdateGuardAreaForSlot(guard_slot);

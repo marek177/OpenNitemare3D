@@ -83,9 +83,9 @@ typedef struct n3d_guard_record
     int8_t move_x;             /* +13 */
     int8_t move_y;             /* +14 */
     uint8_t unknown_15;        /* +15 */
-    uint8_t transition_flag;   /* +16 partial semantic */
-    uint8_t unknown_17;
-    uint8_t unknown_18;
+    uint8_t transition_flag;   /* +16 transition/perception control: 0 proximity, 1/2 LOS */
+    uint8_t unknown_17;        /* +17 cached perception result */
+    uint8_t unknown_18;        /* +18 cached <=1-tile proximity */
     uint8_t unknown_19;
 } n3d_guard_record;
 

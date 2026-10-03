@@ -20,6 +20,7 @@
 #include "../n3d_re_map_archive.h"
 #include "../n3d_re_object_defs.h"
 #include "../n3d_re_guard_sounds.h"
+#include "../n3d_re_guard_perception.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -4026,6 +4027,146 @@ int main(void)
         assert(alert_random == 41);
         assert(N3D_RE_GuardAlertSoundId(
             0x09, alert_random) == 0x3A);
+    }
+
+    /* Exact GUARD 7494 + D50A + 7594 perception/attack helpers. */
+    {
+        n3d_guard_record guard = {0};
+        n3d_object_record object = {0};
+
+        object.world_x = 10 * 64 + 32;
+        object.world_y = 10 * 64 + 32;
+        guard.octant = 2; /* east */
+
+        assert(N3D_RE_GuardPerceptionPrefilter(
+            &guard, &object, 11 * 64 + 32, 10 * 64 + 32, 0));
+        assert(!N3D_RE_GuardPerceptionPrefilter(
+            &guard, &object, 9 * 64 + 32, 10 * 64 + 32, 0));
+        assert(N3D_RE_GuardPerceptionPrefilter(
+            &guard, &object, 9 * 64 + 32, 10 * 64 + 32, 1));
+        assert(!N3D_RE_GuardPerceptionPrefilter(
+            &guard, &object, 19 * 64 + 32, 10 * 64 + 32, 1));
+
+        assert(N3D_RE_GuardLosCellBlocks(0x06, 0, 0, 1));
+        assert(N3D_RE_GuardLosCellBlocks(0x0A, 0, 0, 0));
+        assert(!N3D_RE_GuardLosCellBlocks(0x0A, 0, 0, 1));
+        assert(N3D_RE_GuardLosCellBlocks(0, 0x02, 1, 1));
+        assert(!N3D_RE_GuardLosCellBlocks(0, 0x22, 1, 1));
+        assert(!N3D_RE_GuardLosCellBlocks(0, 0x02, 0, 1));
+
+        N3D_RE_ResetRuntime();
+        for(int id = 0; id < 256; ++id)
+        {
+            n3d_wall_mapping_known[id] = 1;
+            n3d_wall_property_known[id] = 1;
+            n3d_object_mapping_known[id] = 1;
+            n3d_object_property_known[id] = 1;
+            n3d_wall_mapped_type[id] = 0;
+            n3d_object_mapped_type[id] = 0;
+            n3d_wall_property_resolved[id] = 0;
+            n3d_object_property_resolved[id] = 0;
+        }
+
+        n3d_wall_mapped_type[1] = 0x01;
+        n3d_wall_property_resolved[1] =
+            N3D_RE_WallPropertiesForMappedType(0x01);
+
+        /* Destination wall is intentionally not tested by D50A callback. */
+        n3d_map[10 * 64 + 12].wall = 1;
+        assert(N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+
+        n3d_map[10 * 64 + 11].wall = 1;
+        assert(!N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+
+        /* Door state unknown blocks; 0 opens the intermediate LOS cell. */
+        n3d_map[10 * 64 + 11].wall = 2;
+        n3d_wall_mapped_type[2] = 0x31;
+        n3d_wall_property_resolved[2] =
+            N3D_RE_WallPropertiesForMappedType(0x31);
+        assert(N3D_RE_RegisterDoorCell(11, 10) >= 0);
+        assert(!N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+        assert(N3D_RE_SetDoorCellState(11, 10, 0));
+        assert(N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+
+        /* Secondary bit 0x02 blocks only with checks enabled; 0x20 bypasses. */
+        n3d_map[10 * 64 + 11].wall = 0;
+        n3d_map[10 * 64 + 11].object = 3;
+        n3d_object_property_resolved[3] = 0x02;
+        assert(!N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+        assert(N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 0,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+        n3d_object_property_resolved[3] = 0x22;
+        assert(N3D_RE_TraceGuardGridLine(
+            10, 10, 2, 0, 8, 1,
+            N3D_RE_GuardMapIntermediateBlocked, NULL));
+
+        /* Full 7494+D50A wrapper. */
+        guard.octant = 2;
+        object.world_x = 10 * 64 + 32;
+        object.world_y = 10 * 64 + 32;
+        n3d_map[10 * 64 + 11].object = 0;
+        assert(N3D_RE_EvaluateGuardPerceptionMap(
+            &guard, &object, 12 * 64 + 32, 10 * 64 + 32, 1, 0));
+        n3d_map[10 * 64 + 11].wall = 1;
+        assert(!N3D_RE_EvaluateGuardPerceptionMap(
+            &guard, &object, 12 * 64 + 32, 10 * 64 + 32, 1, 0));
+
+        /* FUN_7594 caches both results and selects by +0x16. */
+        int attack_eligible = -1;
+        guard.transition_flag = 0;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &guard, &object, 11 * 64 + 32, 10 * 64 + 32, 0,
+            &attack_eligible));
+        assert(attack_eligible == 1);
+        assert(guard.unknown_17 == 0 && guard.unknown_18 == 1);
+
+        guard.transition_flag = 1;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &guard, &object, 20 * 64, 20 * 64, 1, &attack_eligible));
+        assert(attack_eligible == 1);
+        assert(guard.unknown_17 == 1 && guard.unknown_18 == 0);
+
+        guard.transition_flag = 2;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &guard, &object, 20 * 64, 20 * 64, 0, &attack_eligible));
+        assert(attack_eligible == 0);
+
+        guard.transition_flag = 3;
+        assert(!N3D_RE_TryEvaluateGuardAttackGate(
+            &guard, &object, object.world_x, object.world_y, 1,
+            &attack_eligible));
+        assert(attack_eligible == 0);
+
+        /* Spawn profile is actually written to +0x16. */
+        N3D_RE_ResetRuntime();
+        n3d_object_mapping_known[0x80] = 1;
+        n3d_object_property_known[0x80] = 1;
+        n3d_object_mapped_type[0x80] = 0x08;
+        n3d_object_property_resolved[0x80] =
+            N3D_RE_ObjectPropertiesForMappedType(0x08);
+        assert(N3D_RE_RegisterGuardFromMap(0x80, 1, 1));
+        assert(n3d_guards[0].transition_flag == 0);
+
+        N3D_RE_ResetRuntime();
+        n3d_object_mapping_known[0x90] = 1;
+        n3d_object_property_known[0x90] = 1;
+        n3d_object_mapped_type[0x90] = 0x0B;
+        n3d_object_property_resolved[0x90] =
+            N3D_RE_ObjectPropertiesForMappedType(0x0B);
+        assert(N3D_RE_InstantiateMapObject(0x90, 1, 1, NULL));
+        assert(n3d_guard_count == 1);
+        assert(n3d_guards[0].transition_flag == 1);
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
