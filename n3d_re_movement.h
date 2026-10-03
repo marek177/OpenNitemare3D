@@ -2,8 +2,21 @@
 #define N3D_RE_MOVEMENT_H
 
 #include "n3d_re_collision.h"
+#include "n3d_re_trig.h"
 
 #include <stdint.h>
+
+typedef struct n3d_line_state
+{
+    int16_t sin_q10;          /* original 4C46 */
+    int16_t cos_q10;          /* original 4C48 */
+    int16_t axis_flag;        /* original 4C06 */
+    int16_t error;            /* original 4C08 */
+    int16_t twice_minor;      /* original 4C0A */
+    int16_t twice_minor_minus_major; /* original 4C0C */
+    int16_t step_x;           /* projectile slot +08 */
+    int16_t step_y;           /* projectile slot +0A */
+} n3d_line_state;
 
 typedef struct n3d_player_move_result
 {
@@ -46,6 +59,15 @@ int N3D_RE_TestPlayerYSubstep(
 n3d_player_move_result N3D_RE_MovePlayerWorldDelta(
     int delta_x,
     int delta_y,
+    const n3d_collision_callbacks* callbacks);
+
+int N3D_RE_InitLineStateFromAngle(
+    int angle_degrees,
+    n3d_line_state* state);
+
+n3d_player_move_result N3D_RE_MovePlayerAngleSubsteps(
+    int angle_degrees,
+    uint16_t major_substeps,
     const n3d_collision_callbacks* callbacks);
 
 #endif
