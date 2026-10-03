@@ -44,6 +44,7 @@ namespace Nitemare3D
             TestGuardInitialProfiles();
             TestState07Decision();
             TestState08WallTurn();
+            TestStates0E0F10();
             TestPainReturn();
             TestDoorSelector();
             TestWakeCache();
@@ -114,6 +115,9 @@ namespace Nitemare3D
                 OriginalGuardState.LethalPlayerContact0B,
                 OriginalGuardState.Shared0C,
                 OriginalGuardState.Shared0D,
+                OriginalGuardState.Conditional0E,
+                OriginalGuardState.Timed0F,
+                OriginalGuardState.Timed10,
                 OriginalGuardState.RecoverMove11,
                 OriginalGuardState.WaitAnimation12,
                 OriginalGuardState.Transition13,
@@ -129,9 +133,6 @@ namespace Nitemare3D
 
             OriginalGuardState[] fallback =
             {
-                OriginalGuardState.Conditional0E,
-                OriginalGuardState.Timed0F,
-                OriginalGuardState.Timed10,
                 OriginalGuardState.Periodic14
             };
 
@@ -2378,6 +2379,113 @@ namespace Nitemare3D
                        0x41,
                        2) == OriginalGuardDispatchResult.Waiting,
                 "state 08 wall-turn helper must only act at tile center.");
+        }
+
+        static void TestStates0E0F10()
+        {
+            var definition = new OriginalObjectDefinitionRecord
+            {
+                DirectionalA0 = 0x02A0,
+                DirectionalA1 = 0x02A0,
+                DirectionalA2 = 0x02A0,
+                DirectionalA3 = 0x02A0,
+                DirectionalA4 = 0x02A0,
+                DirectionalA5 = 0x02A0,
+                DirectionalA6 = 0x02A0,
+                DirectionalA7 = 0x02A0,
+                DirectionalB0 = 0x03B0,
+                DirectionalB1 = 0x03B0,
+                DirectionalB2 = 0x03B0,
+                DirectionalB3 = 0x03B0,
+                DirectionalB4 = 0x03B0,
+                DirectionalB5 = 0x03B0,
+                DirectionalB6 = 0x03B0,
+                DirectionalB7 = 0x03B0
+            };
+
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Conditional0E,
+                Control = 1,
+                Octant = 2,
+                ResultOctant = 0,
+                Timer = 9
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 0,
+                WorldY = 0
+            };
+
+            Assert(OriginalGuardDispatcher.TickState0E(
+                       ref guard, ref obj, definition, 64, 0, false) !=
+                   OriginalGuardDispatchResult.NotHandled &&
+                   guard.State == (byte)OriginalGuardState.Conditional0E,
+                "state 0E must remain 0E while 51A5 gate is clear.");
+
+            Assert(OriginalGuardDispatcher.TickState0E(
+                       ref guard, ref obj, definition, 64, 0, true) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Timed0F &&
+                   guard.Timer == 0,
+                "state 0E must enter 0F with timer zero when 51A5 is set.");
+
+            guard.Timer = 2;
+            Assert(OriginalGuardDispatcher.TickState0F(
+                       ref guard, ref obj, definition, 64, 0, true, true,
+                       out bool soundEarly) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   guard.Timer == 1 &&
+                   !soundEarly,
+                "state 0F post-decrement must wait while old timer is nonzero.");
+
+            guard.Timer = 0;
+            Assert(OriginalGuardDispatcher.TickState0F(
+                       ref guard, ref obj, definition, 64, 0, true, true,
+                       out bool soundDue) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   soundDue &&
+                   guard.State == (byte)OriginalGuardState.AnimationTimer &&
+                   guard.NextState == (byte)OriginalGuardState.Timed10 &&
+                   guard.Timer == 3 &&
+                   guard.DefinitionValue == 0x03B0 &&
+                   unchecked((byte)obj.Component03) == 0xB0,
+                "state 0F expiry must schedule bank-B state-0 animation to 0x10.");
+
+            Assert(OriginalGuardDispatcher.CompleteDeferredState(ref guard) ==
+                   OriginalGuardDispatchResult.Completed &&
+                   guard.State == (byte)OriginalGuardState.Timed10,
+                "state 0F animation must return through nextState 0x10.");
+
+            guard.Timer = 1;
+            Assert(!OriginalGuardDispatcher.State10AttackDue(
+                       ref guard, ref obj, definition, 64, 0) &&
+                   guard.Timer == 0,
+                "state 0x10 old timer 1 must decrement to zero without attacking.");
+
+            Assert(OriginalGuardDispatcher.State10AttackDue(
+                       ref guard, ref obj, definition, 64, 0) &&
+                   guard.Timer == -1,
+                "state 0x10 old timer zero must decrement to -1 and attack.");
+
+            Assert(OriginalGuardDispatcher.CompleteState10AttackCycle(
+                       ref guard, ref obj, definition, 64, 0) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Timed0F &&
+                   guard.Timer == 8 &&
+                   guard.DefinitionValue == 0x02A0 &&
+                   unchecked((byte)obj.Component03) == 0xA0,
+                "state 0x10 tail must enter 0x0F timer 8 with bank-A sequence.");
+
+            guard.State = (byte)OriginalGuardState.Timed0F;
+            guard.Timer = 5;
+            Assert(OriginalGuardDispatcher.TickState0F(
+                       ref guard, ref obj, definition, 64, 0, false, true,
+                       out bool gatedSound) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Conditional0E &&
+                   !gatedSound,
+                "state 0x0F must return to 0x0E when 51A5 is clear.");
         }
 
         static void TestPainReturn()
