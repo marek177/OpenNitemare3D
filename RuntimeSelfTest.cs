@@ -1239,8 +1239,8 @@ namespace Nitemare3D
                     "Close remote doors must enter closing state 3 and clear 51A4 bit.");
 
                 Assert(OriginalRuntimeState.ApplyRemoteDoorCommand(2, true) == 0 &&
-                       !OriginalRuntimeState.RemoteDoorsOpenForArea(2),
-                    "nonmatching remote-door area must not move a controller.");
+                       OriginalRuntimeState.RemoteDoorsOpenForArea(2),
+                    "nonmatching remote-door area must leave controllers unchanged but still update 51A4.");
             }
             finally
             {
