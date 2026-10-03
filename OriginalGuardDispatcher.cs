@@ -33,6 +33,24 @@ namespace Nitemare3D
         public short AppliedY;
     }
 
+    public struct OriginalDoorCollisionInfo
+    {
+        public bool Exists;
+        public short State;
+        public byte RenderClass;
+        public byte Orientation;
+        public short TargetX;
+        public short TargetY;
+    }
+
+    public struct OriginalGuardCellCollisionResult
+    {
+        public bool Blocked;
+        public bool DoorToggleRequested;
+        public bool DoorLatchRequested;
+        public bool EnteredRecoverMove11;
+    }
+
     /// <summary>
     /// Executable-backed pieces of the Win16 1.10 GUARD dispatcher.
     /// Partial states stay deliberately unimplemented rather than receiving guessed behavior.
@@ -1232,6 +1250,128 @@ namespace Nitemare3D
                 frame = firstFrame;
 
             obj.Component03 = unchecked((sbyte)(byte)frame);
+        }
+
+        /// <summary>
+        /// Decision/side-effect core of FUN_1010_700A after the candidate world
+        /// coordinate has been mapped to its MAP cell. The caller supplies the
+        /// already-derived MAP property bytes and, for door-family cells, the
+        /// matching 22-byte DOOR-controller facts.
+        /// </summary>
+        public static OriginalGuardCellCollisionResult EvaluateMovementCell700A(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short candidateWorldX,
+            short candidateWorldY,
+            short playerWorldX,
+            short playerWorldY,
+            byte wallFlags,
+            byte objectFlags,
+            OriginalDoorCollisionInfo door,
+            OriginalObjectDefinitionRecord definition)
+        {
+            var result = new OriginalGuardCellCollisionResult();
+
+            // First branch of FUN_700A: the player is an immediate movement block.
+            if (MovementCandidateTouchesPlayer(
+                    candidateWorldX,
+                    candidateWorldY,
+                    playerWorldX,
+                    playerWorldY))
+            {
+                result.Blocked = true;
+                return result;
+            }
+
+            // Object-property bit 0x02 blocks before any door handling.
+            if ((objectFlags & OriginalMapTables.ObjectBlocksMovementOrLos) != 0)
+            {
+                result.Blocked = true;
+                return result;
+            }
+
+            if ((wallFlags & OriginalMapTables.WallDynamicDoor) != 0)
+            {
+                if (!door.Exists)
+                {
+                    // The original expects every bit-08 MAP cell to have a DOOR
+                    // controller. Treat a broken bridge as blocked.
+                    result.Blocked = true;
+                    return result;
+                }
+
+                if (door.State != 1)
+                {
+                    // FUN_1476: only states 0 and 4 are passable.
+                    result.Blocked = door.State != 0 && door.State != 4;
+                    return result;
+                }
+
+                // Closed state-1 classes 0x33..0x3C are not activated by GUARDs.
+                if (door.RenderClass >= 0x33 && door.RenderClass <= 0x3C)
+                {
+                    result.Blocked = true;
+                    return result;
+                }
+
+                if (guard.State == (byte)OriginalGuardState.MoveThen03)
+                    result.DoorLatchRequested = true;
+
+                if (guard.Strategy == 1)
+                {
+                    guard.Timer = 0x20;
+                    guard.MoveX = 0;
+                    guard.MoveY = 0;
+
+                    if (door.Orientation == 2)
+                    {
+                        guard.MoveX = obj.WorldX < candidateWorldX
+                            ? (sbyte)8
+                            : obj.WorldX > candidateWorldX
+                                ? (sbyte)-8
+                                : (sbyte)0;
+                        obj.WorldY = (short)(door.TargetY + 0x20);
+                    }
+                    else
+                    {
+                        guard.MoveY = obj.WorldY < candidateWorldY
+                            ? (sbyte)8
+                            : obj.WorldY > candidateWorldY
+                                ? (sbyte)-8
+                                : (sbyte)0;
+                        obj.WorldX = (short)(door.TargetX + 0x20);
+                    }
+
+                    UpdateOctantFromMovement(
+                        ref guard,
+                        guard.MoveX,
+                        guard.MoveY);
+
+                    // FUN_700A forces FUN_6EE0 while the guard is still state 6,
+                    // then changes the state byte to 0x11.
+                    RefreshDirectionalSequence(
+                        ref guard,
+                        ref obj,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        true);
+
+                    guard.State = (byte)OriginalGuardState.RecoverMove11;
+                    result.EnteredRecoverMove11 = true;
+                }
+
+                // FUN_188A is called for every activatable state-1 door and the
+                // current movement attempt remains blocked this frame.
+                result.DoorToggleRequested = true;
+                result.Blocked = true;
+                return result;
+            }
+
+            // Remaining wall-property bit 0x02 family is solid to movement.
+            result.Blocked =
+                (wallFlags & OriginalMapTables.WallAnyBlockingFamily) != 0;
+            return result;
         }
 
         /// <summary>
