@@ -4,6 +4,7 @@
 #include "n3d_re_player.h"
 #include "n3d_re_runtime.h"
 #include "n3d_re_movement.h"
+#include "n3d_re_combat.h"
 
 #include <stdint.h>
 
@@ -45,6 +46,15 @@ typedef struct n3d_projectile_advance_result
     uint16_t advanced_substeps;
     n3d_projectile_collision_result collision;
 } n3d_projectile_advance_result;
+
+typedef struct n3d_projectile_guard_resolution
+{
+    uint8_t resolved;
+    uint8_t applied_damage;
+    n3d_guard_hit_result guard_result;
+    int score_delta;
+    uint8_t entered_impact;
+} n3d_projectile_guard_resolution;
 
 #define N3D_EXPLODABLE_WALL_EVENT 0x29
 #define N3D_EXPLODABLE_WALL_RUNTIME_CLASS 0x2D
@@ -95,6 +105,16 @@ int N3D_RE_EnterProjectileImpact(
     int slot,
     uint8_t weapon_selector,
     uint8_t sequence_base);
+
+int N3D_RE_EnterProjectileImpactFromFlight(int slot);
+
+n3d_projectile_guard_resolution
+N3D_RE_ResolveProjectileGuardHit(
+    int slot,
+    const n3d_projectile_collision_result* collision,
+    int16_t view_reference_y,
+    uint8_t hamerstein_gate_value,
+    uint16_t rng_value);
 
 void N3D_RE_AdvanceProjectileAnimation(int slot, int frame_count);
 
