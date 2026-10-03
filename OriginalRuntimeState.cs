@@ -931,15 +931,16 @@ namespace Nitemare3D
             short playerWorldY =
                 ToWorldCoordinate(Game.player.position.Y);
 
-            // FUN_7E54 is shared by 0C/0D and only forces the normal
-            // directional/sequence refresh; it does not leave the state.
+            // FUN_7E54 is shared by 0C/0D and calls FUN_6EE0 with
+            // param5=0. It refreshes only when the result octant changes and
+            // never leaves state 0C/0D.
             return OriginalGuardDispatcher.RefreshDirectionalSequence(
                 ref guard,
                 ref obj,
                 definition,
                 playerWorldX,
                 playerWorldY,
-                true);
+                false);
         }
 
         static OriginalGuardDispatchResult TickState08Bridge(
