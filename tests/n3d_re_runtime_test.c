@@ -43,6 +43,31 @@ static void test_touch(uint8_t x, uint8_t y, void* user)
     ++*(int*)user;
 }
 
+typedef struct guard_block_fixture
+{
+    int16_t block_x;
+    int16_t block_y;
+    int block_all;
+    unsigned calls;
+} guard_block_fixture;
+
+static int test_guard_blocked(
+    int16_t x,
+    int16_t y,
+    void* user)
+{
+    guard_block_fixture* f =
+        (guard_block_fixture*)user;
+    if(!f)
+        return 0;
+
+    ++f->calls;
+    return f->block_all ||
+           (x == f->block_x &&
+            y == f->block_y);
+}
+
+
 static void write_u32_le(uint8_t* bytes, size_t offset, uint32_t value)
 {
     bytes[offset + 0] = (uint8_t)value;
@@ -4714,6 +4739,223 @@ int main(void)
         assert(!move.position_committed);
         assert(!move.bounced);
         assert(rng == rng_before);
+    }
+
+    /* Exact GUARD 6EE0/71DC directional and state-06 movement core. */
+    {
+        n3d_guard_record guard = {0};
+        n3d_object_record object = {0};
+        n3d_object_definition_header definition = {{0}};
+
+        object.world_x = 64;
+        object.world_y = 64;
+
+        assert(N3D_RE_ComputeGuardPlayerOctant(
+            1, 64, 64, 128, 64) == 2);
+        assert(N3D_RE_ComputeGuardPlayerOctant(
+            1, 64, 64, 64, 0) == 0);
+        assert(N3D_RE_ComputeGuardPlayerOctant(
+            1, 64, 64, 128, 0) == 1);
+        assert(N3D_RE_ComputeGuardPlayerOctant(
+            0, 64, 64, 0, 0) == 6 ||
+               N3D_RE_ComputeGuardPlayerOctant(
+                   0, 64, 64, 0, 0) == 7);
+
+        /* Bank C for state06 non-strategy2, B for state08, A otherwise. */
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_A_OFFSET + 2 * 2] = 0x11;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_A_OFFSET + 2 * 2 + 1] = 0x01;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_B_OFFSET + 2 * 2] = 0x22;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_B_OFFSET + 2 * 2 + 1] = 0x02;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2] = 0x33;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2 + 1] = 0x03;
+
+        assert(N3D_RE_GetGuardDirectionalSequence(
+            &definition, N3D_GUARD_STATE_06, 0, 2) == 0x0333);
+        assert(N3D_RE_GetGuardDirectionalSequence(
+            &definition, N3D_GUARD_STATE_06, 2, 2) == 0x0111);
+        assert(N3D_RE_GetGuardDirectionalSequence(
+            &definition, N3D_GUARD_STATE_08, 0, 2) == 0x0222);
+
+        guard.control = 1;
+        guard.octant = 2;
+        guard.state = N3D_GUARD_STATE_06;
+        guard.strategy = 0;
+        guard.result_octant = 0xFF;
+        assert(N3D_RE_RefreshGuardDirectionalSequence(
+            &guard, &object, &definition, 128, 64, 0) ==
+               N3D_GUARD_DISPATCH_TRANSITIONED);
+        assert(guard.result_octant <= 7);
+        assert(guard.definition_value != 0);
+        assert((uint8_t)object.animation_frame ==
+               (uint8_t)guard.definition_value);
+
+        /* Vertical bob is restricted to 08/14/1A and clamps 10..35. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        object.object_class = 0x08;
+        object.runtime_1a = 10;
+        assert(N3D_RE_TickGuardVerticalBob(&guard, &object));
+        assert(object.runtime_1a == 11);
+        assert((int8_t)guard.unknown_15 == 1);
+
+        object.runtime_1a = 0x23;
+        guard.unknown_15 = 1;
+        assert(N3D_RE_TickGuardVerticalBob(&guard, &object));
+        assert(object.runtime_1a == 0x23);
+        assert((int8_t)guard.unknown_15 == -1);
+
+        object.object_class = 0x0C;
+        assert(!N3D_RE_TickGuardVerticalBob(&guard, &object));
+
+        assert(N3D_RE_GuardMovementCandidateTouchesPlayer(
+            100, 100, 141, 141));
+        assert(!N3D_RE_GuardMovementCandidateTouchesPlayer(
+            100, 100, 142, 100));
+
+        /* Unblocked state06 commits both vector components. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        guard.state = N3D_GUARD_STATE_06;
+        guard.move_x = 8;
+        guard.move_y = -8;
+        guard.definition_value = 0x0320;
+        object.world_x = 100;
+        object.world_y = 100;
+        object.animation_frame = 0x20;
+
+        guard_block_fixture fixture = {0};
+        uint32_t move_rng = 1;
+        n3d_guard_movement_result movement =
+            N3D_RE_TickGuardMovementCollisionCore(
+                &guard,
+                &object,
+                test_guard_blocked,
+                &fixture,
+                &move_rng);
+        assert(!movement.x_blocked && !movement.y_blocked);
+        assert(movement.position_committed);
+        assert(movement.applied_x == 8);
+        assert(movement.applied_y == -8);
+        assert(object.world_x == 108);
+        assert(object.world_y == 92);
+        assert((uint8_t)object.animation_frame == 0x21);
+        assert(guard.octant == 1);
+
+        /* One blocked axis slides on the other and consumes no bounce RNG. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        guard.state = N3D_GUARD_STATE_06;
+        guard.move_x = 8;
+        guard.move_y = 8;
+        object.world_x = 100;
+        object.world_y = 100;
+        fixture.block_x = 124; /* xProbe = 100 + 8 + 16 */
+        fixture.block_y = 84;
+        fixture.block_all = 0;
+        fixture.calls = 0;
+        move_rng = 1;
+        const uint32_t rng_before_slide = move_rng;
+
+        movement =
+            N3D_RE_TickGuardMovementCollisionCore(
+                &guard,
+                &object,
+                test_guard_blocked,
+                &fixture,
+                &move_rng);
+        assert(movement.x_blocked);
+        assert(!movement.y_blocked);
+        assert(object.world_x == 100);
+        assert(object.world_y == 108);
+        assert(move_rng == rng_before_slide);
+
+        /* Double block in state06 consumes exactly one RNG and bounces. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        guard.state = N3D_GUARD_STATE_06;
+        guard.move_x = 8;
+        guard.move_y = -8;
+        object.world_x = 100;
+        object.world_y = 100;
+        fixture.block_all = 1;
+        move_rng = 1;
+        uint32_t expected_move_rng = move_rng;
+        const uint16_t bounce_rand =
+            N3D_RE_RngNext(&expected_move_rng);
+
+        movement =
+            N3D_RE_TickGuardMovementCollisionCore(
+                &guard,
+                &object,
+                test_guard_blocked,
+                &fixture,
+                &move_rng);
+        assert(movement.x_blocked && movement.y_blocked);
+        assert(movement.bounced);
+        assert(move_rng == expected_move_rng);
+        if(bounce_rand & 1u)
+            assert(guard.move_x == -8);
+        else
+            assert(guard.move_y == 8);
+
+        /* State08 refuses the whole coordinate commit if either axis blocks. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        guard.state = N3D_GUARD_STATE_08;
+        guard.move_x = 8;
+        guard.move_y = 8;
+        object.world_x = 100;
+        object.world_y = 100;
+        fixture.block_x = 124;
+        fixture.block_y = 84;
+        fixture.block_all = 0;
+        move_rng = 1;
+
+        movement =
+            N3D_RE_TickGuardMovementCollisionCore(
+                &guard,
+                &object,
+                test_guard_blocked,
+                &fixture,
+                &move_rng);
+        assert(!movement.position_committed);
+        assert(object.world_x == 100 && object.world_y == 100);
+
+        /* State06 wrapper decrements timer and returns to state03 at zero. */
+        memset(&guard, 0, sizeof(guard));
+        memset(&object, 0, sizeof(object));
+        memset(&definition, 0, sizeof(definition));
+        guard.state = N3D_GUARD_STATE_06;
+        guard.strategy = 0;
+        guard.timer = 1;
+        guard.move_x = 8;
+        object.world_x = 100;
+        object.world_y = 100;
+        guard.result_octant = 0xFF;
+        fixture.block_all = 0;
+        fixture.block_x = INT16_MIN;
+        fixture.block_y = INT16_MIN;
+        move_rng = 1;
+
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2] = 0x20;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2 + 1] = 0x03;
+
+        n3d_guard_movement_result state06_move = {0};
+        const n3d_guard_dispatch_result state06_result =
+            N3D_RE_TickState06Movement(
+                &guard,
+                &object,
+                &definition,
+                164,
+                100,
+                test_guard_blocked,
+                &fixture,
+                &move_rng,
+                &state06_move);
+        assert(state06_result == N3D_GUARD_DISPATCH_TRANSITIONED);
+        assert(guard.state == N3D_GUARD_STATE_03);
+        assert(guard.timer == 0);
+        assert(state06_move.applied_x == 8);
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
