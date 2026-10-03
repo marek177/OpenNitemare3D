@@ -553,6 +553,52 @@ namespace Nitemare3D
             return result;
         }
 
+        static OriginalGuardDispatchResult TickState11Bridge(
+            Entity entity,
+            Binding binding,
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (Game.player == null ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition))
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+            int guardSlot = binding.GuardSlot;
+            int objectSlot = binding.ObjectSlot;
+
+            var result = OriginalGuardDispatcher.TickState11Movement(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                (candidateX, candidateY) =>
+                    EvaluateGuardMovementBlocked(
+                        guardSlot,
+                        objectSlot,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        candidateX,
+                        candidateY),
+                OriginalRandom.Next,
+                out _);
+
+            entity.position.X =
+                (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
+            entity.position.Y =
+                (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+            SyncGuardPosition(entity);
+
+            return result;
+        }
+
         static OriginalGuardDispatchResult TickDormantDirectionalBridge(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj)
@@ -891,6 +937,13 @@ namespace Nitemare3D
                         ref guard,
                         ref obj);
 
+                case OriginalGuardState.RecoverMove11:
+                    return TickState11Bridge(
+                        entity,
+                        binding,
+                        ref guard,
+                        ref obj);
+
                 case OriginalGuardState.WaitAnimation12:
                     return OriginalGuardDispatcher.TickWaitAnimation12(
                         ref guard, ref obj);
@@ -1014,6 +1067,7 @@ namespace Nitemare3D
                 case OriginalGuardState.LethalPlayerContact0B:
                 case OriginalGuardState.Shared0C:
                 case OriginalGuardState.Shared0D:
+                case OriginalGuardState.RecoverMove11:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
                 case OriginalGuardState.Pain15:
