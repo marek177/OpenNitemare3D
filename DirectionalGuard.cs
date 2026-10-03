@@ -168,11 +168,11 @@ namespace Nitemare3D
 
                 if (OriginalRuntimeState.GuardLogicTickDue)
                 {
-                    var result =
-                        OriginalRuntimeState.TickConfirmedAutonomousState(this);
-
-                    if (result == OriginalGuardDispatchResult.NotHandled)
-                        runtimeOwnsGuard = false;
+                    // Match Guard/OriginalMapGuard ownership semantics:
+                    // NotHandled means the recovered state is held until more
+                    // evidence is available. Never resurrect the legacy patrol
+                    // path for an entity already owned by the original runtime.
+                    OriginalRuntimeState.TickConfirmedAutonomousState(this);
                 }
 
                 if (runtimeOwnsGuard &&
