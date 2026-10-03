@@ -11,6 +11,15 @@ namespace Nitemare3D
     /// </summary>
     public static class OriginalWorldObjectRuntime
     {
+        public static bool ShouldUseGenericShell(byte propertyFlags)
+        {
+            return
+                (propertyFlags &
+                 OriginalMapTables.ObjectRuntimePresent) != 0 &&
+                (propertyFlags &
+                 OriginalMapTables.ObjectCreatesGuard) == 0;
+        }
+
         public static void InitializeMapObject(
             ref OriginalObjectRecord obj,
             byte rawObjectId,
