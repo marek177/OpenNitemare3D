@@ -2,6 +2,7 @@
 #include "n3d_re_object_defs.h"
 #include "n3d_re_guard_sounds.h"
 #include "n3d_re_guard_perception.h"
+#include "n3d_re_guard_plan.h"
 
 void G_HandleThinking()
 {
@@ -120,27 +121,47 @@ void G_HandleRecoveredGuardThinking()
                                n3d_player.world_x,
                                n3d_player.world_y,
                                perception_succeeded,
-                               &attack_eligible) &&
-                           attack_eligible)
+                               &attack_eligible))
                         {
-                            uint16_t sequence = 0;
-                            if(N3D_RE_ObjectDefinitionGuardStateSequence(
-                                   &definition->header,
-                                   N3D_GUARD_STATE_03,
-                                   &sequence))
+                            if(attack_eligible)
                             {
-                                N3D_RE_BeginState03AttackSequence(
-                                    guard,
-                                    object,
-                                    sequence);
+                                uint16_t sequence = 0;
+                                if(N3D_RE_ObjectDefinitionGuardStateSequence(
+                                       &definition->header,
+                                       N3D_GUARD_STATE_03,
+                                       &sequence))
+                                {
+                                    N3D_RE_BeginState03AttackSequence(
+                                        guard,
+                                        object,
+                                        sequence);
+                                }
+                            }
+                            else
+                            {
+                                /*
+                                 * Exact FUN_76FC is available for every branch
+                                 * except strategy-1 low-strength retreat, whose
+                                 * RETREAT-door target lookup is still pending.
+                                 */
+                                const int needs_retreat_target =
+                                    guard->strategy == 1 &&
+                                    guard->strength < 0x7F;
+
+                                if(!needs_retreat_target)
+                                {
+                                    N3D_RE_PlanMovement76FC(
+                                        guard,
+                                        object,
+                                        n3d_player.world_x,
+                                        n3d_player.world_y,
+                                        n3d_player.difficulty,
+                                        0,
+                                        0,
+                                        0);
+                                }
                             }
                         }
-
-                        /*
-                         * attack_eligible == 0 enters FUN_76FC movement planning
-                         * in the original. Leave state 03 unchanged until that
-                         * movement planner/collision fallback is ported exactly.
-                         */
                     }
                 }
                 break;
