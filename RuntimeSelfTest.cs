@@ -51,37 +51,55 @@ namespace Nitemare3D
 
         static void TestObjectDefinitionCatalog()
         {
+            Assert(Marshal.SizeOf<OriginalObjectResourceHeader>() ==
+                   OriginalRuntime.ObjectResourceHeaderBytes,
+                "IMG resource header must be 0x5A bytes.");
+            Assert(Marshal.SizeOf<OriginalImageFrameRuntimeRecord>() ==
+                   OriginalRuntime.ObjectResourceEntryBytes,
+                "IMG runtime frame descriptor must be 10 bytes.");
+
             byte[] header = new byte[OriginalRuntime.ObjectResourceHeaderBytes];
-            header[2] = 6;
-            Assert(OriginalObjectDefinitionCatalog.DecodeEntryCountFromHeader(
-                       header, 0) == 6,
-                "FUN_4B86 header +2 entry-count decode mismatch.");
+            header[0x02] = 6;
+            header[0x34] = 0x12;
+            header[0x35] = 0x04;
+            header[0x36] = 0x20;
+            header[0x37] = 0x03;
+            header[0x38] = 0x30;
+            header[0x39] = 0x02;
+
+            var parsed = OriginalObjectDefinitionCatalog.ParseHeader(header, 0);
+            Assert(parsed.FrameCount == 6 &&
+                   parsed.State02Word == 0x0412 &&
+                   parsed.State03Word == 0x0320 &&
+                   parsed.State04Word == 0x0230,
+                "IMG resource-header field decode mismatch.");
+
+            Assert(OriginalObjectDefinitionCatalog.HeaderOffset(0, true) == 0x800 &&
+                   OriginalObjectDefinitionCatalog.HeaderOffset(1, true) == 0x85A &&
+                   OriginalObjectDefinitionCatalog.HeaderOffset(0, false) == 0x6200,
+                "IMG dual-bank 0x5A header offset mismatch.");
 
             byte[] tableA = new byte[6 * OriginalRuntime.ObjectResourceEntryBytes];
-            tableA[0x34] = 0x12;
-            tableA[0x35] = 0x04;
-            tableA[0x36] = 0x20;
-            tableA[0x37] = 0x03;
-            tableA[0x38] = 0x30;
-            tableA[0x39] = 0x02;
 
             var catalog = new OriginalObjectDefinitionCatalog();
-            Assert(catalog.TryGetOrAdd(0x12345678, tableA, out byte first) &&
+            Assert(catalog.TryGetOrAdd(
+                       0x12345678, header, tableA, out byte first) &&
                    first == 0 &&
                    catalog.Count == 1,
-                "first object resource-table allocation mismatch.");
+                "first IMG resource allocation mismatch.");
 
-            byte[] changedSameKey = (byte[])tableA.Clone();
+            byte[] changedSameKey = (byte[])header.Clone();
             changedSameKey[0x34] = 0xFF;
             Assert(catalog.TryGetOrAdd(
-                       0x12345678, changedSameKey, out byte duplicate) &&
+                       0x12345678, changedSameKey, tableA, out byte duplicate) &&
                    duplicate == 0 &&
                    catalog.Count == 1,
                 "equal source key must deduplicate to original definition id.");
 
-            byte[] tableB = (byte[])tableA.Clone();
-            tableB[0x34] = 0x44;
-            Assert(catalog.TryGetOrAdd(0x87654321, tableB, out byte second) &&
+            byte[] headerB = (byte[])header.Clone();
+            headerB[0x34] = 0x44;
+            Assert(catalog.TryGetOrAdd(
+                       0x87654321, headerB, tableA, out byte second) &&
                    second == 1 &&
                    catalog.Count == 2,
                 "new source key must allocate the next definition id.");
@@ -89,21 +107,22 @@ namespace Nitemare3D
             Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.Active02, out ushort seq02) &&
                    seq02 == 0x0412,
-                "state 02 resource-word lookup mismatch.");
+                "state 02 IMG header word lookup mismatch.");
             Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.Detection03, out ushort seq03) &&
                    seq03 == 0x0320,
-                "state 03 resource-word lookup mismatch.");
+                "state 03 IMG header word lookup mismatch.");
             Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.DetectionAttack04, out ushort seq04) &&
                    seq04 == 0x0230,
-                "state 04 resource-word lookup mismatch.");
+                "state 04 IMG header word lookup mismatch.");
 
             Assert(!catalog.TryGetOrAdd(
                        0x11111111,
-                       new byte[OriginalRuntime.ObjectResourceEntryBytes + 1],
+                       header,
+                       new byte[OriginalRuntime.ObjectResourceEntryBytes],
                        out _),
-                "resource tables must be a multiple of the 10-byte entry size.");
+                "frame table byte count must match header frame-count*10.");
         }
 
         static void TestDamageMatrix()
