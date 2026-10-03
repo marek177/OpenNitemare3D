@@ -528,7 +528,7 @@ namespace Nitemare3D
 
             if (damage >= guard.Strength)
             {
-                if (!ObjectDefinitions.TryGet(
+                if (!ObjectDefinitions.TryGetHeader(
                         obj.DefinitionId,
                         out var deathDefinition))
                 {
@@ -557,7 +557,7 @@ namespace Nitemare3D
                 return GuardHitResult.ReactionSkipped;
             }
 
-            if (!ObjectDefinitions.TryGet(
+            if (!ObjectDefinitions.TryGetHeader(
                     obj.DefinitionId,
                     out var reactionDefinition))
             {
