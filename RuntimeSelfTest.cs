@@ -1367,6 +1367,66 @@ namespace Nitemare3D
                    OriginalProjectileRuntime.AngleFromDirection(-1, 0) == 270,
                 "projectile direction-to-original-angle mapping mismatch.");
 
+            var trajectory = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying,
+                RenderObject = new OriginalObjectRecord
+                {
+                    WorldX = 100,
+                    WorldY = 100,
+                    Runtime1A = 5
+                }
+            };
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(
+                ref trajectory,
+                90);
+
+            int visited = 0;
+            Assert(!OriginalProjectileRuntime.AdvanceTrajectoryAndCollide(
+                       ref trajectory,
+                       20,
+                       (x, y) =>
+                       {
+                           visited++;
+                           return false;
+                       }),
+                "unblocked projectile trajectory must not report collision.");
+            Assert(visited == 20 &&
+                   trajectory.RenderObject.WorldX == 120 &&
+                   trajectory.RenderObject.WorldY == 100 &&
+                   trajectory.RenderObject.Runtime1A == 6,
+                "projectile 20-substep trajectory/update-anchor mismatch.");
+
+            trajectory = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying,
+                RenderObject = new OriginalObjectRecord
+                {
+                    WorldX = 100,
+                    WorldY = 100,
+                    Runtime1A = 19
+                }
+            };
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(
+                ref trajectory,
+                90);
+
+            visited = 0;
+            Assert(OriginalProjectileRuntime.AdvanceTrajectoryAndCollide(
+                       ref trajectory,
+                       20,
+                       (x, y) =>
+                       {
+                           visited++;
+                           return x == 105;
+                       }),
+                "projectile trajectory must stop on the first colliding substep.");
+            Assert(visited == 5 &&
+                   trajectory.RenderObject.WorldX == 105 &&
+                   trajectory.RenderObject.WorldY == 100 &&
+                   trajectory.RenderObject.Runtime1A == 20,
+                "projectile collision stop / vertical-anchor clamp mismatch.");
+
             var dda = new OriginalProjectileRecord
             {
                 State = (byte)OriginalProjectileState.Flying,
