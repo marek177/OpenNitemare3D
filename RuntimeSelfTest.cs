@@ -40,6 +40,7 @@ namespace Nitemare3D
             TestWeaponJamScriptBFD8();
             TestGuardSounds();
             TestGuardToPlayerDamage();
+            TestGuardPlayerDamageCommit();
             TestPackedGuardSequences();
             TestExactAnimationSchedulers();
             TestHitTransitionRouting();
@@ -1744,6 +1745,57 @@ namespace Nitemare3D
             Assert(OriginalDamage.ComputeGuardToPlayer(
                        4, 0x1F, 1, false, 0).DifficultyTransformed == 12,
                 "class 0x1F must follow the original default half-seed branch.");
+        }
+
+        static void TestGuardPlayerDamageCommit()
+        {
+            OriginalRuntimeState.Reset();
+
+            var player = new Player
+            {
+                health = 50
+            };
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.DetectionAttack04,
+                ObjectSlot = 7
+            };
+
+            Assert(!OriginalRuntimeState.CommitGuardAttackDamageToPlayer(
+                       player, ref guard, 10) &&
+                   player.health == 40 &&
+                   OriginalRuntimeState.GuardDamageMarker4C0E == 3 &&
+                   guard.State == (byte)OriginalGuardState.DetectionAttack04,
+                "nonlethal FUN_8C0A commit mismatch.");
+
+            OriginalRuntimeState.PlayerDamageSuppressed4BE5 = true;
+            Assert(!OriginalRuntimeState.CommitGuardAttackDamageToPlayer(
+                       player, ref guard, 20) &&
+                   player.health == 40 &&
+                   OriginalRuntimeState.GuardDamageMarker4C0E == 3,
+                "4BE5 protection must suppress health/death commit.");
+
+            OriginalRuntimeState.PlayerDamageSuppressed4BE5 = false;
+            Assert(OriginalRuntimeState.CommitGuardAttackDamageToPlayer(
+                       player, ref guard, 40) &&
+                   player.health == 0 &&
+                   OriginalRuntimeState.GameplayState46B4 == 2 &&
+                   OriginalRuntimeState.PlayerDeathLatch46AC &&
+                   OriginalRuntimeState.PlayerDeathSource4C1A == 7 &&
+                   guard.State ==
+                       (byte)OriginalGuardState.LethalPlayerContact0B,
+                "lethal FUN_8C0A player-death commit mismatch.");
+
+            // Already-dead state still receives the pre-gate damage marker but
+            // must not perform another health/death transition.
+            guard.State = (byte)OriginalGuardState.Timed10;
+            Assert(OriginalRuntimeState.CommitGuardAttackDamageToPlayer(
+                       player, ref guard, 5) &&
+                   player.health == 0 &&
+                   guard.State == (byte)OriginalGuardState.Timed10,
+                "46B4==2 must suppress repeated death commit.");
+
+            OriginalRuntimeState.Reset();
         }
 
         static void TestPackedGuardSequences()
