@@ -205,6 +205,35 @@ namespace Nitemare3D
                 randomForGuard);
         }
 
+        public static bool EvaluateGuardPerception(
+            Entity entity,
+            bool secondaryCellChecks,
+            bool ignoreFacing)
+        {
+            if (Game.player == null ||
+                !bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+
+            return OriginalGuardDispatcher.EvaluateGuardPerception(
+                ref guard,
+                ref obj,
+                playerWorldX,
+                playerWorldY,
+                secondaryCellChecks,
+                ignoreFacing,
+                Level.OriginalPerceptionLineTrace);
+        }
+
         public static bool TryGetGuardPackedSequence(
             Entity entity,
             OriginalGuardState state,
