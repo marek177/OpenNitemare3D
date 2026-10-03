@@ -363,8 +363,29 @@ namespace Nitemare3D
                 var sprite = sprites[spriteOrder[i]];
                 if(!sprite.visible){continue;}
 
-                var spriteW = Img.current.entries[sprite.spriteIndex].width;
-                var spriteH = Img.current.entries[sprite.spriteIndex].height;
+                BitmapImage spriteFrame = null;
+
+                if (sprite is IOriginalSpriteFrameSource originalFrameSource)
+                {
+                    originalFrameSource.TryGetOriginalSpriteFrame(
+                        out spriteFrame);
+                }
+
+                if (spriteFrame == null)
+                {
+                    if (Img.current == null ||
+                        sprite.spriteIndex < 0 ||
+                        sprite.spriteIndex >= Img.current.entries.Count)
+                    {
+                        continue;
+                    }
+
+                    spriteFrame =
+                        Img.current.entries[sprite.spriteIndex];
+                }
+
+                var spriteW = spriteFrame.width;
+                var spriteH = spriteFrame.height;
 
                 float invDet = 1.0f / (plane.X * direction.Y - direction.X * plane.Y);
 
@@ -411,11 +432,11 @@ namespace Nitemare3D
                     {
                         int d = (y-vMoveScreen) * 256 - RayHeight * 128 + spriteHeight * 128;
                         int texY = ((d * spriteH) / spriteHeight) / 256;
-                        var color = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+                        var color = spriteFrame.data[texX, texY];
 
                         if(color != 31)
                         {
-                            GameWindow.frameBuffer[8 + stripe, 4 + y] = Img.current.entries[sprite.spriteIndex].data[texX, texY];
+                            GameWindow.frameBuffer[8 + stripe, 4 + y] = color;
                         }
 
                         
