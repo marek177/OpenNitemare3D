@@ -275,6 +275,66 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Exact FUN_1010_24BC transform from classification byte DS:8196[id]
+        /// to primary property flags DS:7E94[id].
+        /// </summary>
+        public static byte BuildPrimaryCellFlags(byte classification)
+        {
+            byte flags = 0;
+
+            if (classification >= 0x01 && classification <= 0x30)
+                flags |= 0x04;
+
+            if (classification >= 0x2E && classification <= 0x2F)
+                flags |= 0x10;
+
+            if (classification >= 0x31 && classification <= 0x40)
+                flags |= 0x08;
+
+            // FUN_24BC explicitly clears 0x20 for every entry.
+
+            if ((flags & 0x0C) != 0)
+                flags |= 0x01;
+
+            if (classification >= 0x01 && classification <= 0x40)
+                flags |= 0x02;
+
+            if (classification >= 0x47 && classification <= 0x48)
+                flags |= 0x40;
+
+            return flags;
+        }
+
+        /// <summary>
+        /// Exact FUN_1010_2556 transform from classification byte DS:8296[id]
+        /// to secondary property flags DS:7F94[id].
+        /// </summary>
+        public static byte BuildSecondaryCellFlags(byte classification)
+        {
+            byte flags = 0;
+
+            if (classification >= 0x06 && classification <= 0x3D)
+                flags |= 0x01;
+
+            if (classification >= 0x08 && classification <= 0x2D)
+                flags |= 0x02;
+
+            if (classification >= 0x2F && classification <= 0x3D)
+                flags |= 0x04;
+
+            if (classification >= 0x08 && classification <= 0x25)
+                flags |= 0x08;
+
+            if (classification == 0x2A)
+                flags |= 0x20;
+
+            if (classification == 0x04)
+                flags |= 0x40;
+
+            return flags;
+        }
+
+        /// <summary>
         /// Exact intermediate-cell blocking decision from FUN_1010_D50A.
         ///
         /// primaryFlags are table DS:7E94[first cell byte].
