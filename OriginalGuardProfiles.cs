@@ -163,6 +163,51 @@ namespace Nitemare3D
             return false;
         }
 
+        public static void ApplySpawnVariantAndCell(
+            ref OriginalGuardRecord guard,
+            byte variant,
+            byte wallClass)
+        {
+            guard.Octant = (byte)((variant & 3) * 2);
+
+            // FUN_1010_844C tables at DS:00F8 / DS:0100.
+            // Variants 0..3 are stationary N/E/S/W. Variants 4..7 are
+            // moving N/E/S/W and receive an 8-world-unit step vector.
+            switch (variant & 7)
+            {
+                case 4:
+                    guard.MoveX = 0;
+                    guard.MoveY = -8;
+                    break;
+                case 5:
+                    guard.MoveX = 8;
+                    guard.MoveY = 0;
+                    break;
+                case 6:
+                    guard.MoveX = 0;
+                    guard.MoveY = 8;
+                    break;
+                case 7:
+                    guard.MoveX = -8;
+                    guard.MoveY = 0;
+                    break;
+                default:
+                    guard.MoveX = 0;
+                    guard.MoveY = 0;
+                    break;
+            }
+
+            // Tail of FUN_1010_B02C: a nonzero initial vector enters state 08.
+            if (guard.MoveX != 0 || guard.MoveY != 0)
+                guard.State = (byte)OriginalGuardState.Move08;
+
+            // MAP wall-class spawn markers override movement strategy.
+            if (wallClass == 0x42 || wallClass == 0x46)
+                guard.Strategy = 2;
+            else if (wallClass == 0x43)
+                guard.Strategy = 1;
+        }
+
         public static OriginalGuardInitialProfile ForObjectClass(byte objectClass)
         {
             var profile = new OriginalGuardInitialProfile
