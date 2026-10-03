@@ -1,4 +1,5 @@
 #include "n3d_re_player.h"
+#include "n3d_re_trig.h"
 
 #include <string.h>
 
@@ -10,6 +11,24 @@ void N3D_RE_ResetPlayer(void)
     n3d_player.health = N3D_PLAYER_MAX_HEALTH;
     n3d_player.active_weapon = N3D_WEAPON_NONE;
     n3d_player.queued_weapon = N3D_WEAPON_NONE;
+    N3D_RE_SetPlayerAngle(0);
+}
+
+void N3D_RE_SetPlayerAngle(int degrees)
+{
+    const int angle = N3D_RE_NormalizeAngle(degrees);
+    n3d_player.angle_degrees = (int16_t)angle;
+    n3d_player.coarse_octant = (uint8_t)(angle / 45);
+    n3d_player.rounded_octant =
+        (uint8_t)(((2 * angle / 45 + 1) >> 1) & 7);
+    n3d_player.direction_mask_99 =
+        (uint8_t)((1u << n3d_player.coarse_octant) & 0x99u);
+}
+
+void N3D_RE_TurnPlayer(int signed_degrees)
+{
+    N3D_RE_SetPlayerAngle(
+        (int)n3d_player.angle_degrees + signed_degrees);
 }
 
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y)
