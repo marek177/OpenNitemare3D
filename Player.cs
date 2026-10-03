@@ -109,12 +109,6 @@ namespace Nitemare3D
         readonly ushort[] originalWallVisibilityQ4 =
             new ushort[OriginalRendererCore.ScreenWidth];
 
-        static readonly OriginalRendererCore.ProjectionConstants
-            originalProjectionConstants =
-                OriginalRendererCore.BuildProjectionConstants(
-                    OriginalRendererCore.ViewportWidth,
-                    OriginalRendererCore.ViewportHeight);
-
 
         class DecendingComparer<TKey>: IComparer<float>
         {
@@ -538,27 +532,10 @@ namespace Nitemare3D
                     if (screenColumn >= 0 &&
                         screenColumn < originalWallVisibilityQ4.Length)
                     {
-                        long depthQ10 =
-                            (long)Math.Round(
-                                perpWallDist *
-                                OriginalRuntime.WorldUnitsPerTile *
-                                1024.0);
-
-                        if (depthQ10 < OriginalRendererCore.NearDepthQ10)
-                            depthQ10 = OriginalRendererCore.NearDepthQ10;
-
-                        long projectedWallYQ4 =
-                            originalProjectionConstants.VerticalNumerator /
-                            depthQ10 +
-                            OriginalRendererCore.CenterYQ4;
-
-                        if (projectedWallYQ4 < 0)
-                            projectedWallYQ4 = 0;
-                        else if (projectedWallYQ4 > ushort.MaxValue)
-                            projectedWallYQ4 = ushort.MaxValue;
-
                         originalWallVisibilityQ4[screenColumn] =
-                            (ushort)projectedWallYQ4;
+                            OriginalProjectedSpriteQueue
+                                .WallVisibilityQ4FromPerpendicularDistance(
+                                    perpWallDist);
                     }
                 }
 
