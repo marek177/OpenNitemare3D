@@ -261,6 +261,13 @@ namespace Nitemare3D
             }
         }
 
+        public static int WakeGuardsAfterPlayerFire(byte areaId)
+        {
+            return WakeGuardsAfterPlayerFire(
+                areaId,
+                i => OriginalRandom.Next());
+        }
+
         public static int WakeGuardsAfterPlayerFire(
             byte selector,
             Func<int, ushort> randomForGuard)
