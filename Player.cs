@@ -488,14 +488,25 @@ namespace Nitemare3D
                 0,
                 originalWallVisibilityQ4.Length);
 
+            bool originalWallsRendered =
+                OriginalRendererStage4.TryRenderWalls(this);
+
+            if (originalWallsRendered)
+            {
+                OriginalRendererStage4.CopyWallVisibilityQ4(
+                    originalWallVisibilityQ4);
+            }
+
             //var direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
 
 
 
 
 
-            bool flipped = false; 
+            bool flipped = false;
 
+            if (!originalWallsRendered)
+            {
             for (int x = 0; x < RayWidth; x++)
             {
                 float cameraX = 2 * x / (float)RayWidth - 1; 
@@ -697,6 +708,7 @@ namespace Nitemare3D
 
 
             }
+            }
 
             BuildOriginalSpriteQueue();
             
@@ -715,6 +727,12 @@ namespace Nitemare3D
 
                 var sprite = sprites[spriteOrder[i]];
                 if(!sprite.visible){continue;}
+
+                // Do not mix the original VEC/visibility wall renderer with
+                // the historical float-z sprite path. Stage 4 currently draws
+                // only sprites that can enter the recovered 18-byte queue.
+                if (originalWallsRendered)
+                    continue;
 
                 int originalSpriteIndex =
                     spriteOrder[i];
