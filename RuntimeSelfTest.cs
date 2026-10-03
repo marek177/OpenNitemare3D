@@ -19,6 +19,7 @@ namespace Nitemare3D
             TestShadeRuntime();
             TestFrameCalibration();
             TestDeathCameraAngleStep();
+            TestDeathRedFadePalette();
             TestExactSpriteProjection();
             TestProjectedSpriteQueue();
             TestGuardLogicClock();
@@ -192,6 +193,44 @@ namespace Nitemare3D
                    OriginalProjectileRuntime.AngleFromDirection(0, 1) == 180 &&
                    OriginalProjectileRuntime.AngleFromDirection(-1, 0) == 270,
                 "original death-camera cardinal angle convention mismatch.");
+        }
+
+        static void TestDeathRedFadePalette()
+        {
+            byte[] basePalette = new byte[768];
+            byte[] output = new byte[768];
+
+            basePalette[0] = 10;
+            basePalette[1] = 20;
+            basePalette[2] = 30;
+
+            basePalette[3] = 255;
+            basePalette[4] = 40;
+            basePalette[5] = 50;
+
+            OriginalRuntimeState.ApplyDeathRedFadeStep(
+                basePalette,
+                output,
+                1);
+
+            Assert(output[0] == 14 &&
+                   output[1] == 20 &&
+                   output[2] == 30,
+                "death red fade step-1 RGB mismatch.");
+            Assert(output[3] == 255 &&
+                   output[4] == 40 &&
+                   output[5] == 50,
+                "death red fade must preserve max-red and G/B channels.");
+
+            OriginalRuntimeState.ApplyDeathRedFadeStep(
+                basePalette,
+                output,
+                49);
+
+            Assert(output[0] == 250 &&
+                   output[1] == 20 &&
+                   output[2] == 30,
+                "death red fade step-49 integer formula mismatch.");
         }
 
         static void TestExactSpriteProjection()
