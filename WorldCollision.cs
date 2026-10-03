@@ -49,14 +49,33 @@ namespace Nitemare3D
                 return false;
             }
 
-            for (int x = minTileX; x <= maxTileX; x++)
+            if (Level.originalMap != null)
             {
-                for (int y = minTileY; y <= maxTileY; y++)
+                // FUN_84F4 primary phase: hard wall and dynamic-door state.
+                for (int x = minTileX; x <= maxTileX; x++)
                 {
-                    var tile = Level.tilemap[x, y];
-                    if (tile == null || tile.obstacle)
+                    for (int y = minTileY; y <= maxTileY; y++)
                     {
-                        return false;
+                        if (Level.originalMap.IsPlayerPrimaryWallBlocked84F4(
+                                x,
+                                y,
+                                Level.originalWalls))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Fallback only for maps not loaded through OriginalMapTables.
+                for (int x = minTileX; x <= maxTileX; x++)
+                {
+                    for (int y = minTileY; y <= maxTileY; y++)
+                    {
+                        var tile = Level.tilemap[x, y];
+                        if (tile == null || tile.obstacle)
+                            return false;
                     }
                 }
             }
@@ -95,9 +114,24 @@ namespace Nitemare3D
                 }
             }
 
-            // Preserve the historical port's "solid entity occupies a cell"
-            // behavior, but apply it to the player's complete AABB instead of
-            // only the next integer sample point.
+            if (Level.originalMap != null)
+            {
+                // FUN_84F4 performs special-object callbacks here (property 0x04),
+                // then its final collision decision is object property bit 0x02.
+                // The special callback itself is recovered separately; preserve
+                // the confirmed blocking order now.
+                for (int x = minTileX; x <= maxTileX; x++)
+                {
+                    for (int y = minTileY; y <= maxTileY; y++)
+                    {
+                        if (Level.originalMap.IsPlayerObjectBlocked84F4(x, y))
+                            return false;
+                    }
+                }
+            }
+
+            // Preserve the historical port's solid-entity bridge after the exact
+            // MAP wall/object collision tests.
             foreach (var entity in Entity.entities)
             {
                 if (ReferenceEquals(entity, ignore) || !entity.hasCollision)
