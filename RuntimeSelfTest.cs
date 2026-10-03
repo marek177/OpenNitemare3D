@@ -125,6 +125,72 @@ namespace Nitemare3D
                 "frame table byte count must match header frame-count*10.");
         }
 
+        static void TestImgResourceLoader()
+        {
+            const byte objectId = 128;
+            int streamOffset = OriginalRuntime.ImgFirstFrameStreamOffset;
+            byte[] img = new byte[streamOffset + 10 + (32 * 32)];
+
+            int directoryOffset = objectId * 4;
+            img[directoryOffset + 0] = (byte)streamOffset;
+            img[directoryOffset + 1] = (byte)(streamOffset >> 8);
+            img[directoryOffset + 2] = (byte)(streamOffset >> 16);
+            img[directoryOffset + 3] = (byte)(streamOffset >> 24);
+
+            int headerOffset =
+                OriginalObjectDefinitionCatalog.HeaderOffset(objectId, false);
+            img[headerOffset + 0x02] = 1;
+            img[headerOffset + 0x34] = 0x12;
+            img[headerOffset + 0x35] = 0x04;
+            img[headerOffset + 0x36] = 0x20;
+            img[headerOffset + 0x37] = 0x03;
+            img[headerOffset + 0x38] = 0x30;
+            img[headerOffset + 0x39] = 0x02;
+
+            img[streamOffset + 0] = 32;
+            img[streamOffset + 1] = 32;
+
+            Assert(OriginalImgDefinitionLoader.TryReadObjectDefinition(
+                       img,
+                       objectId,
+                       out uint sourceKey,
+                       out byte[] headerBytes,
+                       out byte[] runtimeFrames),
+                "synthetic IMG object resource must parse.");
+
+            Assert(sourceKey == (uint)streamOffset &&
+                   headerBytes.Length == OriginalRuntime.ObjectResourceHeaderBytes &&
+                   runtimeFrames.Length == OriginalRuntime.ObjectResourceEntryBytes,
+                "synthetic IMG object resource sizes mismatch.");
+
+            var definition =
+                OriginalObjectDefinitionCatalog.Parse(headerBytes, 0);
+            Assert(definition.FrameCount == 1 &&
+                   definition.State02Sequence == 0x0412 &&
+                   definition.State03Sequence == 0x0320 &&
+                   definition.State04Sequence == 0x0230,
+                "synthetic IMG definition values mismatch.");
+
+            var frame =
+                OriginalImgResourceReader.DecodeRuntimeFrame(runtimeFrames, 0);
+            Assert(frame.Width == 32 &&
+                   frame.Height == 32 &&
+                   frame.PixelDataFileOffset == (uint)(streamOffset + 10) &&
+                   frame.CachedPixelsPointer == 0,
+                "synthetic IMG runtime frame conversion mismatch.");
+
+            var catalog = new OriginalObjectDefinitionCatalog();
+            Assert(OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
+                       img,
+                       objectId,
+                       catalog,
+                       out byte definitionId) &&
+                   definitionId == 0 &&
+                   catalog.TryGetHeader(definitionId, out var registered) &&
+                   registered.State03Sequence == 0x0320,
+                "synthetic IMG definition registration mismatch.");
+        }
+
         static void TestDamageMatrix()
         {
             Assert(OriginalDamage.ApplyClassWeaponTransform(
