@@ -946,12 +946,7 @@ namespace Nitemare3D
             return 0;
         }
 
-        /// <summary>
-        /// Recovered strategy-0 slice of FUN_1010_76FC. This prepares the
-        /// state-0x06 movement segment. FUN_71DC performs the immediate first
-        /// collision/movement attempt separately.
-        /// </summary>
-        public static OriginalGuardDispatchResult PlanStrategy0Movement(
+        static OriginalGuardDispatchResult PlanPlayerPursuitMovement(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj,
             short playerWorldX,
@@ -959,12 +954,10 @@ namespace Nitemare3D
             byte difficulty,
             Func<ushort> nextRandom)
         {
-            if (guard.Strategy != 0)
-                return OriginalGuardDispatchResult.NotHandled;
             if (nextRandom == null)
                 throw new ArgumentNullException(nameof(nextRandom));
 
-            // The original signed divide-by-32 sequence truncates toward zero.
+            // FUN_76FC uses signed divide-by-32 and therefore truncates toward zero.
             int deltaX32 = (playerWorldX - obj.WorldX) / 32;
             int deltaY32 = (playerWorldY - obj.WorldY) / 32;
 
@@ -1017,6 +1010,80 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Transitioned;
         }
 
+        /// <summary>
+        /// Recovered strategy-0 slice of FUN_1010_76FC.
+        /// </summary>
+        public static OriginalGuardDispatchResult PlanStrategy0Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            byte difficulty,
+            Func<ushort> nextRandom)
+        {
+            if (guard.Strategy != 0)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            return PlanPlayerPursuitMovement(
+                ref guard,
+                ref obj,
+                playerWorldX,
+                playerWorldY,
+                difficulty,
+                nextRandom);
+        }
+
+        /// <summary>
+        /// Recovered strategy-1 / FLEE branch of FUN_1010_76FC.
+        /// Strength >= 0x7F falls back to the normal player-pursuit planner.
+        /// Below 0x7F, FUN_1394 supplies the nearest reachable DOOR controller.
+        /// The exact controller target coordinates (+0x10/+0x12) are supplied by
+        /// the caller; when no door is found the previous movement vector is kept.
+        /// </summary>
+        public static OriginalGuardDispatchResult PlanStrategy1Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            byte difficulty,
+            Func<ushort> nextRandom,
+            bool retreatDoorFound,
+            short retreatTargetWorldX,
+            short retreatTargetWorldY)
+        {
+            if (guard.Strategy != 1)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            if (guard.Strength >= 0x7F)
+            {
+                return PlanPlayerPursuitMovement(
+                    ref guard,
+                    ref obj,
+                    playerWorldX,
+                    playerWorldY,
+                    difficulty,
+                    nextRandom);
+            }
+
+            if (retreatDoorFound)
+            {
+                // FUN_76FC aims 32 world units inside the selected DOOR target.
+                int dx = retreatTargetWorldX - obj.WorldX + 0x20;
+                int dy = retreatTargetWorldY - obj.WorldY + 0x20;
+
+                guard.MoveX = SignedStepFromDelta(dx);
+                guard.MoveY = SignedStepFromDelta(dy);
+            }
+
+            guard.Timer = 0x10;
+            guard.State = (byte)OriginalGuardState.MoveThen03;
+            UpdateOctantFromMovement(
+                ref guard,
+                guard.MoveX,
+                guard.MoveY);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         public static OriginalGuardDispatchResult PlanStrategy2Movement(
             ref OriginalGuardRecord guard,
             Func<ushort> nextRandom)
@@ -1033,6 +1100,73 @@ namespace Nitemare3D
                 guard.MoveX,
                 guard.MoveY);
             return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// Strategies 3 and 4 take the common FUN_76FC tail without replacing
+        /// timer or movement vector; the existing vector is simply promoted to state 6.
+        /// </summary>
+        public static OriginalGuardDispatchResult PlanStrategyCurrentVectorMovement(
+            ref OriginalGuardRecord guard)
+        {
+            if (guard.Strategy < 3)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            guard.State = (byte)OriginalGuardState.MoveThen03;
+            UpdateOctantFromMovement(
+                ref guard,
+                guard.MoveX,
+                guard.MoveY);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// Strategy dispatch portion of FUN_1010_76FC. This intentionally stops
+        /// before the common forced sequence refresh and immediate FUN_71DC movement
+        /// attempt so those independently recovered stages remain testable.
+        /// </summary>
+        public static OriginalGuardDispatchResult PlanMovement76FC(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            byte difficulty,
+            Func<ushort> nextRandom,
+            bool retreatDoorFound,
+            short retreatTargetWorldX,
+            short retreatTargetWorldY)
+        {
+            switch (guard.Strategy)
+            {
+                case 0:
+                    return PlanStrategy0Movement(
+                        ref guard,
+                        ref obj,
+                        playerWorldX,
+                        playerWorldY,
+                        difficulty,
+                        nextRandom);
+
+                case 1:
+                    return PlanStrategy1Movement(
+                        ref guard,
+                        ref obj,
+                        playerWorldX,
+                        playerWorldY,
+                        difficulty,
+                        nextRandom,
+                        retreatDoorFound,
+                        retreatTargetWorldX,
+                        retreatTargetWorldY);
+
+                case 2:
+                    return PlanStrategy2Movement(
+                        ref guard,
+                        nextRandom);
+
+                default:
+                    return PlanStrategyCurrentVectorMovement(ref guard);
+            }
         }
 
         public static bool TickVerticalBob(
