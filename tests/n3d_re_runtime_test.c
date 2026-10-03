@@ -4826,7 +4826,7 @@ int main(void)
         guard_block_fixture fixture = {0};
         uint32_t move_rng = 1;
         n3d_guard_movement_result movement =
-            N3D_RE_TickGuardMovementCollisionCore(
+            N3D_RE_TickGuardMovementCollisionCoreWithRng(
                 &guard,
                 &object,
                 test_guard_blocked,
@@ -4857,7 +4857,7 @@ int main(void)
         const uint32_t rng_before_slide = move_rng;
 
         movement =
-            N3D_RE_TickGuardMovementCollisionCore(
+            N3D_RE_TickGuardMovementCollisionCoreWithRng(
                 &guard,
                 &object,
                 test_guard_blocked,
@@ -4884,7 +4884,7 @@ int main(void)
             N3D_RE_RngNext(&expected_move_rng);
 
         movement =
-            N3D_RE_TickGuardMovementCollisionCore(
+            N3D_RE_TickGuardMovementCollisionCoreWithRng(
                 &guard,
                 &object,
                 test_guard_blocked,
@@ -4912,7 +4912,7 @@ int main(void)
         move_rng = 1;
 
         movement =
-            N3D_RE_TickGuardMovementCollisionCore(
+            N3D_RE_TickGuardMovementCollisionCoreWithRng(
                 &guard,
                 &object,
                 test_guard_blocked,
