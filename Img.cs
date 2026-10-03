@@ -72,13 +72,15 @@ namespace Nitemare3D
         public bool TryGetObjectDefinition(
             byte objectId,
             out uint sourceKey,
-            out OriginalObjectDefinitionRecord definition)
+            out byte[] headerBytes,
+            out byte[] runtimeFrameTable)
         {
             return OriginalImgDefinitionLoader.TryReadObjectDefinition(
                 rawData,
                 objectId,
                 out sourceKey,
-                out definition);
+                out headerBytes,
+                out runtimeFrameTable);
         }
 
         public Img(string file, int episode = 0)
