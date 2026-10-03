@@ -553,52 +553,6 @@ namespace Nitemare3D
             return result;
         }
 
-        public static bool HasConfirmedAutonomousStateHandler(byte state)
-        {
-            switch ((OriginalGuardState)state)
-            {
-                case OriginalGuardState.AnimationTimer:
-                case OriginalGuardState.Delay:
-                case OriginalGuardState.Active02:
-                case OriginalGuardState.Detection03:
-                case OriginalGuardState.DetectionAttack04:
-                case OriginalGuardState.Transition05:
-                case OriginalGuardState.MoveThen03:
-                case OriginalGuardState.Active07:
-                case OriginalGuardState.Move08:
-                    return TickState08Bridge(
-                        entity,
-                        binding,
-                        ref guard,
-                        ref obj);
-
-                case OriginalGuardState.DeathFinalize09:
-                case OriginalGuardState.NoLocalAction0A:
-                case OriginalGuardState.LethalPlayerContact0B:
-                case OriginalGuardState.Shared0C:
-                case OriginalGuardState.Shared0D:
-                case OriginalGuardState.WaitAnimation12:
-                case OriginalGuardState.Transition13:
-                case OriginalGuardState.Pain15:
-                    return true;
-
-                default:
-                    return false;
-            }
-        }
-
-        public static bool HasConfirmedAutonomousHandler(Entity entity)
-        {
-            if (!bindings.TryGetValue(entity, out var binding) ||
-                binding.GuardSlot < 0)
-            {
-                return false;
-            }
-
-            return HasConfirmedAutonomousStateHandler(
-                Guards[binding.GuardSlot].State);
-        }
-
         static OriginalGuardDispatchResult TickDormantDirectionalBridge(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj)
@@ -918,18 +872,6 @@ namespace Nitemare3D
                     return OriginalGuardDispatchResult.NotHandled;
                 }
 
-                case OriginalGuardState.DeathFinalize09:
-                {
-                    // FUN_A0EE finalizes ordinary death to state 0A and performs
-                    // the recovered Dracula 0x11 -> 0x14 phase transition.
-                    // Dr. Hamerstein's additional end-game globals remain a
-                    // separate bridge, but the GUARD state itself is finalized.
-                    var finalization = FinalizeDeath09(entity);
-                    return finalization == GuardHitResult.NoRuntimeBinding
-                        ? OriginalGuardDispatchResult.NotHandled
-                        : OriginalGuardDispatchResult.Transitioned;
-                }
-
                 case OriginalGuardState.NoLocalAction0A:
                 case OriginalGuardState.LethalPlayerContact0B:
                     // Both values share the original no-local-action dispatcher
@@ -1061,6 +1003,10 @@ namespace Nitemare3D
                 case OriginalGuardState.Active07:
                 case OriginalGuardState.Move08:
                 case OriginalGuardState.DeathFinalize09:
+                case OriginalGuardState.NoLocalAction0A:
+                case OriginalGuardState.LethalPlayerContact0B:
+                case OriginalGuardState.Shared0C:
+                case OriginalGuardState.Shared0D:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
                 case OriginalGuardState.Pain15:
