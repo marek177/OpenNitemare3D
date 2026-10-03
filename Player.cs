@@ -341,6 +341,13 @@ namespace Nitemare3D
 
                 if (runtimeEntity != null)
                 {
+                    // CC7C writes OBJECT+0x18 for every successfully projected
+                    // world OBJECT. GUARDs additionally receive the current
+                    // aim/render-generation stamp when they overlap center.
+                    OriginalRuntimeState.RecordObjectProjection(
+                        runtimeEntity,
+                        cacheRow);
+
                     bool overlapsAimCenter =
                         projected.Left - 4 <
                             OriginalRuntime.ViewportCenterX &&
@@ -351,6 +358,16 @@ namespace Nitemare3D
                         runtimeEntity,
                         cacheRow,
                         overlapsAimCenter);
+
+                    // The general OBJECT animator runs from the visible object
+                    // projection path, not from a global off-screen timer.
+                    // Projectile animation has its own 8-slot updater and is
+                    // excluded by the projection-source branch.
+                    if (projectionSource == null)
+                    {
+                        OriginalRuntimeState.TickBoundWorldObjectPresentation(
+                            runtimeEntity);
+                    }
                 }
             }
         }
