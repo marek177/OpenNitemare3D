@@ -275,6 +275,56 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Exact intermediate-cell blocking decision from FUN_1010_D50A.
+        ///
+        /// primaryFlags are table DS:7E94[first cell byte].
+        /// secondaryFlags are table DS:7F94[second cell byte].
+        ///
+        /// Primary bit 0x02 marks a cell requiring special blocking logic.
+        /// Primary bit 0x04 blocks immediately.
+        /// Primary bit 0x08 requires the linked 22-byte runtime record to be
+        /// passable; FUN_1010_1476 accepts only record state +0x0C == 0 or 4.
+        ///
+        /// With secondaryCellChecks enabled, secondary bit 0x02 is blocking
+        /// unless secondary bit 0x20 is also present.
+        /// </summary>
+        public static bool GuardLosCellBlocks(
+            byte primaryFlags,
+            byte secondaryFlags,
+            bool secondaryCellChecks,
+            bool linkedRuntimeRecordPassable)
+        {
+            if ((primaryFlags & 0x02) != 0)
+            {
+                if ((primaryFlags & 0x04) != 0)
+                    return true;
+
+                if ((primaryFlags & 0x08) != 0 &&
+                    !linkedRuntimeRecordPassable)
+                {
+                    return true;
+                }
+            }
+
+            if (secondaryCellChecks &&
+                (secondaryFlags & 0x02) != 0 &&
+                (secondaryFlags & 0x20) == 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Exact FUN_1010_1476 runtime-record state predicate.
+        /// </summary>
+        public static bool GuardLosRuntimeRecordPassable(ushort state0C)
+        {
+            return state0C == 0 || state0C == 4;
+        }
+
+        /// <summary>
         /// Exact stepping core of FUN_1010_D50A. The callback is invoked only for
         /// intermediate cells, never for the destination cell, matching the original
         /// target comparison order. Returning true from isIntermediateBlocked aborts
