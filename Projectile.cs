@@ -26,6 +26,7 @@ namespace Nitemare3D
         const float speed = 4;
         ProjectileType type;
         readonly OriginalWeaponSelector weaponSelector;
+        readonly int runtimeSlotIndex;
         Vec2 direction;
 
         public Projectile(Vec2 direction, ProjectileType type)
@@ -34,21 +35,76 @@ namespace Nitemare3D
                 type,
                 type == ProjectileType.Magic
                     ? OriginalWeaponSelector.MagicWand
-                    : OriginalWeaponSelector.SingleShotLaser)
+                    : OriginalWeaponSelector.SingleShotLaser,
+                -1)
         {
         }
 
-        public Projectile(
+        Projectile(
             Vec2 direction,
             ProjectileType type,
-            OriginalWeaponSelector weaponSelector)
+            OriginalWeaponSelector weaponSelector,
+            int runtimeSlotIndex)
         {
             this.direction = direction;
             this.type = type;
             this.weaponSelector = weaponSelector;
+            this.runtimeSlotIndex = runtimeSlotIndex;
             anim.LoadAnimation(animations[(int)type]);
             Game.player.AddSprite(this);
             hasCollision = false;
+        }
+
+        public static bool TrySpawn(
+            Vec2 direction,
+            ProjectileType type,
+            OriginalWeaponSelector weaponSelector,
+            Vec2 position)
+        {
+            short worldX = (short)MathF.Round(
+                position.X * OriginalRuntime.WorldUnitsPerTile);
+            short worldY = (short)MathF.Round(
+                position.Y * OriginalRuntime.WorldUnitsPerTile);
+
+            // Reserve the original eight-slot pool before creating the legacy
+            // render/movement shell. Sequence base 0 is temporary until the
+            // projectile IMG resource bridge owns presentation as well.
+            if (!OriginalProjectileRuntime.TryAllocateAndInitialize(
+                    OriginalRuntimeState.ProjectilePool.Slots,
+                    (byte)weaponSelector,
+                    worldX,
+                    worldY,
+                    0,
+                    out int slotIndex))
+            {
+                return false;
+            }
+
+            var projectile = new Projectile(
+                direction,
+                type,
+                weaponSelector,
+                slotIndex);
+            Entity.Add(projectile, position);
+            return true;
+        }
+
+        void ReleaseRuntimeSlot()
+        {
+            if (runtimeSlotIndex < 0 ||
+                runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length)
+            {
+                return;
+            }
+
+            OriginalRuntimeState.ProjectilePool.Slots[runtimeSlotIndex] = default;
+        }
+
+        void RemoveProjectile()
+        {
+            ReleaseRuntimeSlot();
+            Entity.Remove(this);
+            visible = false;
         }
 
         public override void Update()
@@ -74,8 +130,7 @@ namespace Nitemare3D
                     hitGuard,
                     weaponSelector,
                     false);
-                Entity.Remove(this);
-                visible = false;
+                RemoveProjectile();
                 return;
             }
 
@@ -93,8 +148,7 @@ namespace Nitemare3D
                 if(entity.position.Rounded().Equals(position.Rounded()) && entity.hasCollision)
                 {
                     entity.SendMessage("ShootPlasma");
-                    Entity.Remove(this);
-                    visible = false;
+                    RemoveProjectile();
                     return;
                 }
             }
@@ -104,7 +158,7 @@ namespace Nitemare3D
                 delete = true;
             }
 
-            if(delete){Entity.Remove(this); visible = false;}
+            if(delete){RemoveProjectile();}
 
         }
     }
