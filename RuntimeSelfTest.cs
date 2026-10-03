@@ -753,6 +753,36 @@ namespace Nitemare3D
                    obj.RuntimeValue == 1200,
                 "world OBJECT simple sequence must loop at frame count.");
 
+            definition = new OriginalObjectDefinitionRecord
+            {
+                Interval = 50,
+                FrameCount = 8,
+                ExtensionFlag = 1,
+                DirectionalA0 = 0x0000,
+                DirectionalA1 = 0x0203,
+                DirectionalA2 = 0x0000,
+                DirectionalA3 = 0x0106
+            };
+
+            obj.ObjectClass = 0x30;
+            obj.Component02 = 1;
+            obj.Component03 = 4;
+            obj.RuntimeValue = 2000;
+
+            ushort[] rng = { 0, 2, 3 };
+            int rngIndex = 0;
+
+            Assert(OriginalWorldObjectRuntime.AdvancePresentationAnimationIfDue(
+                       ref obj,
+                       definition,
+                       2000,
+                       () => rng[rngIndex++]) &&
+                   rngIndex == 3 &&
+                   obj.Component02 == 3 &&
+                   obj.Component03 == 6 &&
+                   obj.RuntimeValue == 2050,
+                "extended OBJECT sequence must resample empty branches and enter selected start frame.");
+
             obj.ObjectClass = 0x2E;
             Assert(OriginalWorldObjectRuntime.UpdateKnownVerticalAnchor(
                        ref obj,
