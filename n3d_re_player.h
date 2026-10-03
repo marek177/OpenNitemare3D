@@ -47,6 +47,11 @@ typedef enum n3d_player_damage_result
 
 typedef struct n3d_player_runtime
 {
+    int16_t angle_degrees;
+    uint8_t coarse_octant;
+    uint8_t rounded_octant;
+    uint8_t direction_mask_99;
+
     int16_t world_x;
     int16_t world_y;
     int16_t tile_x;
@@ -88,6 +93,8 @@ typedef struct n3d_player_runtime
 extern n3d_player_runtime n3d_player;
 
 void N3D_RE_ResetPlayer(void);
+void N3D_RE_SetPlayerAngle(int degrees);
+void N3D_RE_TurnPlayer(int signed_degrees);
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y);
 uint8_t N3D_RE_ClampPlayerHealthForHud(void);
 void N3D_RE_ClampPlayerResourcesForHud(void);
