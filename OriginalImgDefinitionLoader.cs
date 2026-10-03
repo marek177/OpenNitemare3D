@@ -43,7 +43,11 @@ namespace Nitemare3D
                 return false;
             }
 
-            int directoryOffset = imageId * 4;
+            // IMG uses two independent 0x400-byte directories:
+            // wall/low-bank at 0x0000 and object/high-bank at 0x0400.
+            int directoryOffset =
+                (tileBank ? 0x0000 : 0x0400) +
+                imageId * 4;
             if (directoryOffset >
                 imgData.Length - sizeof(uint))
             {
