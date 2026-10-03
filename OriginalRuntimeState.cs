@@ -75,6 +75,8 @@ namespace Nitemare3D
 
         public static uint RuntimeClockMs { get; private set; }
 
+        public static OriginalTrigQ10 ExactTrigQ10 { get; private set; }
+
         public static bool ProjectileDefinitionsReady { get; private set; }
         static byte projectilePlasmaFlightDefinition;
         static byte projectilePlasmaImpactDefinition;
@@ -136,6 +138,23 @@ namespace Nitemare3D
         /// and class 0x48 clears the jam. The original emits event 0x44 only
         /// when the latch actually changes.
         /// </summary>
+        public static bool TryLoadExactTrigQ10(
+            string path = "data/N3D_TRIG_Q10.BIN")
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                ExactTrigQ10 = null;
+                return false;
+            }
+
+            // OriginalTrigQ10.Load validates both byte length and the known
+            // cardinal/45-degree values. If a file exists but is invalid,
+            // propagate the error rather than silently using wrong projection.
+            ExactTrigQ10 =
+                OriginalTrigQ10.Load(path);
+            return true;
+        }
+
         /// <summary>
         /// Ordinary-positive-duration model of Win16 FUN_1010_D7D0:
         /// raw mean is stored before the local 40-ms minimum is applied.
