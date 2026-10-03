@@ -183,6 +183,62 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Stable clean-room handle for the original OBJECT +0x0C map-cell binding.
+        /// The Win16 value is a far pointer into the 64x64x2 MAP buffer; behavior
+        /// only depends on cell identity, so the port stores a nonzero cell index.
+        /// </summary>
+        public static uint CellBindingHandle(int x, int y)
+        {
+            if (x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return 0;
+            }
+
+            return (uint)(1 + y * OriginalRuntime.MapWidth + x);
+        }
+
+        /// <summary>
+        /// Exact externally visible MAP-byte transfer from FUN_1010_7A44
+        /// (GUARD state 0x13). If the candidate remains in the current cell,
+        /// no occupancy test is performed. On a cell crossing the destination
+        /// object byte must be zero and may not be the player's cell; the source
+        /// object byte is then moved to the destination.
+        /// </summary>
+        public bool TryTransferState13ObjectCell(
+            int sourceX,
+            int sourceY,
+            int targetX,
+            int targetY,
+            int playerX,
+            int playerY)
+        {
+            if (sourceX < 0 || sourceY < 0 ||
+                targetX < 0 || targetY < 0 ||
+                sourceX >= OriginalRuntime.MapWidth ||
+                sourceY >= OriginalRuntime.MapHeight ||
+                targetX >= OriginalRuntime.MapWidth ||
+                targetY >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            if (sourceX == targetX && sourceY == targetY)
+                return true;
+
+            if (ObjectId[targetX, targetY] != 0)
+                return false;
+
+            if (targetX == playerX && targetY == playerY)
+                return false;
+
+            ObjectId[targetX, targetY] = ObjectId[sourceX, sourceY];
+            ObjectId[sourceX, sourceY] = 0;
+            return true;
+        }
+
+        /// <summary>
         /// Literal semantic port of FUN_1010_24BC.
         /// </summary>
         public static void BuildWallProperties(
