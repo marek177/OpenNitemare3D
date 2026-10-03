@@ -69,6 +69,110 @@ namespace Nitemare3D
             }
         }
 
+        static short TrigQ10(double value)
+        {
+            double scaled = value * 1024.0;
+            int magnitude = (int)Math.Floor(Math.Abs(scaled) + 1e-9);
+            return (short)(scaled < 0 ? -magnitude : magnitude);
+        }
+
+        public static void ConfigureDdaFromAngle(
+            ref OriginalProjectileRecord projectile,
+            int angleDegrees)
+        {
+            int angle = angleDegrees % 360;
+            if (angle < 0)
+                angle += 360;
+
+            double radians = angle * Math.PI / 180.0;
+
+            // FUN_E516 uses Q10 lookup tables. In Nitemare's coordinate
+            // convention angle 0 points north: X=sin(angle), Y=-cos(angle).
+            short componentX = TrigQ10(Math.Sin(radians));
+            short componentY = TrigQ10(Math.Cos(radians));
+
+            int absX = Math.Abs((int)componentX);
+            int absY = Math.Abs((int)componentY);
+
+            projectile.StepX = (short)(angle < 180 ? 1 : -1);
+            projectile.StepY =
+                (short)(angle > 90 && angle < 270 ? 1 : -1);
+
+            if (absY < absX)
+            {
+                projectile.XIsMajorAxis = 1;
+                projectile.LineError =
+                    (short)(2 * absY - absX);
+                projectile.MinorErrorStep =
+                    (short)(2 * absY);
+                projectile.MajorErrorFixup =
+                    (short)(2 * (absY - absX));
+            }
+            else
+            {
+                projectile.XIsMajorAxis = 0;
+                projectile.LineError =
+                    (short)(2 * absX - absY);
+                projectile.MinorErrorStep =
+                    (short)(2 * absX);
+                projectile.MajorErrorFixup =
+                    (short)(2 * (absX - absY));
+            }
+        }
+
+        public static int AngleFromDirection(float x, float y)
+        {
+            if (x == 0f && y == 0f)
+                return 0;
+
+            // Inverse of X=sin(a), Y=-cos(a).
+            double degrees =
+                Math.Atan2(x, -y) * 180.0 / Math.PI;
+            int angle = (int)Math.Round(degrees);
+            angle %= 360;
+            if (angle < 0)
+                angle += 360;
+            return angle;
+        }
+
+        public static bool AdvanceDdaSubstep(
+            ref OriginalProjectileRecord projectile)
+        {
+            if (projectile.State != (byte)OriginalProjectileState.Flying)
+                return false;
+
+            if (projectile.XIsMajorAxis != 0)
+                projectile.RenderObject.WorldX =
+                    (short)(projectile.RenderObject.WorldX + projectile.StepX);
+            else
+                projectile.RenderObject.WorldY =
+                    (short)(projectile.RenderObject.WorldY + projectile.StepY);
+
+            if (projectile.LineError < 0)
+            {
+                projectile.LineError =
+                    (short)(projectile.LineError +
+                            projectile.MinorErrorStep);
+            }
+            else
+            {
+                projectile.LineError =
+                    (short)(projectile.LineError +
+                            projectile.MajorErrorFixup);
+
+                if (projectile.XIsMajorAxis != 0)
+                    projectile.RenderObject.WorldY =
+                        (short)(projectile.RenderObject.WorldY +
+                                projectile.StepY);
+                else
+                    projectile.RenderObject.WorldX =
+                        (short)(projectile.RenderObject.WorldX +
+                                projectile.StepX);
+            }
+
+            return true;
+        }
+
         public static int FirstFreeSlot(OriginalProjectileRecord[] pool)
         {
             if (pool == null)
@@ -108,6 +212,32 @@ namespace Nitemare3D
 
             return dx > RenderDistanceThreshold || dx < -RenderDistanceThreshold ||
                    dy > RenderDistanceThreshold || dy < -RenderDistanceThreshold;
+        }
+
+        public static bool TryAllocateAndInitialize(
+            OriginalProjectileRecord[] pool,
+            byte weaponSelector,
+            short worldX,
+            short worldY,
+            byte sequenceBase,
+            int angleDegrees,
+            out int slotIndex)
+        {
+            if (!TryAllocateAndInitialize(
+                    pool,
+                    weaponSelector,
+                    worldX,
+                    worldY,
+                    sequenceBase,
+                    out slotIndex))
+            {
+                return false;
+            }
+
+            ConfigureDdaFromAngle(
+                ref pool[slotIndex],
+                angleDegrees);
+            return true;
         }
 
         public static bool TryAllocateAndInitialize(
