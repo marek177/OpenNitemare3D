@@ -26,12 +26,40 @@ namespace Nitemare3D
             public int CellX;
             public int CellY;
 
-            // Original 22-byte controller semantics.
-            public short State = 1;
-            public short Timer;
-            public short TargetX;
-            public short TargetY;
-            public byte Latch;
+            // Byte-exact 22-byte controller payload. The original +00/+04/+08
+            // fields are far pointers; C# object references remain alongside the
+            // record while all behavioral state lives in this exact layout.
+            public OriginalDoorRuntimeRecord Runtime;
+
+            public short State
+            {
+                get => Runtime.State;
+                set => Runtime.State = value;
+            }
+
+            public short Timer
+            {
+                get => Runtime.Timer;
+                set => Runtime.Timer = value;
+            }
+
+            public short TargetX
+            {
+                get => Runtime.TargetX;
+                set => Runtime.TargetX = value;
+            }
+
+            public short TargetY
+            {
+                get => Runtime.TargetY;
+                set => Runtime.TargetY = value;
+            }
+
+            public byte Latch
+            {
+                get => Runtime.Latch;
+                set => Runtime.Latch = value;
+            }
         }
 
         public sealed class Class3Group
