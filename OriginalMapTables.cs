@@ -274,6 +274,23 @@ namespace Nitemare3D
         public bool TryFindNearestReachableDoor(
             int startTileX,
             int startTileY,
+            OriginalWallRuntime wallRuntime,
+            out int doorTileX,
+            out int doorTileY)
+        {
+            return TryFindNearestReachableDoor(
+                startTileX,
+                startTileY,
+                (x, y) =>
+                    wallRuntime != null &&
+                    wallRuntime.DoorAllowsSight(x, y),
+                out doorTileX,
+                out doorTileY);
+        }
+
+        public bool TryFindNearestReachableDoor(
+            int startTileX,
+            int startTileY,
             Func<int, int, bool> dynamicDoorAllowsSight,
             out int doorTileX,
             out int doorTileY)
@@ -325,9 +342,27 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Cell-blocking portion of FUN_1010_D50A after Bresenham stepping.
-        /// Dynamic-door state is supplied separately because the current port does
-        /// not yet mirror the original 22-byte DOOR runtime record/state 0..4.
+        /// Cell-blocking portion of FUN_1010_D50A after Bresenham stepping,
+        /// backed directly by the recovered 22-byte DOOR runtime state.
+        /// </summary>
+        public bool IsPerceptionIntermediateBlocked(
+            int x,
+            int y,
+            bool secondaryCellChecks,
+            OriginalWallRuntime wallRuntime)
+        {
+            return IsPerceptionIntermediateBlocked(
+                x,
+                y,
+                secondaryCellChecks,
+                (doorX, doorY) =>
+                    wallRuntime != null &&
+                    wallRuntime.DoorAllowsSight(doorX, doorY));
+        }
+
+        /// <summary>
+        /// Compatibility overload for isolated tests/callers that provide only
+        /// the dynamic-door passability predicate.
         /// </summary>
         public bool IsPerceptionIntermediateBlocked(
             int x,
