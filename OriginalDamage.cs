@@ -35,6 +35,23 @@ namespace Nitemare3D
         public const byte HamersteinGateRequiredValue = 3;
         public const byte HamersteinBaseDamage = 3;
 
+        public static bool GuardAttackUsesRandom(byte objectClass)
+        {
+            switch (objectClass)
+            {
+                case 0x08:
+                case 0x09:
+                case 0x0A:
+                case 0x11:
+                case 0x12:
+                case 0x13:
+                case 0x14:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         /// <summary>
         /// Exact 16-bit distance helper used by FUN_1010_A1EA through
         /// FUN_1018_32AA/FUN_1018_324A. World coordinates are converted to
