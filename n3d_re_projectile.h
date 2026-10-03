@@ -56,6 +56,15 @@ typedef struct n3d_projectile_guard_resolution
     uint8_t entered_impact;
 } n3d_projectile_guard_resolution;
 
+typedef struct n3d_projectile_wall_resolution
+{
+    uint8_t resolved;
+    uint8_t deferred;
+    uint8_t event_id;
+    uint8_t requested_runtime_wall_class;
+    uint8_t entered_impact;
+} n3d_projectile_wall_resolution;
+
 #define N3D_EXPLODABLE_WALL_EVENT 0x29
 #define N3D_EXPLODABLE_WALL_RUNTIME_CLASS 0x2D
 
@@ -115,6 +124,11 @@ N3D_RE_ResolveProjectileGuardHit(
     int16_t view_reference_y,
     uint8_t hamerstein_gate_value,
     uint16_t rng_value);
+
+n3d_projectile_wall_resolution
+N3D_RE_ResolveProjectileWallCollision(
+    int slot,
+    const n3d_projectile_collision_result* collision);
 
 void N3D_RE_AdvanceProjectileAnimation(int slot, int frame_count);
 
