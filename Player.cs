@@ -109,6 +109,27 @@ namespace Nitemare3D
         readonly ushort[] originalWallVisibilityQ4 =
             new ushort[OriginalRendererCore.ScreenWidth];
 
+        sealed class OriginalSpriteQueueEntry
+        {
+            public ISprite Sprite;
+            public Entity RuntimeEntity;
+            public IOriginalSpriteProjectionSource ProjectionSource;
+            public BitmapImage Frame;
+            public OriginalObjectRecord RuntimeObject;
+            public OriginalSpriteProjectionExact.ProjectedSprite Projected;
+        }
+
+        readonly OriginalSpriteQueueEntry[] originalSpriteQueue =
+            new OriginalSpriteQueueEntry[
+                OriginalProjectedSpriteQueue.SlotCount];
+
+        readonly bool[] originalSpriteQueueOccupied =
+            new bool[
+                OriginalProjectedSpriteQueue.SlotCount];
+
+        readonly bool[] originalSpriteHandled =
+            new bool[maxSprites];
+
 
         class DecendingComparer<TKey>: IComparer<float>
         {
@@ -156,20 +177,31 @@ namespace Nitemare3D
             }
             return false;
         }
-        bool TryRenderExactOriginalSprite(
-            ISprite sprite,
-            IOriginalSpriteProjectionSource source,
-            BitmapImage frame)
+        bool ExactOriginalSpriteQueueEnabled =>
+            OriginalRuntimeState.ExactTrigQ10 != null &&
+            Math.Abs(GameWindow.scale - 1.0f) <= 0.0001f;
+
+        void BuildOriginalSpriteQueue()
         {
-            // The recovered projection constants describe the original
-            // 320x200 viewport. Keep scaled-window configurations on the
-            // historical renderer until its viewport scaling is migrated too.
-            if (OriginalRuntimeState.ExactTrigQ10 == null ||
-                Math.Abs(GameWindow.scale - 1.0f) > 0.0001f ||
-                !source.TryGetOriginalProjectionObject(
-                    out OriginalObjectRecord runtimeObject))
+            Array.Clear(
+                originalSpriteQueue,
+                0,
+                originalSpriteQueue.Length);
+
+            Array.Clear(
+                originalSpriteQueueOccupied,
+                0,
+                originalSpriteQueueOccupied.Length);
+
+            Array.Clear(
+                originalSpriteHandled,
+                0,
+                originalSpriteHandled.Length);
+
+            if (!ExactOriginalSpriteQueueEnabled ||
+                Img.current == null)
             {
-                return false;
+                return;
             }
 
             short playerWorldX =
@@ -187,126 +219,126 @@ namespace Nitemare3D
                     direction.X,
                     direction.Y);
 
-            if (!OriginalSpriteProjectionExact.TryProject(
-                    runtimeObject,
-                    frame,
-                    playerWorldX,
-                    playerWorldY,
-                    angle,
-                    OriginalRuntimeState.ExactTrigQ10,
-                    out var projected))
+            for (int i = 0; i < spriteCount; i++)
             {
-                // Exact path was available; the original projection rejected
-                // the sprite, so do not fall back to a different geometry.
-                return true;
-            }
+                ISprite sprite = sprites[i];
 
-            int firstX =
-                Math.Max(
-                    OriginalRendererCore.ViewLeft,
-                    projected.Left);
-
-            int lastXExclusive =
-                Math.Min(
-                    OriginalRendererCore.ViewRight + 1,
-                    projected.Right);
-
-            int firstY =
-                Math.Max(
-                    OriginalRendererCore.ViewTop,
-                    projected.Top);
-
-            int lastYExclusive =
-                Math.Min(
-                    OriginalRendererCore.ViewBottom + 1,
-                    projected.Bottom);
-
-            if (firstX >= lastXExclusive ||
-                firstY >= lastYExclusive)
-            {
-                return true;
-            }
-
-            if (!OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
-                    originalWallVisibilityQ4,
-                    projected.Left,
-                    projected.CenterX,
-                    projected.Right,
-                    projected.ProjectedYQ4))
-            {
-                return true;
-            }
-
-            bool bypassWall =
-                (runtimeObject.Flags & 0x10) != 0;
-
-            bool projectedVisible = false;
-
-            for (int screenX = firstX;
-                screenX < lastXExclusive;
-                screenX++)
-            {
-                if (!OriginalProjectedSpriteQueue.ColumnPassesWall(
-                        originalWallVisibilityQ4,
-                        screenX,
-                        projected.ProjectedYQ4,
-                        bypassWall))
+                if (sprite == null ||
+                    !sprite.visible)
                 {
                     continue;
                 }
 
-                int texX =
-                    (screenX - projected.Left) *
-                    frame.width /
-                    projected.Width;
+                Entity runtimeEntity =
+                    sprite as Entity;
 
-                if (texX < 0)
-                    texX = 0;
-                else if (texX >= frame.width)
-                    texX = frame.width - 1;
+                IOriginalSpriteProjectionSource projectionSource =
+                    sprite as IOriginalSpriteProjectionSource;
 
-                projectedVisible = true;
+                OriginalObjectRecord runtimeObject;
+                BitmapImage frame;
 
-                for (int screenY = firstY;
-                    screenY < lastYExclusive;
-                    screenY++)
+                if (projectionSource != null)
                 {
-                    int texY =
-                        (screenY - projected.Top) *
-                        frame.height /
-                        projected.Height;
+                    // Runtime projectile semantics include the original +/-20
+                    // projection-call threshold inside TryGetOriginalSpriteFrame.
+                    originalSpriteHandled[i] = true;
 
-                    if (texY < 0)
-                        texY = 0;
-                    else if (texY >= frame.height)
-                        texY = frame.height - 1;
-
-                    byte color =
-                        frame.data[texX, texY];
-
-                    if (color !=
-                        OriginalRuntime.TransparentPaletteIndex)
+                    if (!projectionSource.TryGetOriginalProjectionObject(
+                            out runtimeObject) ||
+                        !projectionSource.TryGetOriginalSpriteFrame(
+                            out frame))
                     {
-                        GameWindow.frameBuffer[
-                            screenX,
-                            screenY] = color;
+                        continue;
                     }
                 }
-            }
+                else if (runtimeEntity != null &&
+                         OriginalRuntimeState.TryGetObjectRecord(
+                             runtimeEntity,
+                             out runtimeObject))
+                {
+                    int frameIndex =
+                        runtimeObject.Component03;
 
-            if (projectedVisible)
-            {
-                int cacheRow =
-                    Math.Max(
+                    if (frameIndex < 0 ||
+                        !OriginalRuntimeState.ObjectDefinitions
+                            .TryGetBitmapFrame(
+                                runtimeObject.DefinitionId,
+                                frameIndex,
+                                Img.current.rawData,
+                                out frame))
+                    {
+                        // Keep the old visual path if this entity has not yet
+                        // been fully migrated to an original IMG sequence.
+                        continue;
+                    }
+
+                    originalSpriteHandled[i] = true;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (!OriginalSpriteProjectionExact.TryProject(
+                        runtimeObject,
+                        frame,
+                        playerWorldX,
+                        playerWorldY,
+                        angle,
+                        OriginalRuntimeState.ExactTrigQ10,
+                        out var projected))
+                {
+                    continue;
+                }
+
+                if (!OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
+                        originalWallVisibilityQ4,
+                        projected.Left,
+                        projected.CenterX,
+                        projected.Right,
+                        projected.ProjectedYQ4))
+                {
+                    continue;
+                }
+
+                int slot =
+                    OriginalProjectedSpriteQueue.FindFreeSlot(
+                        originalSpriteQueueOccupied,
+                        projected.BaselineRow);
+
+                if (slot < 0)
+                {
+                    throw new InvalidOperationException(
+                        "Too many original projected sprites on screen.");
+                }
+
+                originalSpriteQueueOccupied[slot] = true;
+                originalSpriteQueue[slot] =
+                    new OriginalSpriteQueueEntry
+                    {
+                        Sprite = sprite,
+                        RuntimeEntity = runtimeEntity,
+                        ProjectionSource = projectionSource,
+                        Frame = frame,
+                        RuntimeObject = runtimeObject,
+                        Projected = projected
+                    };
+
+                short cacheRow =
+                    (short)Math.Max(
                         short.MinValue,
                         Math.Min(
                             short.MaxValue,
                             projected.BaselineRow));
 
-                source.RecordOriginalProjectedBaseRow(
-                    (short)cacheRow);
+                if (projectionSource != null)
+                {
+                    projectionSource.RecordOriginalProjectedBaseRow(
+                        cacheRow);
+                }
 
-                if (sprite is Entity runtimeEntity)
+                if (runtimeEntity != null)
                 {
                     bool overlapsAimCenter =
                         projected.Left - 4 <
@@ -316,12 +348,133 @@ namespace Nitemare3D
 
                     OriginalRuntimeState.RecordGuardProjection(
                         runtimeEntity,
-                        (short)cacheRow,
+                        cacheRow,
                         overlapsAimCenter);
                 }
             }
+        }
 
-            return true;
+        void DrawOriginalSpriteQueue()
+        {
+            if (!ExactOriginalSpriteQueueEnabled)
+                return;
+
+            for (int slot = 0;
+                slot < originalSpriteQueue.Length;
+                slot++)
+            {
+                OriginalSpriteQueueEntry entry =
+                    originalSpriteQueue[slot];
+
+                if (entry == null ||
+                    entry.Frame == null)
+                {
+                    continue;
+                }
+
+                var projected =
+                    entry.Projected;
+
+                BitmapImage frame =
+                    entry.Frame;
+
+                int firstX =
+                    Math.Max(
+                        OriginalRendererCore.ViewLeft,
+                        projected.Left);
+
+                int lastX =
+                    Math.Min(
+                        OriginalRendererCore.ViewRight,
+                        projected.Right);
+
+                int firstY =
+                    Math.Max(
+                        OriginalRendererCore.ViewTop,
+                        projected.Top);
+
+                int lastY =
+                    Math.Min(
+                        OriginalRendererCore.ViewBottom,
+                        projected.Bottom);
+
+                int screenHeight =
+                    projected.Bottom -
+                    projected.Top +
+                    1;
+
+                if (firstX > lastX ||
+                    firstY > lastY ||
+                    screenHeight <= 0)
+                {
+                    continue;
+                }
+
+                ulong sourceStep16_16 =
+                    ((ulong)frame.height << 16) /
+                    (ulong)screenHeight;
+
+                bool bypassWall =
+                    (entry.RuntimeObject.Flags & 0x10) != 0;
+
+                for (int screenX = firstX;
+                    screenX <= lastX;
+                    screenX++)
+                {
+                    if (!OriginalProjectedSpriteQueue.ColumnPassesWall(
+                            originalWallVisibilityQ4,
+                            screenX,
+                            projected.ProjectedYQ4,
+                            bypassWall))
+                    {
+                        continue;
+                    }
+
+                    ulong sourceXFixed =
+                        (ulong)(screenX - projected.Left) *
+                        sourceStep16_16;
+
+                    int texX =
+                        (int)(sourceXFixed >> 16);
+
+                    if (texX < 0 ||
+                        texX >= frame.width)
+                    {
+                        continue;
+                    }
+
+                    for (int screenY = firstY;
+                        screenY <= lastY;
+                        screenY++)
+                    {
+                        ulong sourceYFixed =
+                            (ulong)(screenY - projected.Top) *
+                            sourceStep16_16;
+
+                        int texY =
+                            (int)(sourceYFixed >> 16);
+
+                        if (texY < 0 ||
+                            texY >= frame.height)
+                        {
+                            continue;
+                        }
+
+                        byte color =
+                            frame.data[
+                                texX,
+                                texY];
+
+                        if (color !=
+                            OriginalRuntime.TransparentPaletteIndex)
+                        {
+                            GameWindow.frameBuffer[
+                                screenX,
+                                screenY] = color;
+                        }
+                    }
+                }
+            }
         }
 
         public void RenderRaycaster()
@@ -541,6 +694,8 @@ namespace Nitemare3D
 
 
             }
+
+            BuildOriginalSpriteQueue();
             
             for(int i = 0; i < spriteCount; i++)
             {
@@ -557,6 +712,15 @@ namespace Nitemare3D
 
                 var sprite = sprites[spriteOrder[i]];
                 if(!sprite.visible){continue;}
+
+                int originalSpriteIndex =
+                    spriteOrder[i];
+
+                if (ExactOriginalSpriteQueueEnabled &&
+                    originalSpriteHandled[originalSpriteIndex])
+                {
+                    continue;
+                }
 
                 BitmapImage spriteFrame = null;
 
@@ -582,15 +746,6 @@ namespace Nitemare3D
 
                     spriteFrame =
                         Img.current.entries[sprite.spriteIndex];
-                }
-
-                if (sprite is IOriginalSpriteProjectionSource exactProjectionSource &&
-                    TryRenderExactOriginalSprite(
-                        sprite,
-                        exactProjectionSource,
-                        spriteFrame))
-                {
-                    continue;
                 }
 
                 var spriteW = spriteFrame.width;
@@ -697,6 +852,7 @@ namespace Nitemare3D
 
             }
 
+            DrawOriginalSpriteQueue();
         }
 
 
