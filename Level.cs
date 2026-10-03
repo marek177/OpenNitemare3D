@@ -1059,6 +1059,60 @@ namespace Nitemare3D
         /// 22-byte DOOR runtime is integrated, a dynamic door allows sight only
         /// when the current Tile has become non-obstructing.
         /// </summary>
+        public static bool TryCommitOriginalState13MapMove(
+            int sourceTileX,
+            int sourceTileY,
+            int targetTileX,
+            int targetTileY,
+            int playerTileX,
+            int playerTileY)
+        {
+            if (originalMap == null)
+                return false;
+
+            return originalMap.TryTransferState13ObjectCell(
+                sourceTileX,
+                sourceTileY,
+                targetTileX,
+                targetTileY,
+                playerTileX,
+                playerTileY);
+        }
+
+        /// <summary>
+        /// FUN_1018_3876 + FUN_1018_392C used by GUARD state 0x13.
+        /// Finds the ONE_SHOT VEC in the guard's current cell whose orientation
+        /// matches the guard octant, then changes animation frame +03 from 0 to 1.
+        /// </summary>
+        public static bool TriggerOriginalState13OneShot(
+            int tileX,
+            int tileY,
+            byte guardOctant)
+        {
+            if (originalVectors == null)
+                return false;
+
+            foreach (OriginalRendererCore.Vec vec in originalVectors)
+            {
+                if (vec.SourceTileX != tileX ||
+                    vec.SourceTileY != tileY ||
+                    vec.RenderClass != (byte)OriginalWallSemanticClass.OneShot ||
+                    !OriginalGuardDispatcher.State13TriggerOrientationMatches(
+                        vec.Orientation,
+                        guardOctant))
+                {
+                    continue;
+                }
+
+                if (vec.AnimationFrame == 0)
+                    vec.AnimationFrame = 1;
+
+                return true;
+            }
+
+            return false;
+        }
+
         public static bool OriginalPerceptionIntermediateBlocked(
             int x,
             int y,
