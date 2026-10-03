@@ -13,6 +13,7 @@
 #include "../n3d_re_movement.h"
 #include "../n3d_re_timing.h"
 #include "../n3d_re_controls.h"
+#include "../n3d_re_weapon.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -2090,6 +2091,101 @@ int main(void)
 
         remove("N3D_TRIG_Q10_EXACT_MOVE_TEST.BIN");
     }
+
+    /* Recovered FIRE preflight: jam/ammo/pool ordering without guessed cadence. */
+    N3D_RE_ResetRuntime();
+    N3D_RE_ResetPlayer();
+
+    n3d_fire_result fire_result =
+        N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_NO_WEAPON);
+
+    n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+    n3d_player.laser_ammo = 5;
+    n3d_player.weapon_jam = 1;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_JAMMED);
+    assert(n3d_player.laser_ammo == 5);
+    assert(N3D_RE_FirstFreeProjectileSlot() == 0);
+
+    n3d_player.weapon_jam = 0;
+    n3d_player.laser_ammo = 0;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_NO_AMMO);
+    assert(n3d_player.laser_ammo == 0);
+    assert(N3D_RE_FirstFreeProjectileSlot() == 0);
+
+    n3d_player.laser_ammo = 5;
+    for(int i = 0; i < N3D_MAX_PROJECTILES; ++i)
+        n3d_projectiles[i].state = 1;
+
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_PROJECTILE_POOL_FULL);
+    assert(n3d_player.laser_ammo == 5);
+    assert(fire_result.ammo_consumed == 0);
+
+    N3D_RE_ResetRuntime();
+    N3D_RE_InitPlayerAtTile(4, 5);
+    n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+    n3d_player.laser_ammo = 5;
+
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_PROJECTILE_READY);
+    assert(fire_result.projectile_slot == 0);
+    assert(fire_result.weapon_selector == N3D_WEAPON_SINGLE_LASER);
+    assert(fire_result.ammo_before == 5);
+    assert(fire_result.ammo_after == 4);
+    assert(fire_result.ammo_consumed == 1);
+    assert(n3d_player.laser_ammo == 4);
+    assert(n3d_projectiles[0].state == 1);
+    assert(n3d_projectiles[0].object.world_x == n3d_player.world_x);
+    assert(n3d_projectiles[0].object.world_y == n3d_player.world_y);
+    assert(n3d_projectiles[0].object.sequence_id == 20);
+
+    /* Selector 3 shares the exact same laser ammo byte. */
+    n3d_player.active_weapon = N3D_WEAPON_CONTINUOUS_LASER;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_PROJECTILE_READY);
+    assert(fire_result.projectile_slot == 1);
+    assert(fire_result.ammo_before == 4);
+    assert(fire_result.ammo_after == 3);
+    assert(n3d_player.laser_ammo == 3);
+
+    /* Silver Pistol is hitscan and must not allocate a projectile slot. */
+    N3D_RE_ResetRuntime();
+    N3D_RE_InitPlayerAtTile(4, 5);
+    n3d_player.active_weapon = N3D_WEAPON_SILVER_PISTOL;
+    n3d_player.silver_ammo = 7;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_HITSCAN_READY);
+    assert(fire_result.projectile_slot == -1);
+    assert(fire_result.ammo_before == 7);
+    assert(fire_result.ammo_after == 6);
+    assert(n3d_player.silver_ammo == 6);
+    assert(N3D_RE_FirstFreeProjectileSlot() == 0);
+
+    /* Wand uses its own ammo pool and projectile sequence +2. */
+    n3d_player.active_weapon = N3D_WEAPON_MAGIC_WAND;
+    n3d_player.wand_ammo = 3;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_PROJECTILE_READY);
+    assert(fire_result.projectile_slot == 0);
+    assert(fire_result.ammo_before == 3);
+    assert(fire_result.ammo_after == 2);
+    assert(n3d_projectiles[0].object.sequence_id == 22);
+
+    /* Omnipotent permits firing with zero ammo and does not decrement it. */
+    N3D_RE_ResetRuntime();
+    N3D_RE_InitPlayerAtTile(4, 5);
+    n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+    n3d_player.laser_ammo = 0;
+    n3d_player.omnipotent = 1;
+    fire_result = N3D_RE_TryBeginPlayerFire(20);
+    assert(fire_result.kind == N3D_FIRE_PROJECTILE_READY);
+    assert(fire_result.ammo_before == 0);
+    assert(fire_result.ammo_after == 0);
+    assert(fire_result.ammo_consumed == 0);
+    assert(n3d_player.laser_ammo == 0);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
