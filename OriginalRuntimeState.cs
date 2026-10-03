@@ -1073,6 +1073,12 @@ namespace Nitemare3D
 
         static int ReleaseState14Group()
         {
+            // FUN_AE56(1) emits original SND event 0x45 before restoring the
+            // normal level music through C63E. Game.Update already owns the
+            // normal level-song selection, so only the recovered event is
+            // required here.
+            SoundEffect.PlayOriginalEvent(0x45);
+
             int released = 0;
 
             for (int i = 0; i < GuardCount; i++)
@@ -1105,9 +1111,8 @@ namespace Nitemare3D
                 }
             }
 
-            // Original AE56(1) also emits SND 0x45 and restores normal level
-            // music through C63E. The current port already owns background music,
-            // while the legacy SND bridge is not safe for original IDs <34.
+            // C63E restores normal level music in the original; the current
+            // Game scene already keeps that level song selected continuously.
             return released;
         }
 
