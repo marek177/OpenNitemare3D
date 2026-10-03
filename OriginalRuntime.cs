@@ -16,6 +16,14 @@ namespace Nitemare3D
         public const int MapHeaderBytes = 514;
         public const int MapLevelBytes = MapWidth * MapHeight * MapCellBytes; // 8192
         public const int WorldUnitsPerTile = 64;
+
+        // NITE3W 1.10 normalized DS offsets for the loaded MAP.N header/runtime.
+        public const ushort MapHeaderGlobal = 0x8194;
+        public const ushort WallClassTableGlobal = 0x8196;
+        public const ushort ObjectClassTableGlobal = 0x8296;
+        public const ushort WallPropertyTableGlobal = 0x7E94;
+        public const ushort ObjectPropertyTableGlobal = 0x7F94;
+        public const ushort MapCellBufferGlobal = 0xA69E;
         public const int TileCenterOffset = 32;
 
         // Player.
