@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
 
 namespace Nitemare3D
 {
@@ -26,6 +27,65 @@ namespace Nitemare3D
             new byte[OrientationCount, OctantCount];
 
         public string SourcePath { get; private set; }
+
+        static string Sha256Hex(byte[] data)
+        {
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] digest = sha.ComputeHash(data);
+                return BitConverter.ToString(digest)
+                    .Replace("-", "")
+                    .ToLowerInvariant();
+            }
+        }
+
+        public static OriginalVisibilityOctants LoadFromNite3w110Exe(
+            string path)
+        {
+            byte[] exe = File.ReadAllBytes(path);
+
+            if (Sha256Hex(exe) !=
+                OriginalTrigQ10.ExpectedNite3w110Sha256)
+            {
+                throw new InvalidDataException(
+                    "NITE3W.EXE hash does not match audited Win16 1.10.");
+            }
+
+            int start =
+                OriginalTrigQ10.Nite3w110DataSegmentFileOffset +
+                0x04C6;
+
+            if (start < 0 ||
+                start > exe.Length - FileSize)
+            {
+                throw new InvalidDataException(
+                    "NITE3W visibility tables lie outside executable.");
+            }
+
+            OriginalVisibilityOctants result =
+                new OriginalVisibilityOctants();
+
+            result.SourcePath =
+                Path.GetFullPath(path);
+
+            int p = start;
+            for (int orientation = 0;
+                orientation < OrientationCount;
+                orientation++)
+            {
+                for (int octant = 0;
+                    octant < OctantCount;
+                    octant++)
+                {
+                    result.enabled[
+                        orientation,
+                        octant] =
+                        exe[p++];
+                }
+            }
+
+            return result;
+        }
 
         public static OriginalVisibilityOctants Load(
             string path)
