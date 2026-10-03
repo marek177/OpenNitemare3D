@@ -1420,7 +1420,8 @@ namespace Nitemare3D
             // The extractor under tools/ creates this table from the checked
             // original Win16 executable. Missing data keeps the legacy visual
             // projection as a compatibility fallback.
-            OriginalRuntimeState.TryLoadExactTrigQ10();
+            if (OriginalRuntimeState.ExactTrigQ10 == null)
+                OriginalRuntimeState.TryLoadExactTrigQ10();
 
             // The four projectile resources are runtime sequence-cache entries,
             // not ordinary map spawns. Load them explicitly so flight/impact
