@@ -42,12 +42,16 @@ namespace Nitemare3D
         public const int PushRuntimeStride = 6;
         public const int MaxObjects = 350;
         public const int ObjectRuntimeStride = 28;
-        // Per-level object-definition blocks loaded/deduplicated by FUN_1010_4C8A.
-        public const int ObjectDefinitionBytes = 0x5A;
+        // Per-level object resource tables loaded/deduplicated by FUN_1010_4C8A/4B86.
+        // 0x5A is the temporary on-disk header size. FUN_4B86 returns a separately
+        // allocated table of 10-byte decoded entries; OBJECT +0x04 indexes those
+        // per-level tables through the pointer metadata rooted at DS:4748.
+        public const int ObjectResourceHeaderBytes = 0x5A;
+        public const int ObjectResourceEntryBytes = 10;
         public const int MaxObjectDefinitions = 256; // OBJECT +0x04 is one byte.
-        public const int ObjectDefinitionAlertSequenceOffset = 0x34;
-        public const int ObjectDefinitionAttackSequenceOffset = 0x36;
-        public const int ObjectDefinitionRecoverySequenceOffset = 0x38;
+        public const int GuardState02ResourceWordOffset = 0x34;
+        public const int GuardState03ResourceWordOffset = 0x36;
+        public const int GuardState04ResourceWordOffset = 0x38;
         public const int ObjectDefinitionReactionSequenceOffset = 0x3A;
         public const int ObjectDefinitionDeathSequenceOffset = 0x4A;
         public const int ObjectDefinitionReactionSequenceCount = 8;
