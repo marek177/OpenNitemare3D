@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Nitemare3D
@@ -349,5 +350,501 @@ namespace Nitemare3D
 
             return false;
         }
+        public byte FindWallIdByClass(
+            byte wallClass,
+            byte startId)
+        {
+            for (int i = startId;
+                i < 256;
+                i++)
+            {
+                if (WallClass[i] == wallClass)
+                {
+                    return (byte)i;
+                }
+            }
+
+            for (int i = 0;
+                i < startId;
+                i++)
+            {
+                if (WallClass[i] == wallClass)
+                {
+                    return (byte)i;
+                }
+            }
+
+            throw new InvalidDataException(
+                "No wall ID found for class 0x" +
+                wallClass.ToString("X2"));
+        }
+
+        /// <summary>
+        /// FUN_1018_3CFC.
+        ///
+        /// Odd classes 31,33,...,3F are visible on orientations 2/3.
+        /// Even classes 32,34,...,40 are visible on orientations 0/1.
+        /// </summary>
+        public static bool ClassVisibleOnOrientation(
+            int orientation,
+            byte wallClass)
+        {
+            if (wallClass >= 0x31 &&
+                wallClass <= 0x3F &&
+                (wallClass & 1) != 0)
+            {
+                return orientation == 2 ||
+                       orientation == 3;
+            }
+
+            if (wallClass >= 0x32 &&
+                wallClass <= 0x40 &&
+                (wallClass & 1) == 0)
+            {
+                return orientation == 0 ||
+                       orientation == 1;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Semantic port of FUN_1018_4046 + 3D54 + 3E82 + 4006.
+        ///
+        /// The only non-original field is TextureIndex, supplied by the
+        /// OpenNitemare3D bridge for the current cell.
+        /// </summary>
+        public List<OriginalRendererCore.Vec>
+            BuildVectors(
+                Func<int, int, int> textureIndexAt)
+        {
+            if (textureIndexAt == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(textureIndexAt));
+            }
+
+            List<OriginalRendererCore.Vec> vectors =
+                new List<OriginalRendererCore.Vec>();
+
+            for (int orientation = 0;
+                orientation < 4;
+                orientation++)
+            {
+                ScanOrientation(
+                    orientation,
+                    vectors,
+                    textureIndexAt);
+            }
+
+            return vectors;
+        }
+
+        void ScanOrientation(
+            int orientation,
+            List<OriginalRendererCore.Vec> vectors,
+            Func<int, int, int> textureIndexAt)
+        {
+            bool mergeActive = false;
+            bool previousObjectClass3 = false;
+            byte previousBit10 = 0;
+            byte previousWallId = 0;
+            byte previousNeighborWallId = 0;
+
+            for (int outer = 0;
+                outer < 64;
+                outer++)
+            {
+                mergeActive = false;
+                previousObjectClass3 = false;
+                previousBit10 = 0;
+                previousWallId = 0;
+                previousNeighborWallId = 0;
+
+                for (int inner = 0;
+                    inner < 64;
+                    inner++)
+                {
+                    if (vectors.Count >=
+                        OriginalRendererCore.MaxVectors)
+                    {
+                        throw new InvalidOperationException(
+                            "MAXVEC exceeded (1000).");
+                    }
+
+                    int x =
+                        orientation == 0 ||
+                        orientation == 1
+                        ? inner
+                        : outer;
+
+                    int y =
+                        orientation == 0 ||
+                        orientation == 1
+                        ? outer
+                        : inner;
+
+                    int dx =
+                        orientation == 2
+                        ? 1
+                        : orientation == 3
+                            ? -1
+                            : 0;
+
+                    int dy =
+                        orientation == 0
+                        ? -1
+                        : orientation == 1
+                            ? 1
+                            : 0;
+
+                    int nx = x + dx;
+                    int ny = y + dy;
+
+                    if (nx < 0 || nx >= 64 ||
+                        ny < 0 || ny >= 64)
+                    {
+                        continue;
+                    }
+
+                    byte currentWall =
+                        WallId[x, y];
+
+                    byte neighborWall =
+                        WallId[nx, ny];
+
+                    byte currentProperty =
+                        WallProperty[currentWall];
+
+                    byte neighborProperty =
+                        WallProperty[neighborWall];
+
+                    byte currentBit10 =
+                        (byte)(
+                            (currentProperty & 0x10) >> 4);
+
+                    bool dynamicNeighborBoundary =
+                        (((currentProperty & 0x10) == 0) ||
+                         neighborWall != currentWall) &&
+                        ((neighborProperty & 0x10) != 0);
+
+                    bool currentObjectClass3 =
+                        ObjectClass[
+                            ObjectId[x, y]] == 0x03;
+
+                    bool neighborObjectClass3 =
+                        ObjectClass[
+                            ObjectId[nx, ny]] == 0x03;
+
+                    bool class3Boundary =
+                        neighborObjectClass3 &&
+                        !(currentObjectClass3 &&
+                          neighborWall == currentWall);
+
+                    if ((currentProperty & 0x04) == 0)
+                    {
+                        byte c =
+                            WallClass[currentWall];
+
+                        if (!ClassVisibleOnOrientation(
+                            orientation,
+                            c))
+                        {
+                            mergeActive = false;
+                        }
+                        else
+                        {
+                            vectors.Add(
+                                CreateHalfVec(
+                                    x,
+                                    y,
+                                    currentWall,
+                                    orientation,
+                                    textureIndexAt(x, y)));
+
+                            // The original does not explicitly change
+                            // its merge-active byte on this successful
+                            // half-vector path. Preserve that behavior.
+                        }
+                    }
+                    else if (
+                        (neighborProperty & 0x04) == 0 ||
+                        class3Boundary ||
+                        dynamicNeighborBoundary)
+                    {
+                        bool compatibleMerge =
+                            mergeActive &&
+                            previousWallId == currentWall &&
+                            ((WallProperty[
+                                previousNeighborWallId] ^
+                              neighborProperty) & 0x08) == 0 &&
+                            previousObjectClass3 ==
+                                currentObjectClass3 &&
+                            previousBit10 ==
+                                currentBit10;
+
+                        if (compatibleMerge)
+                        {
+                            ExtendVec(
+                                vectors[
+                                    vectors.Count - 1],
+                                orientation);
+                        }
+                        else
+                        {
+                            vectors.Add(
+                                CreateFullVec(
+                                    x,
+                                    y,
+                                    currentWall,
+                                    neighborWall,
+                                    orientation,
+                                    textureIndexAt(x, y)));
+
+                            mergeActive = true;
+                        }
+                    }
+                    else
+                    {
+                        mergeActive = false;
+                    }
+
+                    previousNeighborWallId =
+                        neighborWall;
+
+                    previousBit10 =
+                        currentBit10;
+
+                    previousObjectClass3 =
+                        currentObjectClass3;
+
+                    previousWallId =
+                        currentWall;
+                }
+            }
+        }
+
+        OriginalRendererCore.Vec CreateFullVec(
+            int x,
+            int y,
+            byte currentWall,
+            byte neighborWall,
+            int orientation,
+            int textureIndex)
+        {
+            OriginalRendererCore.Vec vec =
+                new OriginalRendererCore.Vec();
+
+            vec.WallId = currentWall;
+            vec.AnimationAux = 0;
+            vec.AnimationFrame = 0;
+            vec.RenderClass =
+                WallClass[currentWall];
+            vec.Flags =
+                WallProperty[currentWall];
+            vec.Orientation =
+                (byte)orientation;
+            vec.RuntimeTimer = 0;
+            vec.SourceTileX = x;
+            vec.SourceTileY = y;
+            vec.TextureIndex = textureIndex;
+
+            int xx = x;
+            int yy = y;
+
+            if (orientation == 2)
+            {
+                xx++;
+            }
+
+            vec.X1 =
+                OriginalRendererCore.Wrap16(
+                    xx << 6);
+
+            if (orientation == 1)
+            {
+                yy++;
+            }
+
+            vec.Y1 =
+                OriginalRendererCore.Wrap16(
+                    yy << 6);
+
+            vec.X2 =
+                OriginalRendererCore.Wrap16(
+                    vec.X1 +
+                    ((orientation == 0 ||
+                      orientation == 1)
+                        ? 0x40
+                        : 0));
+
+            vec.Y2 =
+                OriginalRendererCore.Wrap16(
+                    vec.Y1 +
+                    ((orientation == 2 ||
+                      orientation == 3)
+                        ? 0x40
+                        : 0));
+
+            byte firstId =
+                FindWallIdByClass(
+                    vec.RenderClass,
+                    0);
+
+            vec.TextureOffset =
+                unchecked(
+                    (sbyte)(
+                        currentWall -
+                        firstId));
+
+            byte neighborClass =
+                WallClass[neighborWall];
+
+            bool neighborCurtainClass =
+                neighborClass == 0x3F ||
+                neighborClass == 0x40;
+
+            if ((WallProperty[neighborWall] &
+                    0x08) != 0)
+            {
+                bool neighborFacesThisEdge =
+                    ClassVisibleOnOrientation(
+                        orientation,
+                        neighborClass);
+
+                if (!neighborFacesThisEdge &&
+                    !neighborCurtainClass)
+                {
+                    // Original changes only VEC +00 here. Flags/class
+                    // stay those of the original current wall.
+                    vec.WallId =
+                        FindWallIdByClass(
+                            0x30,
+                            neighborWall);
+                }
+            }
+
+            return vec;
+        }
+
+        OriginalRendererCore.Vec CreateHalfVec(
+            int x,
+            int y,
+            byte wallId,
+            int orientation,
+            int textureIndex)
+        {
+            OriginalRendererCore.Vec vec =
+                new OriginalRendererCore.Vec();
+
+            vec.WallId = wallId;
+            vec.AnimationAux = 0;
+            vec.AnimationFrame = 0;
+            vec.RenderClass =
+                WallClass[wallId];
+            vec.Flags =
+                WallProperty[wallId];
+            vec.Orientation =
+                (byte)orientation;
+            vec.RuntimeTimer = 0;
+            vec.SourceTileX = x;
+            vec.SourceTileY = y;
+            vec.TextureIndex = textureIndex;
+
+            int halfX =
+                (orientation == 2 ||
+                 orientation == 3)
+                ? 0x20
+                : 0;
+
+            int halfY =
+                (orientation == 0 ||
+                 orientation == 1)
+                ? 0x20
+                : 0;
+
+            vec.X1 =
+                OriginalRendererCore.Wrap16(
+                    x * 0x40 +
+                    halfX);
+
+            vec.Y1 =
+                OriginalRendererCore.Wrap16(
+                    y * 0x40 +
+                    halfY);
+
+            vec.X2 =
+                OriginalRendererCore.Wrap16(
+                    (x +
+                     ((orientation == 0 ||
+                       orientation == 1)
+                        ? 1
+                        : 0)) *
+                    0x40 +
+                    halfX);
+
+            vec.Y2 =
+                OriginalRendererCore.Wrap16(
+                    (y +
+                     ((orientation == 2 ||
+                       orientation == 3)
+                        ? 1
+                        : 0)) *
+                    0x40 +
+                    halfY);
+
+            if (vec.RenderClass == 0x3D ||
+                vec.RenderClass == 0x3E)
+            {
+                byte first =
+                    FindWallIdByClass(
+                        0x3E,
+                        0);
+
+                vec.TextureOffset =
+                    unchecked(
+                        (sbyte)(
+                            wallId - first));
+            }
+            else
+            {
+                byte first =
+                    FindWallIdByClass(
+                        vec.RenderClass,
+                        0);
+
+                int delta =
+                    wallId - first;
+
+                vec.TextureOffset =
+                    unchecked(
+                        (sbyte)(
+                            delta / 2));
+            }
+
+            return vec;
+        }
+
+        static void ExtendVec(
+            OriginalRendererCore.Vec vec,
+            int orientation)
+        {
+            if (orientation == 0 ||
+                orientation == 1)
+            {
+                vec.X2 =
+                    OriginalRendererCore.Wrap16(
+                        vec.X2 + 0x40);
+            }
+
+            if (orientation == 2 ||
+                orientation == 3)
+            {
+                vec.Y2 =
+                    OriginalRendererCore.Wrap16(
+                        vec.Y2 + 0x40);
+            }
+        }
+
     }
 }
