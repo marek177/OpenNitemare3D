@@ -65,25 +65,39 @@ namespace Nitemare3D
             short worldY = (short)MathF.Round(
                 position.Y * OriginalRuntime.WorldUnitsPerTile);
 
-            // Reserve the original eight-slot pool before creating the legacy
-            // render/movement shell. Sequence base 0 is temporary until the
-            // projectile IMG resource bridge owns presentation as well.
             int angleDegrees =
                 OriginalProjectileRuntime.AngleFromDirection(
                     direction.X,
                     direction.Y);
 
-            if (!OriginalProjectileRuntime.TryAllocateAndInitialize(
-                    OriginalRuntimeState.ProjectilePool.Slots,
-                    (byte)weaponSelector,
-                    worldX,
-                    worldY,
-                    0,
-                    angleDegrees,
-                    out int slotIndex))
+            if (!OriginalRuntimeState.TryGetProjectileDefinition(
+                    weaponSelector,
+                    false,
+                    out byte flightDefinitionId,
+                    out OriginalObjectDefinitionRecord flightDefinition))
             {
                 return false;
             }
+
+            int slotIndex =
+                OriginalRuntimeState.ProjectilePool.FirstFreeSlot();
+            if (slotIndex < 0)
+                return false;
+
+            ref var runtime =
+                ref OriginalRuntimeState.ProjectilePool.Slots[slotIndex];
+
+            OriginalProjectileRuntime.InitializeSpawnWithDefinition(
+                ref runtime,
+                flightDefinitionId,
+                worldX,
+                worldY,
+                OriginalRuntimeState.RuntimeClockMs,
+                flightDefinition.Interval);
+
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(
+                ref runtime,
+                angleDegrees);
 
             var projectile = new Projectile(
                 direction,
@@ -108,6 +122,12 @@ namespace Nitemare3D
         void RemoveProjectile()
         {
             ReleaseRuntimeSlot();
+            Entity.Remove(this);
+            visible = false;
+        }
+
+        void RemoveRenderShell()
+        {
             Entity.Remove(this);
             visible = false;
         }
@@ -197,37 +217,71 @@ namespace Nitemare3D
 
             if (runtime.State == (byte)OriginalProjectileState.Free)
             {
-                Entity.Remove(this);
-                visible = false;
+                RemoveRenderShell();
                 return;
             }
 
-            if (runtime.State == (byte)OriginalProjectileState.Flying &&
-                OriginalRuntimeState.ProjectileLogicTickDue)
+            if (OriginalRuntimeState.ProjectileLogicTickDue)
             {
-                bool collided =
-                    OriginalProjectileRuntime.AdvanceTrajectoryAndCollide(
-                        ref runtime,
-                        OriginalRuntimeState.ProjectileSubstepsPerTick,
-                        RuntimeCollisionAt);
-
-                position.X =
-                    (float)runtime.RenderObject.WorldX /
-                    OriginalRuntime.WorldUnitsPerTile;
-                position.Y =
-                    (float)runtime.RenderObject.WorldY /
-                    OriginalRuntime.WorldUnitsPerTile;
-
-                if (collided)
+                if (OriginalRuntimeState.ObjectDefinitions.TryGetHeader(
+                        runtime.RenderObject.DefinitionId,
+                        out var activeDefinition))
                 {
-                    // The movement/collision source of truth is now the recovered
-                    // 42-byte slot. Impact presentation still uses the legacy
-                    // shell until projectile IMG sequence timing is bridged.
-                    RemoveProjectile();
+                    OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                        ref runtime,
+                        OriginalRuntimeState.RuntimeClockMs,
+                        activeDefinition.FrameCount,
+                        activeDefinition.Interval);
+                }
+
+                if (runtime.State == (byte)OriginalProjectileState.Free)
+                {
+                    RemoveRenderShell();
                     return;
+                }
+
+                if (runtime.State == (byte)OriginalProjectileState.Flying)
+                {
+                    bool collided =
+                        OriginalProjectileRuntime.AdvanceTrajectoryAndCollide(
+                            ref runtime,
+                            OriginalRuntimeState.ProjectileSubstepsPerTick,
+                            RuntimeCollisionAt);
+
+                    position.X =
+                        (float)runtime.RenderObject.WorldX /
+                        OriginalRuntime.WorldUnitsPerTile;
+                    position.Y =
+                        (float)runtime.RenderObject.WorldY /
+                        OriginalRuntime.WorldUnitsPerTile;
+
+                    if (collided)
+                    {
+                        if (!OriginalRuntimeState.TryGetProjectileDefinition(
+                                weaponSelector,
+                                true,
+                                out byte impactDefinitionId,
+                                out OriginalObjectDefinitionRecord impactDefinition))
+                        {
+                            RemoveProjectile();
+                            return;
+                        }
+
+                        OriginalProjectileRuntime.EnterImpactWithDefinition(
+                            ref runtime,
+                            impactDefinitionId,
+                            OriginalRuntimeState.RuntimeClockMs,
+                            impactDefinition.Interval);
+                    }
                 }
             }
 
+            position.X =
+                (float)runtime.RenderObject.WorldX /
+                OriginalRuntime.WorldUnitsPerTile;
+            position.Y =
+                (float)runtime.RenderObject.WorldY /
+                OriginalRuntime.WorldUnitsPerTile;
             spritePosition = position;
         }
     }
