@@ -1510,6 +1510,125 @@ namespace Nitemare3D
             return false;
         }
 
+        static bool HitscanStateEligible(ref OriginalGuardRecord guard)
+        {
+            return guard.Strength != 0 &&
+                   guard.State != (byte)OriginalGuardState.AnimationTimer &&
+                   guard.State != (byte)OriginalGuardState.DeathFinalize09 &&
+                   guard.State != (byte)OriginalGuardState.NoLocalAction0A;
+        }
+
+        public static GuardHitResult ApplyPlayerWeaponDamage(
+            Entity entity,
+            OriginalWeaponSelector weaponSelector,
+            bool requireCurrentAimStamp)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return GuardHitResult.NoRuntimeBinding;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            if (guard.Strength == 0)
+                return GuardHitResult.NoDamage;
+
+            if (requireCurrentAimStamp &&
+                (CurrentRenderGeneration == 0 ||
+                 guard.Timestamp != CurrentRenderGeneration ||
+                 !HitscanStateEligible(ref guard)))
+            {
+                return GuardHitResult.NoDamage;
+            }
+
+            var computed = OriginalDamage.ComputePlayerToGuard(
+                obj.ProjectedBaseRow,
+                OriginalRuntime.ViewportCenterY,
+                obj.ObjectClass,
+                (byte)weaponSelector,
+                Difficulty,
+                (byte)Game.episode,
+                OriginalRandom.Next());
+
+            bool perceptionSucceeded =
+                EvaluateGuardPerception(
+                    entity,
+                    false,
+                    false);
+
+            return ApplyNormalGuardDamage(
+                entity,
+                computed.StoredByte,
+                OriginalRandom.Next,
+                perceptionSucceeded);
+        }
+
+        public static int FireHitscan(OriginalWeaponSelector weaponSelector)
+        {
+            if (weaponSelector != OriginalWeaponSelector.SilverPistol ||
+                Game.player == null)
+            {
+                return 0;
+            }
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+            int playerTileX = playerWorldX >> 6;
+            int playerTileY = playerWorldY >> 6;
+            int hits = 0;
+
+            foreach (var pair in bindings)
+            {
+                var binding = pair.Value;
+                if (binding.GuardSlot < 0 ||
+                    binding.ObjectSlot < 0)
+                {
+                    continue;
+                }
+
+                ref var guard = ref Guards[binding.GuardSlot];
+                ref var obj = ref Objects[binding.ObjectSlot];
+
+                if (!HitscanStateEligible(ref guard) ||
+                    CurrentRenderGeneration == 0 ||
+                    guard.Timestamp != CurrentRenderGeneration)
+                {
+                    continue;
+                }
+
+                int guardTileX = obj.WorldX >> 6;
+                int guardTileY = obj.WorldY >> 6;
+
+                if (!Level.OriginalPerceptionLineTrace(
+                        playerTileX,
+                        playerTileY,
+                        guardTileX - playerTileX,
+                        guardTileY - playerTileY,
+                        16,
+                        true))
+                {
+                    continue;
+                }
+
+                var result = ApplyPlayerWeaponDamage(
+                    pair.Key,
+                    weaponSelector,
+                    true);
+
+                if (result != GuardHitResult.NoRuntimeBinding &&
+                    result != GuardHitResult.NoDamage &&
+                    result != GuardHitResult.MissingDefinition)
+                {
+                    hits++;
+                }
+            }
+
+            return hits;
+        }
+
         public enum GuardHitResult
         {
             NoRuntimeBinding,
