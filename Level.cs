@@ -25,6 +25,27 @@ namespace Nitemare3D
             if(id == 0){return;}
             var position = new Vec2(x, y) + .5f;
 
+            // MAP.N class/property tables are episode-specific and therefore
+            // authoritative over the legacy global ObjectType enum. Route every
+            // actor-linked object directly into the recovered GUARD runtime
+            // before the historical switch can reinterpret an overlapping raw ID.
+            if (originalMap != null)
+            {
+                byte rawId =
+                    unchecked((byte)id);
+                byte propertyFlags =
+                    originalMap.ObjectProperty[rawId];
+
+                if ((propertyFlags &
+                        OriginalMapTables.ObjectCreatesGuard) != 0)
+                {
+                    Entity.Add(
+                        new OriginalMapGuard(rawId),
+                        position);
+                    return;
+                }
+            }
+
             var type = (ObjectType)id;
             Entity ent = null;
 
