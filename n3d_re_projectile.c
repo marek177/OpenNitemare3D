@@ -104,6 +104,97 @@ int N3D_RE_InitializeProjectile(
     return 1;
 }
 
+int N3D_RE_InitializeProjectileFromAngle(
+    int slot,
+    uint8_t weapon_selector,
+    int16_t world_x,
+    int16_t world_y,
+    uint8_t sequence_base,
+    int angle_degrees)
+{
+    if(!N3D_RE_InitializeProjectile(
+            slot,
+            weapon_selector,
+            world_x,
+            world_y,
+            sequence_base))
+        return 0;
+
+    n3d_line_state line = {0};
+    if(!N3D_RE_InitLineStateFromAngle(angle_degrees, &line))
+    {
+        n3d_projectiles[slot].state = 0;
+        return 0;
+    }
+
+    n3d_projectile_record* projectile = &n3d_projectiles[slot];
+    projectile->x_is_major_axis = line.axis_flag;
+    projectile->line_error = line.error;
+    projectile->minor_error_step = line.twice_minor;
+    projectile->major_error_fixup = line.twice_minor_minus_major;
+    projectile->step_x = line.step_x;
+    projectile->step_y = line.step_y;
+
+    return 1;
+}
+
+int N3D_RE_AdvanceProjectileLineSubstep(int slot)
+{
+    if(slot < 0 || slot >= N3D_MAX_PROJECTILES)
+        return 0;
+
+    n3d_projectile_record* projectile = &n3d_projectiles[slot];
+    if(projectile->state != 1)
+        return 0;
+
+    /*
+     * Exact 9D30-style line stepping over the projectile record itself.
+     * Collision/impact decisions are intentionally outside this primitive.
+     */
+    if(projectile->x_is_major_axis != 0)
+        projectile->object.world_x =
+            (int16_t)(projectile->object.world_x + projectile->step_x);
+    else
+        projectile->object.world_y =
+            (int16_t)(projectile->object.world_y + projectile->step_y);
+
+    if(projectile->line_error < 0)
+    {
+        projectile->line_error =
+            (int16_t)(
+                projectile->line_error +
+                projectile->minor_error_step);
+    }
+    else
+    {
+        projectile->line_error =
+            (int16_t)(
+                projectile->line_error +
+                projectile->major_error_fixup);
+
+        if(projectile->x_is_major_axis != 0)
+            projectile->object.world_y =
+                (int16_t)(projectile->object.world_y + projectile->step_y);
+        else
+            projectile->object.world_x =
+                (int16_t)(projectile->object.world_x + projectile->step_x);
+    }
+
+    return 1;
+}
+
+int N3D_RE_AdvanceProjectileLineSteps(int slot, uint16_t substeps)
+{
+    int advanced = 0;
+    for(uint16_t i = 0; i < substeps; ++i)
+    {
+        if(!N3D_RE_AdvanceProjectileLineSubstep(slot))
+            break;
+        ++advanced;
+    }
+    return advanced;
+}
+
 int N3D_RE_EnterProjectileImpact(
     int slot,
     uint8_t weapon_selector,
