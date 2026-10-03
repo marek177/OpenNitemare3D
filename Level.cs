@@ -1362,6 +1362,12 @@ namespace Nitemare3D
             // MAP.N and IMG.N are episode-coupled in the original runtime.
             Img.LoadEpisode(episode);
 
+            // Exact CC7C/E5D8 sprite projection is opt-in by data presence.
+            // The extractor under tools/ creates this table from the checked
+            // original Win16 executable. Missing data keeps the legacy visual
+            // projection as a compatibility fallback.
+            OriginalRuntimeState.TryLoadExactTrigQ10();
+
             // The four projectile resources are runtime sequence-cache entries,
             // not ordinary map spawns. Load them explicitly so flight/impact
             // selectors and deadlines come from IMG.N instead of placeholder IDs.
