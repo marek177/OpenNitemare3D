@@ -2549,6 +2549,161 @@ int main(void)
         assert(advance.collision.enter_impact == 1);
     }
 
+    /* Projectile -> GUARD damage bridge: explicit render/RNG inputs only. */
+    {
+        N3D_RE_ResetRuntime();
+        N3D_RE_ResetPlayer();
+
+        /* Map object 148 is class 0x0C (Mrs H.) in the recovered guard blocks. */
+        n3d_object_mapping_known[148] = 1;
+        n3d_object_property_known[148] = 1;
+        n3d_object_mapped_type[148] = 0x0C;
+        n3d_object_property_resolved[148] =
+            N3D_RE_ObjectPropertiesForMappedType(0x0C);
+
+        int damage_object_slot = -1;
+        assert(N3D_RE_InstantiateMapObject(
+            148, 8, 8, &damage_object_slot));
+        assert(damage_object_slot >= 0);
+
+        const int damage_guard_slot =
+            n3d_objects[damage_object_slot].guard_index;
+        assert(damage_guard_slot >= 0);
+        assert(damage_guard_slot < (int)n3d_guard_count);
+
+        n3d_objects[damage_object_slot].projected_y_base = 90;
+        n3d_guards[damage_guard_slot].strength = 255;
+
+        n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+        n3d_player.difficulty = 1;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        n3d_projectile_collision_result hit = {0};
+        hit.kind = N3D_PROJECTILE_COLLISION_GUARD_HIT;
+        hit.object_slot = (int16_t)damage_object_slot;
+        hit.guard_slot = (int16_t)damage_guard_slot;
+        hit.enter_impact = 1;
+
+        n3d_projectile_guard_resolution guard_resolution =
+            N3D_RE_ResolveProjectileGuardHit(
+                0, &hit, 80, 0, 0);
+
+        assert(guard_resolution.resolved == 1);
+        assert(guard_resolution.applied_damage == 10);
+        assert(guard_resolution.guard_result == N3D_GUARD_HIT_PAIN);
+        assert(guard_resolution.score_delta == 0);
+        assert(guard_resolution.entered_impact == 1);
+        assert(n3d_guards[damage_guard_slot].strength == 245);
+        assert(n3d_projectiles[0].state == 2);
+        assert(n3d_projectiles[0].object.sequence_id == 21);
+        assert((n3d_projectiles[0].object.flags & 0x10) != 0);
+
+        /* Same 10 damage becomes lethal and returns the class score delta. */
+        N3D_RE_ResetRuntime();
+        n3d_object_mapping_known[148] = 1;
+        n3d_object_property_known[148] = 1;
+        n3d_object_mapped_type[148] = 0x0C;
+        n3d_object_property_resolved[148] =
+            N3D_RE_ObjectPropertiesForMappedType(0x0C);
+
+        assert(N3D_RE_InstantiateMapObject(
+            148, 8, 8, &damage_object_slot));
+        const int lethal_guard_slot =
+            n3d_objects[damage_object_slot].guard_index;
+        n3d_objects[damage_object_slot].projected_y_base = 90;
+        n3d_guards[lethal_guard_slot].strength = 10;
+
+        n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+        n3d_player.difficulty = 1;
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        hit.object_slot = (int16_t)damage_object_slot;
+        hit.guard_slot = (int16_t)lethal_guard_slot;
+
+        guard_resolution =
+            N3D_RE_ResolveProjectileGuardHit(
+                0, &hit, 80, 0, 0);
+        assert(guard_resolution.guard_result == N3D_GUARD_HIT_KILLED);
+        assert(guard_resolution.applied_damage == 10);
+        assert(guard_resolution.score_delta == 250);
+        assert(n3d_guards[lethal_guard_slot].strength == 0);
+        assert(n3d_projectiles[0].state == 2);
+
+        /* Dracula lethal phase 1 transforms instead of awarding kill score. */
+        N3D_RE_ResetRuntime();
+        n3d_object_mapping_known[176] = 1;
+        n3d_object_property_known[176] = 1;
+        n3d_object_mapped_type[176] = 0x11;
+        n3d_object_property_resolved[176] =
+            N3D_RE_ObjectPropertiesForMappedType(0x11);
+
+        int dracula_object_slot = -1;
+        assert(N3D_RE_InstantiateMapObject(
+            176, 8, 8, &dracula_object_slot));
+        const int dracula_guard_slot =
+            n3d_objects[dracula_object_slot].guard_index;
+
+        n3d_objects[dracula_object_slot].projected_y_base = 112;
+        n3d_guards[dracula_guard_slot].strength = 32;
+
+        n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+        n3d_player.difficulty = 1;
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        hit.object_slot = (int16_t)dracula_object_slot;
+        hit.guard_slot = (int16_t)dracula_guard_slot;
+
+        guard_resolution =
+            N3D_RE_ResolveProjectileGuardHit(
+                0, &hit, 80, 0, 0);
+        assert(guard_resolution.guard_result ==
+               N3D_GUARD_HIT_DRACULA_TRANSFORMED);
+        assert(guard_resolution.applied_damage == 32);
+        assert(guard_resolution.score_delta == 0);
+        assert(n3d_objects[dracula_object_slot].object_class == 0x14);
+        assert(n3d_guards[dracula_guard_slot].strength == 0xFF);
+        assert(n3d_guards[dracula_guard_slot].state == N3D_GUARD_STATE_08);
+        assert(n3d_guards[dracula_guard_slot].next_state == N3D_GUARD_STATE_02);
+        assert(n3d_guards[dracula_guard_slot].timer == 1);
+        assert(n3d_projectiles[0].state == 2);
+
+        /* Negative signed producer output is ignored, never uint8-wrapped. */
+        N3D_RE_ResetRuntime();
+        n3d_object_mapping_known[148] = 1;
+        n3d_object_property_known[148] = 1;
+        n3d_object_mapped_type[148] = 0x0C;
+        n3d_object_property_resolved[148] =
+            N3D_RE_ObjectPropertiesForMappedType(0x0C);
+
+        assert(N3D_RE_InstantiateMapObject(
+            148, 8, 8, &damage_object_slot));
+        const int negative_guard_slot =
+            n3d_objects[damage_object_slot].guard_index;
+        n3d_objects[damage_object_slot].projected_y_base = 70;
+        n3d_guards[negative_guard_slot].strength = 255;
+
+        n3d_player.active_weapon = N3D_WEAPON_SINGLE_LASER;
+        n3d_player.difficulty = 1;
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        hit.object_slot = (int16_t)damage_object_slot;
+        hit.guard_slot = (int16_t)negative_guard_slot;
+
+        guard_resolution =
+            N3D_RE_ResolveProjectileGuardHit(
+                0, &hit, 80, 0, 0);
+        assert(guard_resolution.resolved == 1);
+        assert(guard_resolution.applied_damage == 0);
+        assert(guard_resolution.guard_result == N3D_GUARD_HIT_NO_DAMAGE);
+        assert(n3d_guards[negative_guard_slot].strength == 255);
+        assert(n3d_projectiles[0].state == 2);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
