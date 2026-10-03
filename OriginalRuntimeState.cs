@@ -36,6 +36,9 @@ namespace Nitemare3D
         public static readonly OriginalWeaponRuntime WeaponRuntime =
             new OriginalWeaponRuntime();
 
+        public static readonly OriginalPickupRuntime PickupRuntime =
+            new OriginalPickupRuntime();
+
         static readonly Dictionary<Entity, Binding> bindings =
             new Dictionary<Entity, Binding>();
 
