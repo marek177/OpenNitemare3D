@@ -78,6 +78,16 @@ namespace Nitemare3D
                 yOffset = 32;
         }
 
+        public override void Start()
+        {
+            if (rawObjectId != 0)
+            {
+                OriginalRuntimeState.RegisterWorldObject(
+                    this,
+                    rawObjectId);
+            }
+        }
+
         public override void Update()
         {
             anim.Update();
@@ -133,6 +143,9 @@ namespace Nitemare3D
                 OriginalPickupRuntime.PickupSoundEventId(objectClass);
             if (soundEvent >= 0)
                 SoundEffect.PlayOriginalEvent(soundEvent);
+
+            OriginalRuntimeState.DeactivateCollectedWorldObject(
+                this);
 
             Entity.Remove(this);
             visible = false;
