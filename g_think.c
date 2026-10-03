@@ -272,6 +272,36 @@ void G_HandleRecoveredGuardThinking()
                 }
                 break;
 
+            case N3D_GUARD_STATE_05:
+                if(guard->object_slot < n3d_object_count)
+                {
+                    n3d_object_record* object =
+                        &n3d_objects[guard->object_slot];
+
+                    /*
+                     * State 05 enters FUN_76FC directly. The only still-open
+                     * sub-branch is low-strength strategy 1, which requires the
+                     * original RETREAT-door target lookup.
+                     */
+                    const int needs_retreat_target =
+                        guard->strategy == 1 &&
+                        guard->strength < 0x7F;
+
+                    if(!needs_retreat_target)
+                    {
+                        N3D_RE_PlanMovement76FC(
+                            guard,
+                            object,
+                            n3d_player.world_x,
+                            n3d_player.world_y,
+                            n3d_player.difficulty,
+                            0,
+                            0,
+                            0);
+                    }
+                }
+                break;
+
             case N3D_GUARD_STATE_0A:
             case N3D_GUARD_STATE_LETHAL_CONTACT:
                 /* no local dispatcher action */
