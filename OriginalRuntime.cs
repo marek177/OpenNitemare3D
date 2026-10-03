@@ -21,6 +21,10 @@ namespace Nitemare3D
         // Player.
         public const int PlayerMaxHealth = 100;
         public const int PlayerCollisionHalfExtent = 27;
+        public const byte DifficultyEasy = 0;
+        public const byte DifficultyNormal = 1;
+        public const byte DifficultyHard = 2;
+        public const byte DefaultDifficulty = DifficultyNormal;
 
         // Input mask recovered from DEMO/runtime handling.
         public const ushort InputForward = 0x0002;
