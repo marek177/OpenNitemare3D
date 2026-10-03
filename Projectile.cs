@@ -217,6 +217,23 @@ namespace Nitemare3D
             if (runtime.State == (byte)OriginalProjectileState.Free)
                 return false;
 
+            if (Game.player == null)
+                return false;
+
+            int playerWorldX = (int)MathF.Round(
+                Game.player.position.X * OriginalRuntime.WorldUnitsPerTile);
+            int playerWorldY = (int)MathF.Round(
+                Game.player.position.Y * OriginalRuntime.WorldUnitsPerTile);
+
+            if (!OriginalProjectileRuntime.NeedsProjection(
+                    runtime.RenderObject.WorldX,
+                    runtime.RenderObject.WorldY,
+                    playerWorldX,
+                    playerWorldY))
+            {
+                return false;
+            }
+
             int frameIndex = runtime.RenderObject.Component03;
             if (frameIndex < 0)
                 return false;
