@@ -29,6 +29,7 @@ namespace Nitemare3D
             TestPerceptionPrefilter();
             TestGuardGridTrace();
             TestGuardLosCellFlags();
+            TestCellFlagGenerators();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -1071,6 +1072,31 @@ namespace Nitemare3D
                    !OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(1) &&
                    !OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(3),
                 "FUN_1476 runtime state predicate mismatch.");
+        }
+
+        static void TestCellFlagGenerators()
+        {
+            Assert(OriginalGuardDispatcher.BuildPrimaryCellFlags(0x00) == 0x00,
+                "primary class 00 flags mismatch.");
+            Assert(OriginalGuardDispatcher.BuildPrimaryCellFlags(0x01) == 0x07,
+                "primary class 01 must set 0x01/0x02/0x04.");
+            Assert(OriginalGuardDispatcher.BuildPrimaryCellFlags(0x2E) == 0x17,
+                "primary class 2E must add 0x10.");
+            Assert(OriginalGuardDispatcher.BuildPrimaryCellFlags(0x31) == 0x0B,
+                "primary class 31 must set 0x01/0x02/0x08.");
+            Assert(OriginalGuardDispatcher.BuildPrimaryCellFlags(0x47) == 0x40,
+                "primary class 47 must set only 0x40.");
+
+            Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x04) == 0x40,
+                "secondary class 04 flags mismatch.");
+            Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x08) == 0x0B,
+                "secondary class 08 must set 0x01/0x02/0x08.");
+            Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x2A) == 0x23,
+                "secondary class 2A must set 0x01/0x02/0x20.");
+            Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x2F) == 0x05,
+                "secondary class 2F must set 0x01/0x04.");
+            Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x3D) == 0x05,
+                "secondary class 3D must set 0x01/0x04.");
         }
 
         static void TestProjectileRuntime()
