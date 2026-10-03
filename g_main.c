@@ -43,8 +43,9 @@ void G_Init()
      * float speed constants.
      */
     N3D_RE_SetTimingFromRawMean(40);
+    N3D_RE_ResetTimingCalibration();
     printf(
-        "gameplay timing baseline: move=%u turn=%u projectile=%u\n",
+        "gameplay timing provisional baseline: move=%u turn=%u projectile=%u\n",
         n3d_timing.movement_substeps,
         n3d_timing.turn_degrees,
         n3d_timing.projectile_substeps);
@@ -87,6 +88,26 @@ void G_DrawPlayerFace()
 void G_UpdateGame()
 {
     I_HandleKeyboard();
+
+    const int frame_ms = I_FrameTime();
+    if(frame_ms > 0)
+    {
+        const uint16_t sample_ms =
+            frame_ms > 0xFFFF ? 0xFFFF : (uint16_t)frame_ms;
+
+        if(N3D_RE_SampleTimingFrame(sample_ms))
+        {
+            printf(
+                "gameplay timing calibrated: raw=%u effective=%u "
+                "move=%u turn=%u projectile=%u\n",
+                n3d_timing.raw_mean_ms,
+                n3d_timing.effective_ms,
+                n3d_timing.movement_substeps,
+                n3d_timing.turn_degrees,
+                n3d_timing.projectile_substeps);
+        }
+    }
+
     switch (gameinfo.gamestate)
     {
     case GAMESTATE_STARTSCREEN:
