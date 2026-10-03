@@ -1,143 +1,26 @@
 using System;
-using System.Runtime.InteropServices;
 
 namespace Nitemare3D
 {
     /// <summary>
-    /// Byte-exact known tail of the 0x5A-byte IMG definition record used by
-    /// OBJECT +0x04. FUN_1010_4B86 selects the object bank by adding 0x100
-    /// before multiplying by 0x5A.
-    /// </summary>
-    [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.ObjectDefinitionBytes)]
-    public struct OriginalObjectDefinitionRecord
-    {
-        [FieldOffset(0x02)] public byte FrameCount;
-
-        [FieldOffset(0x04)] public ulong DirectionalA0To3;
-        [FieldOffset(0x0C)] public ulong DirectionalA4To7;
-        [FieldOffset(0x14)] public ulong DirectionalB0To3;
-        [FieldOffset(0x1C)] public ulong DirectionalB4To7;
-        [FieldOffset(0x24)] public ulong DirectionalC0To3;
-        [FieldOffset(0x2C)] public ulong DirectionalC4To7;
-
-        [FieldOffset(OriginalRuntime.ObjectDefinitionAlertSequenceOffset)]
-        public ushort AlertSequence;
-
-        [FieldOffset(OriginalRuntime.ObjectDefinitionAttackSequenceOffset)]
-        public ushort AttackSequence;
-
-        [FieldOffset(OriginalRuntime.ObjectDefinitionRecoverySequenceOffset)]
-        public ushort RecoverySequence;
-
-        [FieldOffset(0x3A)] public ushort ReactionSequence0;
-        [FieldOffset(0x3C)] public ushort ReactionSequence1;
-        [FieldOffset(0x3E)] public ushort ReactionSequence2;
-        [FieldOffset(0x40)] public ushort ReactionSequence3;
-        [FieldOffset(0x42)] public ushort ReactionSequence4;
-        [FieldOffset(0x44)] public ushort ReactionSequence5;
-        [FieldOffset(0x46)] public ushort ReactionSequence6;
-        [FieldOffset(0x48)] public ushort ReactionSequence7;
-
-        [FieldOffset(0x4A)] public ushort DeathSequence0;
-        [FieldOffset(0x4C)] public ushort DeathSequence1;
-        [FieldOffset(0x4E)] public ushort DeathSequence2;
-        [FieldOffset(0x50)] public ushort DeathSequence3;
-        [FieldOffset(0x52)] public ushort DeathSequence4;
-        [FieldOffset(0x54)] public ushort DeathSequence5;
-        [FieldOffset(0x56)] public ushort DeathSequence6;
-        [FieldOffset(0x58)] public ushort DeathSequence7;
-
-        static ushort GetPackedDirectional(
-            ulong lowFour,
-            ulong highFour,
-            int selector)
-        {
-            if (selector < 0 || selector > 7)
-                return 0;
-
-            ulong packed = selector < 4 ? lowFour : highFour;
-            int shift = (selector & 3) * 16;
-            return (ushort)(packed >> shift);
-        }
-
-        public ushort GetDirectionalSequenceA(int selector)
-        {
-            return GetPackedDirectional(
-                DirectionalA0To3,
-                DirectionalA4To7,
-                selector);
-        }
-
-        public ushort GetDirectionalSequenceB(int selector)
-        {
-            return GetPackedDirectional(
-                DirectionalB0To3,
-                DirectionalB4To7,
-                selector);
-        }
-
-        public ushort GetDirectionalSequenceC(int selector)
-        {
-            return GetPackedDirectional(
-                DirectionalC0To3,
-                DirectionalC4To7,
-                selector);
-        }
-
-        public bool TryGetReactionSequence(int selector, out ushort sequence)
-        {
-            switch (selector)
-            {
-                case 0: sequence = ReactionSequence0; return (sequence & 0xFF00) != 0;
-                case 1: sequence = ReactionSequence1; return (sequence & 0xFF00) != 0;
-                case 2: sequence = ReactionSequence2; return (sequence & 0xFF00) != 0;
-                case 3: sequence = ReactionSequence3; return (sequence & 0xFF00) != 0;
-                case 4: sequence = ReactionSequence4; return (sequence & 0xFF00) != 0;
-                case 5: sequence = ReactionSequence5; return (sequence & 0xFF00) != 0;
-                case 6: sequence = ReactionSequence6; return (sequence & 0xFF00) != 0;
-                case 7: sequence = ReactionSequence7; return (sequence & 0xFF00) != 0;
-                default:
-                    sequence = 0;
-                    return false;
-            }
-        }
-
-        public bool TryGetDeathSequence(int selector, out ushort sequence)
-        {
-            switch (selector)
-            {
-                case 0: sequence = DeathSequence0; return (sequence & 0xFF00) != 0;
-                case 1: sequence = DeathSequence1; return (sequence & 0xFF00) != 0;
-                case 2: sequence = DeathSequence2; return (sequence & 0xFF00) != 0;
-                case 3: sequence = DeathSequence3; return (sequence & 0xFF00) != 0;
-                case 4: sequence = DeathSequence4; return (sequence & 0xFF00) != 0;
-                case 5: sequence = DeathSequence5; return (sequence & 0xFF00) != 0;
-                case 6: sequence = DeathSequence6; return (sequence & 0xFF00) != 0;
-                case 7: sequence = DeathSequence7; return (sequence & 0xFF00) != 0;
-                default:
-                    sequence = 0;
-                    return false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Mirrors FUN_1010_4C8A's per-level definition deduplication. Equal source
-    /// keys collapse to one byte-sized DefinitionId, matching OBJECT +0x04.
+    /// Neutral model of the per-level object resource table produced by
+    /// FUN_1010_4B86. The original first reads a 0x5A-byte header, then allocates
+    /// count*10 bytes and fills 10-byte decoded entries. The returned table pointer,
+    /// not the header buffer, is stored in the per-level metadata rooted at DS:4748.
     /// </summary>
     public sealed class OriginalObjectDefinitionCatalog
     {
         readonly uint[] sourceKeys =
             new uint[OriginalRuntime.MaxObjectDefinitions];
-        readonly OriginalObjectDefinitionRecord[] definitions =
-            new OriginalObjectDefinitionRecord[OriginalRuntime.MaxObjectDefinitions];
+        readonly byte[][] resourceTables =
+            new byte[OriginalRuntime.MaxObjectDefinitions][];
 
         public int Count { get; private set; }
 
         public void Clear()
         {
             Array.Clear(sourceKeys, 0, sourceKeys.Length);
-            Array.Clear(definitions, 0, definitions.Length);
+            Array.Clear(resourceTables, 0, resourceTables.Length);
             Count = 0;
         }
 
@@ -156,82 +39,65 @@ namespace Nitemare3D
             return false;
         }
 
-        public bool TryGet(byte definitionId, out OriginalObjectDefinitionRecord definition)
+        public bool TryGetTable(byte definitionId, out byte[] table)
         {
-            if (definitionId < Count)
+            if (definitionId < Count && resourceTables[definitionId] != null)
             {
-                definition = definitions[definitionId];
+                table = resourceTables[definitionId];
                 return true;
             }
 
-            definition = default;
+            table = null;
             return false;
         }
 
-        public bool TryGetSequence(
+        public bool TryGetGuardStateWord(
             byte definitionId,
             OriginalGuardState state,
-            out ushort packedSequence)
+            out ushort value)
         {
-            if (!TryGet(definitionId, out var definition))
-            {
-                packedSequence = 0;
+            value = 0;
+            if (!TryGetTable(definitionId, out var table))
                 return false;
-            }
 
+            int offset;
             switch (state)
             {
                 case OriginalGuardState.Active02:
-                    packedSequence = definition.AlertSequence;
-                    return packedSequence != 0;
+                    offset = OriginalRuntime.GuardState02ResourceWordOffset;
+                    break;
 
                 case OriginalGuardState.Detection03:
-                    packedSequence = definition.AttackSequence;
-                    return packedSequence != 0;
+                    offset = OriginalRuntime.GuardState03ResourceWordOffset;
+                    break;
 
                 case OriginalGuardState.DetectionAttack04:
-                    packedSequence = definition.RecoverySequence;
-                    return packedSequence != 0;
+                    offset = OriginalRuntime.GuardState04ResourceWordOffset;
+                    break;
 
                 default:
-                    packedSequence = 0;
                     return false;
             }
-        }
 
-        public bool TryGetReactionSequence(
-            byte definitionId,
-            int selector,
-            out ushort packedSequence)
-        {
-            if (TryGet(definitionId, out var definition))
-                return definition.TryGetReactionSequence(selector, out packedSequence);
+            if (offset < 0 || offset + 1 >= table.Length)
+                return false;
 
-            packedSequence = 0;
-            return false;
-        }
-
-        public bool TryGetDeathSequence(
-            byte definitionId,
-            int selector,
-            out ushort packedSequence)
-        {
-            if (TryGet(definitionId, out var definition))
-                return definition.TryGetDeathSequence(selector, out packedSequence);
-
-            packedSequence = 0;
-            return false;
+            value = ReadUInt16LittleEndian(table, offset);
+            return true;
         }
 
         public bool TryGetOrAdd(
             uint sourceKey,
-            OriginalObjectDefinitionRecord definition,
+            byte[] decodedResourceTable,
             out byte definitionId)
         {
             if (TryFindBySourceKey(sourceKey, out definitionId))
                 return true;
 
-            if (Count >= OriginalRuntime.MaxObjectDefinitions)
+            if (decodedResourceTable == null ||
+                decodedResourceTable.Length == 0 ||
+                decodedResourceTable.Length % OriginalRuntime.ObjectResourceEntryBytes != 0 ||
+                Count >= OriginalRuntime.MaxObjectDefinitions)
             {
                 definitionId = 0;
                 return false;
@@ -239,81 +105,28 @@ namespace Nitemare3D
 
             definitionId = (byte)Count;
             sourceKeys[Count] = sourceKey;
-            definitions[Count] = definition;
+            resourceTables[Count] = (byte[])decodedResourceTable.Clone();
             Count++;
             return true;
         }
 
-        public bool TryGetOrAdd(
-            uint sourceKey,
-            byte[] block,
-            out byte definitionId)
+        public static int DecodeEntryCountFromHeader(byte[] header, int offset)
         {
-            if (TryFindBySourceKey(sourceKey, out definitionId))
-                return true;
-
-            if (block == null ||
-                block.Length < OriginalRuntime.ObjectDefinitionBytes)
-            {
-                definitionId = 0;
-                return false;
-            }
-
-            return TryGetOrAdd(sourceKey, Parse(block, 0), out definitionId);
-        }
-
-        public static OriginalObjectDefinitionRecord Parse(byte[] block, int offset)
-        {
-            if (block == null)
-                throw new ArgumentNullException(nameof(block));
+            if (header == null)
+                throw new ArgumentNullException(nameof(header));
             if (offset < 0 ||
-                offset > block.Length - OriginalRuntime.ObjectDefinitionBytes)
+                offset > header.Length - OriginalRuntime.ObjectResourceHeaderBytes)
             {
                 throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            return new OriginalObjectDefinitionRecord
-            {
-                FrameCount = block[offset + 0x02],
-                DirectionalA0To3 = ReadUInt64LittleEndian(block, offset + 0x04),
-                DirectionalA4To7 = ReadUInt64LittleEndian(block, offset + 0x0C),
-                DirectionalB0To3 = ReadUInt64LittleEndian(block, offset + 0x14),
-                DirectionalB4To7 = ReadUInt64LittleEndian(block, offset + 0x1C),
-                DirectionalC0To3 = ReadUInt64LittleEndian(block, offset + 0x24),
-                DirectionalC4To7 = ReadUInt64LittleEndian(block, offset + 0x2C),
-                AlertSequence = ReadUInt16LittleEndian(block, offset + 0x34),
-                AttackSequence = ReadUInt16LittleEndian(block, offset + 0x36),
-                RecoverySequence = ReadUInt16LittleEndian(block, offset + 0x38),
-                ReactionSequence0 = ReadUInt16LittleEndian(block, offset + 0x3A),
-                ReactionSequence1 = ReadUInt16LittleEndian(block, offset + 0x3C),
-                ReactionSequence2 = ReadUInt16LittleEndian(block, offset + 0x3E),
-                ReactionSequence3 = ReadUInt16LittleEndian(block, offset + 0x40),
-                ReactionSequence4 = ReadUInt16LittleEndian(block, offset + 0x42),
-                ReactionSequence5 = ReadUInt16LittleEndian(block, offset + 0x44),
-                ReactionSequence6 = ReadUInt16LittleEndian(block, offset + 0x46),
-                ReactionSequence7 = ReadUInt16LittleEndian(block, offset + 0x48),
-                DeathSequence0 = ReadUInt16LittleEndian(block, offset + 0x4A),
-                DeathSequence1 = ReadUInt16LittleEndian(block, offset + 0x4C),
-                DeathSequence2 = ReadUInt16LittleEndian(block, offset + 0x4E),
-                DeathSequence3 = ReadUInt16LittleEndian(block, offset + 0x50),
-                DeathSequence4 = ReadUInt16LittleEndian(block, offset + 0x52),
-                DeathSequence5 = ReadUInt16LittleEndian(block, offset + 0x54),
-                DeathSequence6 = ReadUInt16LittleEndian(block, offset + 0x56),
-                DeathSequence7 = ReadUInt16LittleEndian(block, offset + 0x58)
-            };
+            // FUN_1010_4B86 reads the count from header +2 and allocates count*10.
+            return header[offset + 2];
         }
 
         static ushort ReadUInt16LittleEndian(byte[] data, int offset)
         {
             return (ushort)(data[offset] | (data[offset + 1] << 8));
-        }
-
-        static ulong ReadUInt64LittleEndian(byte[] data, int offset)
-        {
-            ulong value = 0;
-            for (int i = 0; i < 8; i++)
-                value |= ((ulong)data[offset + i]) << (i * 8);
-            return value;
         }
     }
 }
