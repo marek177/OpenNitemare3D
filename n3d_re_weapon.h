@@ -27,6 +27,17 @@ typedef struct n3d_fire_result
     uint8_t ammo_consumed;
 } n3d_fire_result;
 
+typedef struct n3d_weapon_jam_event_result
+{
+    uint8_t handled;
+    uint8_t jammed;
+    uint8_t sound_id;
+} n3d_weapon_jam_event_result;
+
+#define N3D_WEAPON_JAM_ENABLE_EVENT 0x47
+#define N3D_WEAPON_JAM_DISABLE_EVENT 0x48
+#define N3D_WEAPON_JAM_SOUND_ID 0x44
+
 /*
  * Executes only the recovered pre-fire transaction.
  * Exact cadence/cooldown remains outside until its scheduler is closed.
@@ -34,5 +45,6 @@ typedef struct n3d_fire_result
  * decremented. Silver Pistol returns HITSCAN_READY without projectile use.
  */
 n3d_fire_result N3D_RE_TryBeginPlayerFire(uint8_t projectile_sequence_base);
+n3d_weapon_jam_event_result N3D_RE_ApplyWeaponJamEvent(uint8_t event_id);
 
 #endif
