@@ -27,6 +27,23 @@ namespace Nitemare3D
         [FieldOffset(0x1B)] public byte Unknown1B;
     }
 
+    [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.DoorRuntimeStride)]
+    public struct OriginalDoorRuntimeRecord
+    {
+        // Original Win16 values are far pointers. The clean-room port may use
+        // stable opaque handles here; behavioral code uses the C# references
+        // retained by OriginalWallRuntime.PairedWall.
+        [FieldOffset(0x00)] public uint FirstVectorRef;
+        [FieldOffset(0x04)] public uint SecondVectorRef;
+        [FieldOffset(0x08)] public uint MapCellBinding;
+        [FieldOffset(0x0C)] public short State;
+        [FieldOffset(0x0E)] public short Timer;
+        [FieldOffset(0x10)] public short TargetX;
+        [FieldOffset(0x12)] public short TargetY;
+        [FieldOffset(0x14)] public byte Latch;
+        [FieldOffset(0x15)] public byte Unknown15;
+    }
+
     [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.GuardRuntimeStride)]
     public struct OriginalGuardRecord
     {
