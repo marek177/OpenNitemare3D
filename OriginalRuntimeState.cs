@@ -68,6 +68,11 @@ namespace Nitemare3D
         // persists while crossing ordinary cells.
         public static byte PlayerAreaSelector { get; private set; }
 
+        // DAT_1048_53DC. The original increments this 32-bit generation before
+        // world-object projection. GUARD +0x02..05 receives the value only when
+        // the projected sprite overlaps the aim center; hitscan requires equality.
+        public static uint CurrentRenderGeneration { get; private set; }
+
         // Mirrors the second half of the class-0x16 damage gate:
         // (episode == 3 || DAT_1048_51A6 != 0). The exact producer of 51A6 is
         // still separate, so production defaults this override to false.
@@ -143,6 +148,7 @@ namespace Nitemare3D
             guardLogicAccumulator = 0;
             GuardLogicTickDue = false;
             GuardProcessingGate = false;
+            CurrentRenderGeneration = 0;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -1428,6 +1434,54 @@ namespace Nitemare3D
 
             guardEntity = null;
             return false;
+        }
+
+        public static void BeginRenderGeneration()
+        {
+            unchecked
+            {
+                CurrentRenderGeneration++;
+            }
+
+            // A zero stamp is also the spawn/reset value. Skip it on wrap so a
+            // never-projected guard cannot accidentally look current.
+            if (CurrentRenderGeneration == 0)
+                CurrentRenderGeneration = 1;
+        }
+
+        public static bool RecordGuardProjection(
+            Entity entity,
+            short projectedBaseRow,
+            bool overlapsAimCenter)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return false;
+            }
+
+            ref var obj = ref Objects[binding.ObjectSlot];
+            ref var guard = ref Guards[binding.GuardSlot];
+
+            // OBJECT+0x18 is persistent: projection overwrites it only after a
+            // successful visible sprite projection; failed/off-screen frames do
+            // not clear the previous cached row.
+            obj.ProjectedBaseRow = projectedBaseRow;
+
+            if (overlapsAimCenter)
+                guard.Timestamp = CurrentRenderGeneration;
+
+            return true;
+        }
+
+        public static bool GuardHasCurrentAimStamp(Entity entity)
+        {
+            return bindings.TryGetValue(entity, out var binding) &&
+                   binding.GuardSlot >= 0 &&
+                   CurrentRenderGeneration != 0 &&
+                   Guards[binding.GuardSlot].Timestamp ==
+                       CurrentRenderGeneration;
         }
 
         public static bool TryGetGuardRecord(Entity entity, out OriginalGuardRecord guard)
