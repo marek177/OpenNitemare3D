@@ -70,6 +70,10 @@ int N3D_RE_KnownWallPropertyForClass(
     const char* class_name,
     uint8_t* property_flags);
 
+int N3D_RE_KnownWallPropertyForClass(
+    const char* class_name,
+    uint8_t* property_flags);
+
 int N3D_RE_KnownObjectMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type);
@@ -77,6 +81,8 @@ int N3D_RE_KnownObjectMappedTypeForClass(
 void N3D_RE_RebuildKnownMappedTypes(void);
 int N3D_RE_WallMappingKnown(uint8_t raw_id);
 int N3D_RE_ObjectMappingKnown(uint8_t raw_id);
+int N3D_RE_WallPropertyKnown(uint8_t raw_id);
+int N3D_RE_ObjectPropertyKnown(uint8_t raw_id);
 int N3D_RE_WallPropertyKnown(uint8_t raw_id);
 int N3D_RE_ObjectPropertyKnown(uint8_t raw_id);
 n3d_mapping_coverage N3D_RE_WallMappingCoverage(void);
