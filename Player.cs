@@ -1037,7 +1037,13 @@ namespace Nitemare3D
                 // FUN_D8FC owns view rotation while the player is dying.
                 OriginalRuntimeState.TickPlayerDeathCamera(this);
             }
-            else if (OriginalRuntimeState.GameplayState46B4 != 3)
+            else if (OriginalRuntimeState.GameplayState46B4 == 3)
+            {
+                // FUN_33D6/3B7C mode 4: one visible red-palette step per
+                // vertical-refresh-equivalent host frame.
+                OriginalRuntimeState.TickPlayerDeathRedFade();
+            }
+            else
             {
                 float oldRot = rotation;
 
