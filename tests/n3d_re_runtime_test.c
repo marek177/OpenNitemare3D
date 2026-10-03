@@ -43,6 +43,8 @@ int main(void)
     uint8_t trig_fixture[N3D_TRIG_FILE_BYTES] = {0};
     write_s16_le(trig_fixture, 45 * 2, 724);
     write_s16_le(trig_fixture, 90 * 2, 1024);
+    write_s16_le(trig_fixture, 180 * 2, 0);
+    write_s16_le(trig_fixture, 270 * 2, -1024);
     write_s16_le(
         trig_fixture,
         N3D_TRIG_ANGLE_COUNT * 2 + 0 * 2,
@@ -51,6 +53,14 @@ int main(void)
         trig_fixture,
         N3D_TRIG_ANGLE_COUNT * 2 + 45 * 2,
         724);
+    write_s16_le(
+        trig_fixture,
+        N3D_TRIG_ANGLE_COUNT * 2 + 180 * 2,
+        -1024);
+    write_s16_le(
+        trig_fixture,
+        N3D_TRIG_ANGLE_COUNT * 2 + 270 * 2,
+        0);
 
     FILE* trig_file = fopen("N3D_TRIG_Q10_TEST.BIN", "wb");
     assert(trig_file != NULL);
@@ -73,6 +83,45 @@ int main(void)
     assert(N3D_RE_RoundedOctant(22) == 0);
     assert(N3D_RE_RoundedOctant(23) == 1);
     assert(N3D_RE_RoundedOctant(359) == 0);
+
+    n3d_line_state exact_line = {0};
+
+    assert(N3D_RE_InitLineStateFromAngle(0, &exact_line));
+    assert(exact_line.sin_q10 == 0);
+    assert(exact_line.cos_q10 == 1024);
+    assert(exact_line.axis_flag == 0);
+    assert(exact_line.error == -1024);
+    assert(exact_line.twice_minor == 0);
+    assert(exact_line.twice_minor_minus_major == -2048);
+    assert(exact_line.step_x == 1);
+    assert(exact_line.step_y == -1);
+
+    assert(N3D_RE_InitLineStateFromAngle(45, &exact_line));
+    assert(exact_line.sin_q10 == 724);
+    assert(exact_line.cos_q10 == 724);
+    assert(exact_line.axis_flag == 0);
+    assert(exact_line.error == 724);
+    assert(exact_line.twice_minor == 1448);
+    assert(exact_line.twice_minor_minus_major == 0);
+    assert(exact_line.step_x == 1);
+    assert(exact_line.step_y == -1);
+
+    assert(N3D_RE_InitLineStateFromAngle(90, &exact_line));
+    assert(exact_line.sin_q10 == 1024);
+    assert(exact_line.cos_q10 == 0);
+    assert(exact_line.axis_flag == 1);
+    assert(exact_line.error == -1024);
+    assert(exact_line.twice_minor == 0);
+    assert(exact_line.twice_minor_minus_major == -2048);
+    assert(exact_line.step_x == 1);
+
+    assert(N3D_RE_InitLineStateFromAngle(180, &exact_line));
+    assert(exact_line.axis_flag == 0);
+    assert(exact_line.step_y == 1);
+
+    assert(N3D_RE_InitLineStateFromAngle(270, &exact_line));
+    assert(exact_line.axis_flag == 1);
+    assert(exact_line.step_x == -1);
 
     remove("N3D_TRIG_Q10_TEST.BIN");
 
@@ -1862,6 +1911,118 @@ int main(void)
         1, 0, &player_move_callbacks);
     assert(move_result.accepted_x == 1);
     assert(n3d_player.world_x == trap_x + 1);
+
+    /*
+     * Exact E516/9D30 angle-driven movement. 0 degrees is north (Y-),
+     * 90 east (X+), 180 south (Y+), 270 west (X-).
+     */
+    {
+        uint8_t exact_trig_fixture[N3D_TRIG_FILE_BYTES] = {0};
+        write_s16_le(exact_trig_fixture, 45 * 2, 724);
+        write_s16_le(exact_trig_fixture, 90 * 2, 1024);
+        write_s16_le(exact_trig_fixture, 180 * 2, 0);
+        write_s16_le(exact_trig_fixture, 270 * 2, -1024);
+        write_s16_le(
+            exact_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 0 * 2,
+            1024);
+        write_s16_le(
+            exact_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 45 * 2,
+            724);
+        write_s16_le(
+            exact_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 180 * 2,
+            -1024);
+        write_s16_le(
+            exact_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 270 * 2,
+            0);
+
+        FILE* exact_trig_file =
+            fopen("N3D_TRIG_Q10_EXACT_MOVE_TEST.BIN", "wb");
+        assert(exact_trig_file != NULL);
+        assert(fwrite(
+            exact_trig_fixture,
+            1,
+            sizeof(exact_trig_fixture),
+            exact_trig_file) == sizeof(exact_trig_fixture));
+        fclose(exact_trig_file);
+
+        assert(N3D_RE_LoadTrigQ10(
+            "N3D_TRIG_Q10_EXACT_MOVE_TEST.BIN"));
+
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        n3d_collision_callbacks exact_move_callbacks = {
+            N3D_RE_DoorCellPassableCallback,
+            NULL,
+            N3D_RE_PlayerPickupTouchCallback,
+            NULL
+        };
+
+        N3D_RE_InitPlayerAtTile(20, 20);
+        const int16_t exact_start_x = n3d_player.world_x;
+        const int16_t exact_start_y = n3d_player.world_y;
+
+        n3d_player_move_result exact_move =
+            N3D_RE_MovePlayerAngleSubsteps(
+                0, 10, &exact_move_callbacks);
+        assert(exact_move.requested_x == 0);
+        assert(exact_move.requested_y == -10);
+        assert(exact_move.accepted_x == 0);
+        assert(exact_move.accepted_y == -10);
+        assert(n3d_player.world_x == exact_start_x);
+        assert(n3d_player.world_y == exact_start_y - 10);
+
+        N3D_RE_InitPlayerAtTile(20, 20);
+        exact_move = N3D_RE_MovePlayerAngleSubsteps(
+            90, 10, &exact_move_callbacks);
+        assert(exact_move.requested_x == 10);
+        assert(exact_move.requested_y == 0);
+        assert(exact_move.accepted_x == 10);
+        assert(exact_move.accepted_y == 0);
+        assert(n3d_player.world_x == exact_start_x + 10);
+        assert(n3d_player.world_y == exact_start_y);
+
+        N3D_RE_InitPlayerAtTile(20, 20);
+        exact_move = N3D_RE_MovePlayerAngleSubsteps(
+            180, 10, &exact_move_callbacks);
+        assert(exact_move.requested_x == 0);
+        assert(exact_move.requested_y == 10);
+        assert(exact_move.accepted_y == 10);
+        assert(n3d_player.world_y == exact_start_y + 10);
+
+        N3D_RE_InitPlayerAtTile(20, 20);
+        exact_move = N3D_RE_MovePlayerAngleSubsteps(
+            270, 10, &exact_move_callbacks);
+        assert(exact_move.requested_x == -10);
+        assert(exact_move.requested_y == 0);
+        assert(exact_move.accepted_x == -10);
+        assert(n3d_player.world_x == exact_start_x - 10);
+
+        N3D_RE_InitPlayerAtTile(20, 20);
+        exact_move = N3D_RE_MovePlayerAngleSubsteps(
+            45, 10, &exact_move_callbacks);
+        assert(exact_move.requested_x == 10);
+        assert(exact_move.requested_y == -10);
+        assert(exact_move.accepted_x == 10);
+        assert(exact_move.accepted_y == -10);
+        assert(exact_move.x_attempts == 10);
+        assert(exact_move.y_attempts == 10);
+        assert(n3d_player.world_x == exact_start_x + 10);
+        assert(n3d_player.world_y == exact_start_y - 10);
+
+        remove("N3D_TRIG_Q10_EXACT_MOVE_TEST.BIN");
+    }
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
