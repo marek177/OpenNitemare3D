@@ -798,6 +798,48 @@ namespace Nitemare3D
                 doorTargetY);
         }
 
+        public static bool TryGetGuardRuntimeState(
+            Entity entity,
+            out OriginalGuardState state,
+            out OriginalGuardState nextState)
+        {
+            state = default;
+            nextState = default;
+
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            state = (OriginalGuardState)guard.State;
+            nextState = (OriginalGuardState)guard.NextState;
+            return true;
+        }
+
+        public static bool IsConfirmedAutonomousState(OriginalGuardState state)
+        {
+            switch (state)
+            {
+                case OriginalGuardState.AnimationTimer:
+                case OriginalGuardState.Delay:
+                case OriginalGuardState.Active02:
+                case OriginalGuardState.Detection03:
+                case OriginalGuardState.DetectionAttack04:
+                case OriginalGuardState.Transition05:
+                case OriginalGuardState.MoveThen03:
+                case OriginalGuardState.Active07:
+                case OriginalGuardState.WaitAnimation12:
+                case OriginalGuardState.Transition13:
+                case OriginalGuardState.Pain15:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         public static bool EnterStrategy3TimedMove(Entity entity, ushort randomValue)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
