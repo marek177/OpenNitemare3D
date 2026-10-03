@@ -51,7 +51,7 @@ namespace Nitemare3D
 
         static void TestObjectDefinitionCatalog()
         {
-            Assert(Marshal.SizeOf<OriginalObjectResourceHeader>() ==
+            Assert(Marshal.SizeOf<OriginalObjectDefinitionRecord>() ==
                    OriginalRuntime.ObjectResourceHeaderBytes,
                 "IMG resource header must be 0x5A bytes.");
             Assert(Marshal.SizeOf<OriginalImageFrameRuntimeRecord>() ==
