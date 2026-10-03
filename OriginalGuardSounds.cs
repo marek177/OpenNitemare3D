@@ -7,6 +7,28 @@ namespace Nitemare3D
     /// </summary>
     public static class OriginalGuardSounds
     {
+        public static bool AlertUsesRandom(byte objectClass)
+        {
+            return objectClass == 0x09 ||
+                   objectClass == 0x0A ||
+                   objectClass == 0x0F ||
+                   objectClass == 0x10;
+        }
+
+        public static bool AttackUsesRandom(byte objectClass)
+        {
+            return objectClass == 0x0F ||
+                   objectClass == 0x10 ||
+                   objectClass == 0x16 ||
+                   (objectClass >= 0x1B && objectClass <= 0x1F);
+        }
+
+        public static bool DeathUsesRandom(byte objectClass)
+        {
+            return objectClass == 0x0F ||
+                   objectClass == 0x10;
+        }
+
         public static int AlertSoundId(byte objectClass, ushort randomValue)
         {
             switch (objectClass)
