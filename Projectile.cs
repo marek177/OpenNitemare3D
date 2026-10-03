@@ -6,17 +6,9 @@ namespace Nitemare3D
         Plasma,
         Magic
     }
-    public class Projectile : Entity, ISprite
+    public class Projectile : Entity, ISprite, IOriginalSpriteFrameSource
     {
 
-
-        static Animation[] animations = new Animation[]
-        {
-            new Animation(666, 2, 125), //plasma
-            new Animation(671, 3, 125) //magic
-        };
-
-        AnimationHandler anim = new AnimationHandler();
 
         public int spriteIndex {get; set;}
         public bool visible{get;set;} = true;
@@ -49,7 +41,6 @@ namespace Nitemare3D
             this.type = type;
             this.weaponSelector = weaponSelector;
             this.runtimeSlotIndex = runtimeSlotIndex;
-            anim.LoadAnimation(animations[(int)type]);
             Game.player.AddSprite(this);
             hasCollision = false;
         }
@@ -209,11 +200,36 @@ namespace Nitemare3D
             return blockingObject && !permeable;
         }
 
+        public bool TryGetOriginalSpriteFrame(out BitmapImage frame)
+        {
+            frame = null;
+
+            if (runtimeSlotIndex < 0 ||
+                runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length ||
+                Img.current == null)
+            {
+                return false;
+            }
+
+            ref var runtime =
+                ref OriginalRuntimeState.ProjectilePool.Slots[runtimeSlotIndex];
+
+            if (runtime.State == (byte)OriginalProjectileState.Free)
+                return false;
+
+            int frameIndex = runtime.RenderObject.Component03;
+            if (frameIndex < 0)
+                return false;
+
+            return OriginalRuntimeState.ObjectDefinitions.TryGetBitmapFrame(
+                runtime.RenderObject.DefinitionId,
+                frameIndex,
+                Img.current.rawData,
+                out frame);
+        }
+
         public override void Update()
         {
-            anim.Update();
-            spriteIndex = anim.index;
-
             if (runtimeSlotIndex < 0 ||
                 runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length)
             {
@@ -293,6 +309,7 @@ namespace Nitemare3D
                 (float)runtime.RenderObject.WorldY /
                 OriginalRuntime.WorldUnitsPerTile;
             spritePosition = position;
+            yOffset = runtime.RenderObject.Runtime1A;
         }
     }
 }
