@@ -13,6 +13,7 @@ namespace Nitemare3D
         {
             public int Left;
             public int Right;
+            public int CenterX;
             public int Top;
             public int Bottom;
             public int BaselineRow;
@@ -136,6 +137,7 @@ namespace Nitemare3D
             {
                 Left = left,
                 Right = right,
+                CenterX = point.ScreenX,
                 Top = top,
                 Bottom = bottom,
                 BaselineRow = baseline,
