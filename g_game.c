@@ -20,6 +20,7 @@ void G_StartMainGame()
 
 void G_UpdateMainGame()
 {
+    G_HandleThinking();
     G_HandleRecoveredGuardThinking();
     G_ShowWalls();
 
@@ -65,17 +66,35 @@ void G_CreateMapObject(byte id, uint8_t x, uint8_t y)
     {
         N3D_RE_InitPlayerAtTile(x, y);
 
+        /*
+         * Original START object IDs are N/E/S/W in quarter-turn order.
+         * E516 angle convention is 0=north, 90=east, 180=south, 270=west.
+         */
+        const int start_angle = ((int)id - 1) * 90;
+        N3D_RE_SetPlayerAngle(start_angle);
+
         if(!p_player)
         {
-            obj_t* spawned_player = M_Spawn(id, x, y, id-1);
+            obj_t* spawned_player =
+                M_Spawn(M_PLAYER, x, y, 0);
             P_InitPlayer(spawned_player);
         }
+
+        if(!p_player)
+            return;
 
         p_player->health = n3d_player.health;
         p_player->x =
             (float)n3d_player.world_x / (float)N3D_WORLD_UNITS_PER_TILE;
         p_player->y =
             (float)n3d_player.world_y / (float)N3D_WORLD_UNITS_PER_TILE;
+        p_player->velx = 0;
+        p_player->vely = 0;
+
+        if(p_player->player)
+            p_player->player->angle =
+                (float)n3d_player.angle_degrees;
+
         return;
     }
 
