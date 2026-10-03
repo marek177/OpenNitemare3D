@@ -62,6 +62,10 @@ namespace Nitemare3D
             new OriginalRendererCore.Vec[
                 OriginalRendererCore.ScreenWidth];
 
+        static readonly ushort[] wallVisibilityQ4 =
+            new ushort[
+                OriginalRendererCore.ScreenWidth];
+
         static OriginalVisibilityExact.Result lastVisibility;
 
         // Original RNG is a separate engine subsystem. Stage 4 refuses to
@@ -117,9 +121,16 @@ namespace Nitemare3D
                 return;
             }
 
-            trig =
-                OriginalTrigQ10.Load(
+            if (!OriginalRuntimeState.TryLoadExactTrigQ10(
+                    trigPath))
+            {
+                throw new FileNotFoundException(
+                    "Exact Nitemare3D Q10 trig table is required.",
                     trigPath);
+            }
+
+            trig =
+                OriginalRuntimeState.ExactTrigQ10;
 
             visibility =
                 OriginalVisibilityOctants.Load(
@@ -154,6 +165,11 @@ namespace Nitemare3D
             }
 
             EnsureRuntime();
+
+            Array.Clear(
+                wallVisibilityQ4,
+                0,
+                wallVisibilityQ4.Length);
 
             FillOriginalBackground();
 
@@ -193,8 +209,7 @@ namespace Nitemare3D
                 spans.Count;
 
             uint nowMs =
-                unchecked(
-                    (uint)Environment.TickCount);
+                OriginalRuntimeState.RuntimeClockMs;
 
             DrawWallSpans(
                 spans,
@@ -218,49 +233,44 @@ namespace Nitemare3D
 
         static void EnsureRuntime()
         {
-            if (vectors != null &&
-                loadedEpisode == Game.episode &&
-                loadedLevel == Game.level)
+            if (Level.originalMap == null ||
+                Level.originalVectors == null ||
+                Level.originalWalls == null ||
+                Level.originalWallImages == null)
             {
-                return;
+                throw new InvalidOperationException(
+                    "Stage 4 requires Level.LoadMap original runtime state.");
             }
 
-            string mapPath =
-                Path.Combine(
-                    "data",
-                    "MAP." +
-                    Game.episode.ToString(
-                        CultureInfo.InvariantCulture));
-
-            string imgPath =
-                Path.Combine(
-                    "data",
-                    "IMG." +
-                    Game.episode.ToString(
-                        CultureInfo.InvariantCulture));
+            bool sameRuntime =
+                Object.ReferenceEquals(
+                    vectors,
+                    Level.originalVectors) &&
+                Object.ReferenceEquals(
+                    mapTables,
+                    Level.originalMap) &&
+                loadedEpisode == Game.episode &&
+                loadedLevel == Game.level;
 
             mapTables =
-                OriginalMapTables.Load(
-                    mapPath,
-                    Game.level);
+                Level.originalMap;
 
             vectors =
-                mapTables.BuildVectors(
-                    TextureIndexAt);
+                Level.originalVectors;
 
             wallImages =
-                new OriginalImgWallRuntime(
-                    imgPath,
-                    vectors);
+                Level.originalWallImages;
 
             wallRuntime =
-                new OriginalWallRuntime(
-                    mapTables,
-                    vectors);
+                Level.originalWalls;
 
-            orientationLists =
-                BuildOrientationLists(
-                    vectors);
+            if (!sameRuntime ||
+                orientationLists == null)
+            {
+                orientationLists =
+                    BuildOrientationLists(
+                        vectors);
+            }
 
             LastVectorCount =
                 vectors.Count;
@@ -303,9 +313,10 @@ namespace Nitemare3D
                     Math.PI,
                     MidpointRounding.AwayFromZero);
 
+            // Port rotation 0 = east. Original N3D angle 0 = north.
             return
                 OriginalTrigQ10.Normalize(
-                    degrees);
+                    degrees + 90);
         }
 
         static void FillOriginalBackground()
@@ -488,6 +499,22 @@ namespace Nitemare3D
                         OriginalRendererCore.CenterYQ4 +
                         displacementQ4;
 
+                    int visibilityValue =
+                        OriginalRendererCore.CenterYQ4 +
+                        displacementQ4;
+
+                    if (visibilityValue < 0)
+                        visibilityValue = 0;
+                    else if (visibilityValue > ushort.MaxValue)
+                        visibilityValue = ushort.MaxValue;
+
+                    if (x >= 0 &&
+                        x < wallVisibilityQ4.Length)
+                    {
+                        wallVisibilityQ4[x] =
+                            (ushort)visibilityValue;
+                    }
+
                     int topQ4 =
                         OriginalRendererCore.CenterYQ4 -
                         displacementQ4;
@@ -632,6 +659,24 @@ namespace Nitemare3D
                 source,
                 step,
                 null);
+        }
+
+        public static void CopyWallVisibilityQ4(
+            ushort[] destination)
+        {
+            if (destination == null ||
+                destination.Length <
+                    wallVisibilityQ4.Length)
+            {
+                throw new ArgumentException(
+                    "320-entry wall visibility destination is required.",
+                    nameof(destination));
+            }
+
+            Array.Copy(
+                wallVisibilityQ4,
+                destination,
+                wallVisibilityQ4.Length);
         }
 
         // ---- Public gameplay/debug bridge for future USE dispatcher work ----
