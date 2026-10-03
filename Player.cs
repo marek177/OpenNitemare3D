@@ -70,13 +70,30 @@ namespace Nitemare3D
 
         public override void Start()
         {
-            weapons[0].hasWeapon = true;
+            // FUN_BA16 clears the player gameplay block, leaving no active or
+            // owned weapon and zeroing all three ammo pools.
+            OriginalRuntimeState.WeaponRuntime.ResetNewGame();
+            weaponIndex = -1;
+            for (int i = 0; i < weapons.Length; i++)
+                weapons[i].hasWeapon = false;
 
             RayWidth  = (int)(RayWidth * GameWindow.scale);
             RayHeight  = (int)(RayHeight * GameWindow.scale);
             
             zBuffer = new float[RayWidth];
             hasCollision = false;
+        }
+
+        public bool AcquireWeapon(OriginalWeaponSelector selector)
+        {
+            int index = (int)selector;
+            if (index < 0 || index >= weapons.Length)
+                return false;
+
+            OriginalRuntimeState.WeaponRuntime.GrantWeapon(selector);
+            weapons[index].hasWeapon = true;
+            weaponIndex = index;
+            return true;
         }
 
         ISprite[] sprites = new ISprite[maxSprites];        
@@ -436,37 +453,61 @@ namespace Nitemare3D
 
         void RenderWeapon()
         {
-            if(weaponIndex == -1){return;} //empty hand
-            GameWindow.DrawImg(weapons[weaponIndex].texture, ImageConsts.UI_WEAPONPOSITION);
-
-            GameWindow.DrawImg(ImageConsts.UI_FACE_START, ImageConsts.UI_FACEPOSITION);
+            bool fireDown = Input.IsKeyDown(KeyboardKey.LControl);
+            bool fireEdge = fireDown && !fireWasDown;
+            fireWasDown = fireDown;
 
             var input = Input.GetNumberInput();
-            int oldWeaponIndex = weaponIndex;
             if (input > 0 && input <= weaponCount)
             {
-                fireTimer = 0;
-                weaponIndex = input - 1;
+                var requested =
+                    (OriginalWeaponSelector)(input - 1);
 
-                if(!weapons[weaponIndex].hasWeapon)
-                {
-                    weaponIndex = oldWeaponIndex;
-                }
+                if (OriginalRuntimeState.WeaponRuntime.TrySelect(requested))
+                    weaponIndex = input - 1;
             }
 
-            fireTimer += Time.dt;
-            if (Input.IsKeyDown(KeyboardKey.LControl))
-            {
-                if (fireTimer > weapons[weaponIndex].fireTime)
-                {
-                    fireTimer = 0;
-                    weapons[weaponIndex].Fire();
-                    SoundEffect.PlaySound(weapons[weaponIndex].fireSound);
-                }
+            if (weaponIndex == -1)
+                return; // original new-game state: empty hand
 
+            GameWindow.DrawImg(
+                weapons[weaponIndex].texture,
+                ImageConsts.UI_WEAPONPOSITION);
+            GameWindow.DrawImg(
+                ImageConsts.UI_FACE_START,
+                ImageConsts.UI_FACEPOSITION);
+
+            var selector = (OriginalWeaponSelector)weaponIndex;
+            if (!OriginalRuntimeState.WeaponRuntime.TryAcceptFireAttempt(
+                    selector,
+                    fireEdge,
+                    fireDown))
+            {
+                return;
+            }
+
+            // Shot acceptance is deliberately after the cadence gate.
+            // A rejected attempt keeps the original AA90 counter-reset behavior.
+            if (OriginalRuntimeState.WeaponRuntime.Jammed)
+                return;
+
+            if (OriginalProjectileRuntime.WeaponUsesProjectile(
+                    (byte)selector) &&
+                OriginalRuntimeState.ProjectilePool.FirstFreeSlot() < 0)
+            {
+                return;
+            }
+
+            if (!OriginalRuntimeState.WeaponRuntime.ConsumeAmmo(selector))
+                return;
+
+            if (weapons[weaponIndex].Fire())
+            {
+                SoundEffect.PlaySound(weapons[weaponIndex].fireSound);
+                OriginalRuntimeState.WakeGuardsAfterPlayerFire(
+                    areaWakeSelector);
             }
         }
-
 
 
         public Player()
@@ -474,7 +515,7 @@ namespace Nitemare3D
 
 
         }
-        float fireTimer = 0;
+        bool fireWasDown = false;
         bool useWasDown = false;
 
         void MoveWithCollision(float amount)
