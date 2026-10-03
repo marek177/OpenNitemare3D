@@ -243,6 +243,65 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// FUN_1010_1394 door-target selection used by GUARD strategy 1.
+        /// The original scans the DOOR pool in map creation order, compares
+        /// Manhattan tile distance, and accepts a nearer candidate only if D50A
+        /// can trace to it with secondary object checks disabled.
+        /// </summary>
+        public bool TryFindNearestReachableDoor(
+            int startTileX,
+            int startTileY,
+            Func<int, int, bool> dynamicDoorAllowsSight,
+            out int doorTileX,
+            out int doorTileY)
+        {
+            doorTileX = 0;
+            doorTileY = 0;
+            int bestDistance = 0x7FFF;
+            bool found = false;
+
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
+            {
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
+                {
+                    if ((WallPropertyAt(x, y) & WallDynamicDoor) == 0)
+                        continue;
+
+                    int dx = x - startTileX;
+                    int dy = y - startTileY;
+                    int distance = Math.Abs(dx) + Math.Abs(dy);
+
+                    if (distance >= bestDistance)
+                        continue;
+
+                    bool reachable = OriginalGuardDispatcher.TraceGuardGridLine(
+                        startTileX,
+                        startTileY,
+                        dx,
+                        dy,
+                        distance,
+                        false,
+                        (cx, cy, secondary) =>
+                            IsPerceptionIntermediateBlocked(
+                                cx,
+                                cy,
+                                secondary,
+                                dynamicDoorAllowsSight));
+
+                    if (!reachable)
+                        continue;
+
+                    bestDistance = distance;
+                    doorTileX = x;
+                    doorTileY = y;
+                    found = true;
+                }
+            }
+
+            return found;
+        }
+
+        /// <summary>
         /// Cell-blocking portion of FUN_1010_D50A after Bresenham stepping.
         /// Dynamic-door state is supplied separately because the current port does
         /// not yet mirror the original 22-byte DOOR runtime record/state 0..4.
