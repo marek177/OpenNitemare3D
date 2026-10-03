@@ -14,6 +14,7 @@ namespace Nitemare3D
         public static void Run()
         {
             TestRecordSizes();
+            TestFrameCalibration();
             TestGuardLogicClock();
             TestWeaponRuntime();
             TestAutonomousGuardStateCoverage();
@@ -78,6 +79,29 @@ namespace Nitemare3D
                 "DOOR record field offsets must match Win16 0x16-byte layout.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
+        }
+
+        static void TestFrameCalibration()
+        {
+            OriginalRuntimeState.ConfigureFrameCalibration(10);
+            Assert(OriginalRuntimeState.RawFrameMeanMs == 10 &&
+                   OriginalRuntimeState.FrameRateParameter53F4 == 25 &&
+                   OriginalRuntimeState.MovementStep53F6 == 10 &&
+                   OriginalRuntimeState.TurnStep53F8 == 5 &&
+                   OriginalRuntimeState.ProjectileSubstepsPerTick == 20,
+                "D7D0 minimum-40-ms calibration mismatch.");
+
+            OriginalRuntimeState.ConfigureFrameCalibration(80);
+            Assert(OriginalRuntimeState.RawFrameMeanMs == 80 &&
+                   OriginalRuntimeState.FrameRateParameter53F4 == 13 &&
+                   OriginalRuntimeState.MovementStep53F6 == 20 &&
+                   OriginalRuntimeState.TurnStep53F8 == 10 &&
+                   OriginalRuntimeState.ProjectileSubstepsPerTick == 40,
+                "D7D0 80-ms calibration mismatch.");
+
+            // Restore the portable/default effective 40-ms profile for all
+            // subsequent runtime tests.
+            OriginalRuntimeState.ConfigureFrameCalibration(40);
         }
 
         static void TestGuardLogicClock()
