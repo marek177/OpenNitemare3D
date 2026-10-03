@@ -276,6 +276,23 @@ namespace Nitemare3D
                        true),
                 "OBJECT flag 0x10 wall-bypass path must ignore per-column wall depth.");
 
+            uint step =
+                OriginalProjectedSpriteQueue.SpriteSourceStep16_16(
+                    32,
+                    67,
+                    144);
+
+            Assert(step == 26886 &&
+                   OriginalProjectedSpriteQueue.SpriteSourceCoordinate(
+                       122,
+                       122,
+                       step) == 0 &&
+                   OriginalProjectedSpriteQueue.SpriteSourceCoordinate(
+                       199,
+                       122,
+                       step) == 31,
+                "3EDC/36C8 16.16 sprite source sampling mismatch.");
+
             bool[] occupied =
                 new bool[OriginalProjectedSpriteQueue.SlotCount];
 
