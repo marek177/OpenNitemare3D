@@ -56,6 +56,9 @@ namespace Nitemare3D
             reader.BaseStream.Position = 1156;
             pal = reader.ReadBytes(768);
 
+            OriginalRuntimeState.ConfigureShadePalette(
+                pal);
+
             reader.BaseStream.Close();
 
             rect.Texture = new Texture(renderTarget);
