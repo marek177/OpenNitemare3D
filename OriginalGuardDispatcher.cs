@@ -894,16 +894,17 @@ namespace Nitemare3D
             if (guard.State != (byte)OriginalGuardState.Transition13)
                 return OriginalGuardDispatchResult.NotHandled;
 
-            // The recovered helper transitions only when called with timer already 0.
-            if (guard.Timer <= 0)
+            // FUN_7A44 uses post-decrement semantics: the old value is tested
+            // only after Timer has already been decremented.
+            short oldTimer = guard.Timer;
+            guard.Timer--;
+
+            if (oldTimer == 0)
             {
-                guard.Timer = 0;
                 guard.Strategy = 0;
                 guard.State = (byte)OriginalGuardState.Active02;
                 return OriginalGuardDispatchResult.Transitioned;
             }
-
-            guard.Timer--;
 
             if (guard.Timer == 8)
             {
