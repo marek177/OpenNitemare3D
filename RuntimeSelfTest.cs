@@ -15,6 +15,7 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestGuardLogicClock();
+            TestAutonomousGuardStateCoverage();
             TestObjectDefinitionCatalog();
             TestImgResourceLoader();
             TestOriginalMapTables();
@@ -92,6 +93,53 @@ namespace Nitemare3D
 
             OriginalRuntimeState.AutonomousGuardRuntimeEnabled = previous;
             OriginalRuntimeState.Reset();
+        }
+
+        static void TestAutonomousGuardStateCoverage()
+        {
+            OriginalGuardState[] confirmed =
+            {
+                OriginalGuardState.AnimationTimer,
+                OriginalGuardState.Delay,
+                OriginalGuardState.Active02,
+                OriginalGuardState.Detection03,
+                OriginalGuardState.DetectionAttack04,
+                OriginalGuardState.Transition05,
+                OriginalGuardState.MoveThen03,
+                OriginalGuardState.Active07,
+                OriginalGuardState.Move08,
+                OriginalGuardState.DeathFinalize09,
+                OriginalGuardState.NoLocalAction0A,
+                OriginalGuardState.LethalPlayerContact0B,
+                OriginalGuardState.Shared0C,
+                OriginalGuardState.Shared0D,
+                OriginalGuardState.WaitAnimation12,
+                OriginalGuardState.Transition13,
+                OriginalGuardState.Pain15
+            };
+
+            foreach (var state in confirmed)
+            {
+                Assert(OriginalRuntimeState.IsConfirmedAutonomousState(state),
+                    "confirmed autonomous GUARD state missing from ownership gate: 0x" +
+                    ((byte)state).ToString("X2"));
+            }
+
+            OriginalGuardState[] fallback =
+            {
+                OriginalGuardState.Conditional0E,
+                OriginalGuardState.Timed0F,
+                OriginalGuardState.Timed10,
+                OriginalGuardState.RecoverMove11,
+                OriginalGuardState.Periodic14
+            };
+
+            foreach (var state in fallback)
+            {
+                Assert(!OriginalRuntimeState.IsConfirmedAutonomousState(state),
+                    "partial GUARD state must remain on legacy fallback: 0x" +
+                    ((byte)state).ToString("X2"));
+            }
         }
 
         static void TestObjectDefinitionCatalog()
