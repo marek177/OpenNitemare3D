@@ -184,7 +184,7 @@ namespace Nitemare3D
         // FUN_1010_8C0A player-damage/death globals.
         // 4C0E is set to 3 whenever computed GUARD damage is nonzero.
         // 46AC is latched to 1 on lethal player damage.
-        // 4C1A receives the low WORD of the attacking OBJECT +0x08 runtime value.
+        // 4C1A receives attacking GUARD +0x08, i.e. the OBJECT slot index.
         public static ushort GuardDamageMarker4C0E { get; private set; }
         public static bool PlayerDeathLatch46AC { get; private set; }
         public static ushort PlayerDeathSource4C1A { get; private set; }
@@ -1148,7 +1148,7 @@ namespace Nitemare3D
                 GameplayState46B4 = 2;
                 PlayerDeathLatch46AC = true;
                 PlayerDeathSource4C1A =
-                    unchecked((ushort)obj.RuntimeValue);
+                    guard.ObjectSlot;
 
                 // FUN_80EA: the attacking GUARD enters the shared no-local-action
                 // state immediately when its hit kills the player.
