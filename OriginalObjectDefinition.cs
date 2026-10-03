@@ -163,6 +163,8 @@ namespace Nitemare3D
             new OriginalObjectDefinitionRecord[OriginalRuntime.MaxObjectDefinitions];
         readonly byte[][] frameTables =
             new byte[OriginalRuntime.MaxObjectDefinitions][];
+        readonly BitmapImage[][] decodedFrames =
+            new BitmapImage[OriginalRuntime.MaxObjectDefinitions][];
 
         public int Count { get; private set; }
 
@@ -171,6 +173,7 @@ namespace Nitemare3D
             Array.Clear(sourceKeys, 0, sourceKeys.Length);
             Array.Clear(headers, 0, headers.Length);
             Array.Clear(frameTables, 0, frameTables.Length);
+            Array.Clear(decodedFrames, 0, decodedFrames.Length);
             Count = 0;
         }
 
@@ -213,6 +216,75 @@ namespace Nitemare3D
 
             table = null;
             return false;
+        }
+
+        public bool TryGetBitmapFrame(
+            byte definitionId,
+            int frameIndex,
+            byte[] imgData,
+            out BitmapImage bitmap)
+        {
+            bitmap = null;
+
+            if (definitionId >= Count ||
+                frameIndex < 0 ||
+                frameTables[definitionId] == null ||
+                imgData == null)
+            {
+                return false;
+            }
+
+            if (!TryGetHeader(definitionId, out var header) ||
+                frameIndex >= header.FrameCount)
+            {
+                return false;
+            }
+
+            if (decodedFrames[definitionId] == null ||
+                decodedFrames[definitionId].Length != header.FrameCount)
+            {
+                decodedFrames[definitionId] =
+                    new BitmapImage[header.FrameCount];
+            }
+
+            bitmap = decodedFrames[definitionId][frameIndex];
+            if (bitmap != null)
+                return true;
+
+            OriginalImageFrameRuntimeRecord frame =
+                OriginalImgResourceReader.DecodeRuntimeFrame(
+                    frameTables[definitionId],
+                    frameIndex);
+
+            long pixelOffset = frame.PixelDataFileOffset;
+            long pixelCount = (long)frame.Width * frame.Height;
+            if (frame.Width == 0 ||
+                frame.Height == 0 ||
+                pixelOffset < 0 ||
+                pixelOffset + pixelCount > imgData.Length)
+            {
+                return false;
+            }
+
+            bitmap = new BitmapImage
+            {
+                width = frame.Width,
+                height = frame.Height,
+                data = new byte[frame.Width, frame.Height]
+            };
+
+            int source = checked((int)pixelOffset);
+            for (int x = 0; x < frame.Width; x++)
+            {
+                for (int y = 0; y < frame.Height; y++)
+                {
+                    bitmap.data[x, y] =
+                        imgData[source++];
+                }
+            }
+
+            decodedFrames[definitionId][frameIndex] = bitmap;
+            return true;
         }
 
         public bool TryGetGuardStateWord(
@@ -271,6 +343,7 @@ namespace Nitemare3D
             sourceKeys[Count] = sourceKey;
             headers[Count] = header;
             frameTables[Count] = (byte[])decodedFrameTable.Clone();
+            decodedFrames[Count] = new BitmapImage[header.FrameCount];
             Count++;
             return true;
         }
@@ -293,6 +366,7 @@ namespace Nitemare3D
             sourceKeys[Count] = sourceKey;
             headers[Count] = definition;
             frameTables[Count] = null;
+            decodedFrames[Count] = null;
             Count++;
             return true;
         }
