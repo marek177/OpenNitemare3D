@@ -178,6 +178,7 @@ namespace Nitemare3D
             return false;
         }
         bool ExactOriginalSpriteQueueEnabled =>
+            OriginalRendererStage4.Enabled &&
             OriginalRuntimeState.ExactTrigQ10 != null &&
             Math.Abs(GameWindow.scale - 1.0f) <= 0.0001f;
 
