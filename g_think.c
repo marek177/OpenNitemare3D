@@ -1,6 +1,7 @@
 #include "g_think.h"
 #include "n3d_re_object_defs.h"
 #include "n3d_re_guard_sounds.h"
+#include "n3d_re_guard_perception.h"
 
 void G_HandleThinking()
 {
@@ -83,6 +84,63 @@ void G_HandleRecoveredGuardThinking()
                                 object,
                                 sequence);
                         }
+                    }
+                }
+                break;
+
+            case N3D_GUARD_STATE_03:
+                if(guard->object_slot < n3d_object_count)
+                {
+                    n3d_object_record* object =
+                        &n3d_objects[guard->object_slot];
+
+                    const n3d_object_definition_slot* definition =
+                        N3D_RE_ObjectDefinition(
+                            object->sequence_id);
+
+                    if(definition)
+                    {
+                        /*
+                         * FUN_7594 calls FUN_7494/D50A with secondary object
+                         * checks enabled and facing/FOV bypassed.
+                         */
+                        const int perception_succeeded =
+                            N3D_RE_EvaluateGuardPerceptionMap(
+                                guard,
+                                object,
+                                n3d_player.world_x,
+                                n3d_player.world_y,
+                                1,
+                                1);
+
+                        int attack_eligible = 0;
+                        if(N3D_RE_TryEvaluateGuardAttackGate(
+                               guard,
+                               object,
+                               n3d_player.world_x,
+                               n3d_player.world_y,
+                               perception_succeeded,
+                               &attack_eligible) &&
+                           attack_eligible)
+                        {
+                            uint16_t sequence = 0;
+                            if(N3D_RE_ObjectDefinitionGuardStateSequence(
+                                   &definition->header,
+                                   N3D_GUARD_STATE_03,
+                                   &sequence))
+                            {
+                                N3D_RE_BeginState03AttackSequence(
+                                    guard,
+                                    object,
+                                    sequence);
+                            }
+                        }
+
+                        /*
+                         * attack_eligible == 0 enters FUN_76FC movement planning
+                         * in the original. Leave state 03 unchanged until that
+                         * movement planner/collision fallback is ported exactly.
+                         */
                     }
                 }
                 break;
