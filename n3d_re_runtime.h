@@ -50,7 +50,7 @@ typedef struct n3d_object_record
     uint8_t variant;             /* +01 */
     int8_t animation_aux;        /* +02 */
     int8_t animation_frame;      /* +03 */
-    uint8_t sequence_id;         /* +04 */
+    uint8_t sequence_id;         /* +04 ordinary OBJECT definition id; projectile sequence id */
     uint8_t flags;               /* +05 */
     uint8_t object_class;        /* +06 */
     uint8_t guard_index;         /* +07 */

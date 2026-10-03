@@ -5,6 +5,7 @@
 #include "n3d_re_use.h"
 #include "n3d_re_definitions.h"
 #include "n3d_re_wall_explosion.h"
+#include "n3d_re_object_defs.h"
 #include <string.h>
 
 n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
@@ -27,6 +28,7 @@ void N3D_RE_ResetRuntime(void)
     N3D_RE_ResetPanelsAndPushes();
     N3D_RE_ResetUseLatch();
     N3D_RE_ResetExplodingWalls();
+    N3D_RE_ResetObjectDefinitions();
     n3d_object_count = 0;
     n3d_guard_count = 0;
 }
@@ -145,6 +147,14 @@ int N3D_RE_InstantiateMapObject(
     memset(obj, 0, sizeof(*obj));
 
     obj->map_object_id = map_object_id;
+
+    uint8_t definition_id = 0;
+    if(N3D_RE_RegisterMapObjectDefinition(
+            map_object_id,
+            &definition_id))
+    {
+        obj->sequence_id = definition_id;
+    }
 
     uint8_t variant_index = 0;
     if(N3D_RE_DefinitionVariantIndex(

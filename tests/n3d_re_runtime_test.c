@@ -18,6 +18,7 @@
 #include "../n3d_re_img.h"
 #include "../n3d_re_wall_explosion.h"
 #include "../n3d_re_map_archive.h"
+#include "../n3d_re_object_defs.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -3675,6 +3676,210 @@ int main(void)
         assert(variant == 5);
 
         remove("N3D_MAP_HEADER_TEST.BIN");
+    }
+
+    /* Byte-exact 0x5A object-resource definition catalog. */
+    {
+        const uint8_t object_a = 0x80;
+        const uint8_t object_b = 0x81;
+        const uint8_t object_c = 0x82;
+
+        const size_t stream_a =
+            N3D_IMG_FRAME_DATA_OFFSET;
+        const size_t stream_c =
+            stream_a +
+            2 * (N3D_IMG_FRAME_HEADER_BYTES + 1);
+        const size_t total_size =
+            stream_c +
+            (N3D_IMG_FRAME_HEADER_BYTES + 1);
+
+        uint8_t* img_bytes =
+            (uint8_t*)calloc(total_size, 1);
+        assert(img_bytes != NULL);
+
+        /* A/B share one sourceKey and therefore one runtime definition id. */
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_RESOURCE_DIRECTORY_OFFSET + object_a * 4u,
+            (uint32_t)stream_a);
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_RESOURCE_DIRECTORY_OFFSET + object_b * 4u,
+            (uint32_t)stream_a);
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_RESOURCE_DIRECTORY_OFFSET + object_c * 4u,
+            (uint32_t)stream_c);
+
+        const size_t header_a =
+            N3D_IMG_HIGH_SEQUENCE_BANK_OFFSET +
+            object_a * N3D_OBJECT_RESOURCE_HEADER_BYTES;
+        const size_t header_b =
+            N3D_IMG_HIGH_SEQUENCE_BANK_OFFSET +
+            object_b * N3D_OBJECT_RESOURCE_HEADER_BYTES;
+        const size_t header_c =
+            N3D_IMG_HIGH_SEQUENCE_BANK_OFFSET +
+            object_c * N3D_OBJECT_RESOURCE_HEADER_BYTES;
+
+        img_bytes[header_a + 0x02] = 2;
+        img_bytes[header_b + 0x02] = 2;
+        img_bytes[header_c + 0x02] = 1;
+
+        /* Directional A/B/C and state 02/03/04 words. */
+        img_bytes[header_a + 0x04] = 0x10;
+        img_bytes[header_a + 0x05] = 0x01;
+        img_bytes[header_a + 0x14] = 0x20;
+        img_bytes[header_a + 0x15] = 0x02;
+        img_bytes[header_a + 0x24] = 0x30;
+        img_bytes[header_a + 0x25] = 0x03;
+
+        img_bytes[header_a + 0x34] = 0x40;
+        img_bytes[header_a + 0x35] = 0x04;
+        img_bytes[header_a + 0x36] = 0x50;
+        img_bytes[header_a + 0x37] = 0x05;
+        img_bytes[header_a + 0x38] = 0x60;
+        img_bytes[header_a + 0x39] = 0x06;
+
+        img_bytes[header_a + 0x3A] = 0x70;
+        img_bytes[header_a + 0x3B] = 0x07;
+        img_bytes[header_a + 0x4A] = 0x80;
+        img_bytes[header_a + 0x4B] = 0x08;
+
+        /*
+         * B deliberately has different header bytes but same sourceKey:
+         * original catalog dedup keeps the first registered definition.
+         */
+        memcpy(
+            img_bytes + header_b,
+            img_bytes + header_a,
+            N3D_OBJECT_RESOURCE_HEADER_BYTES);
+        img_bytes[header_b + 0x34] = 0x99;
+
+        img_bytes[header_c + 0x34] = 0xA0;
+        img_bytes[header_c + 0x35] = 0x01;
+
+        for(unsigned frame = 0; frame < 2; ++frame)
+        {
+            const size_t off =
+                stream_a +
+                frame *
+                (N3D_IMG_FRAME_HEADER_BYTES + 1);
+            img_bytes[off + 0] = 1;
+            img_bytes[off + 1] = 1;
+            img_bytes[off + 10] =
+                (uint8_t)(0x40 + frame);
+        }
+
+        img_bytes[stream_c + 0] = 1;
+        img_bytes[stream_c + 1] = 1;
+        img_bytes[stream_c + 10] = 0x55;
+
+        FILE* f =
+            fopen("N3D_OBJECT_DEFS_TEST.BIN", "wb");
+        assert(f != NULL);
+        assert(fwrite(
+            img_bytes,
+            1,
+            total_size,
+            f) == total_size);
+        fclose(f);
+        free(img_bytes);
+
+        N3D_RE_FreeImgArchive(&n3d_img);
+        assert(N3D_RE_LoadImgArchive(
+            "N3D_OBJECT_DEFS_TEST.BIN",
+            &n3d_img));
+
+        N3D_RE_ResetObjectDefinitions();
+
+        uint8_t def_a = 0xFF;
+        uint8_t def_b = 0xFF;
+        uint8_t def_c = 0xFF;
+
+        assert(N3D_RE_RegisterMapObjectDefinition(
+            object_a, &def_a));
+        assert(def_a == 0);
+        assert(n3d_object_definition_count == 1);
+
+        assert(N3D_RE_RegisterMapObjectDefinition(
+            object_b, &def_b));
+        assert(def_b == def_a);
+        assert(n3d_object_definition_count == 1);
+
+        assert(N3D_RE_RegisterMapObjectDefinition(
+            object_c, &def_c));
+        assert(def_c == 1);
+        assert(n3d_object_definition_count == 2);
+
+        const n3d_object_definition_slot* def =
+            N3D_RE_ObjectDefinition(def_a);
+        assert(def != NULL);
+        assert(def->source_key == stream_a);
+        assert(def->source_object_id == object_a);
+        assert(N3D_RE_ObjectDefinitionFrameCount(
+            &def->header) == 2);
+
+        assert(N3D_RE_ObjectDefinitionDirectional(
+            &def->header, 0, 0) == 0x0110);
+        assert(N3D_RE_ObjectDefinitionDirectional(
+            &def->header, 1, 0) == 0x0220);
+        assert(N3D_RE_ObjectDefinitionDirectional(
+            &def->header, 2, 0) == 0x0330);
+
+        uint16_t sequence = 0;
+        assert(N3D_RE_ObjectDefinitionGuardStateSequence(
+            &def->header,
+            N3D_GUARD_STATE_02,
+            &sequence));
+        assert(sequence == 0x0440);
+        assert(N3D_RE_PackedSequenceHasFrames(sequence));
+
+        assert(N3D_RE_ObjectDefinitionGuardStateSequence(
+            &def->header,
+            N3D_GUARD_STATE_03,
+            &sequence));
+        assert(sequence == 0x0550);
+
+        assert(N3D_RE_ObjectDefinitionGuardStateSequence(
+            &def->header,
+            N3D_GUARD_STATE_04,
+            &sequence));
+        assert(sequence == 0x0660);
+
+        assert(N3D_RE_ObjectDefinitionReactionSequence(
+            &def->header, 0) == 0x0770);
+        assert(N3D_RE_ObjectDefinitionDeathSequence(
+            &def->header, 0) == 0x0880);
+
+        /* Register through normal OBJECT instantiation. */
+        n3d_object_mapping_known[object_a] = 1;
+        n3d_object_property_known[object_a] = 1;
+        n3d_object_mapped_type[object_a] = 0x08;
+        n3d_object_property_resolved[object_a] =
+            N3D_RE_ObjectPropertiesForMappedType(0x08);
+
+        N3D_RE_ResetRuntime();
+
+        /* ResetRuntime clears catalog, not the loaded IMG archive. */
+        assert(n3d_object_definition_count == 0);
+        assert(N3D_RE_InstantiateMapObject(
+            object_a, 3, 4, NULL));
+        assert(n3d_object_count == 1);
+        assert(n3d_object_definition_count == 1);
+        assert(n3d_objects[0].sequence_id == 0);
+
+        def = N3D_RE_ObjectDefinition(
+            n3d_objects[0].sequence_id);
+        assert(def != NULL);
+        assert(N3D_RE_ObjectDefinitionGuardStateSequence(
+            &def->header,
+            N3D_GUARD_STATE_02,
+            &sequence));
+        assert(sequence == 0x0440);
+
+        N3D_RE_FreeImgArchive(&n3d_img);
+        N3D_RE_ResetObjectDefinitions();
+        remove("N3D_OBJECT_DEFS_TEST.BIN");
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
