@@ -17,3 +17,30 @@ jobs:
 
       - name: Run recovered runtime test
         run: ./n3d_re_runtime_test
+
+
+  legacy-shell-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install legacy shell headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl2-dev \
+            libsdl2-mixer-dev \
+            libsdl2-image-dev \
+            libsdl2-ttf-dev \
+            libfluidsynth-dev
+
+      - name: Syntax-check integrated legacy C shell
+        run: |
+          gcc -std=c11 -Wall -Wextra -fsyntax-only \
+            p_think.c \
+            g_game.c \
+            g_main.c \
+            g_think.c \
+            m_obj.c \
+            $(pkg-config --cflags sdl2 SDL2_mixer SDL2_image SDL2_ttf fluidsynth)
