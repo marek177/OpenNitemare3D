@@ -244,3 +244,203 @@ n3d_player_move_result N3D_RE_MovePlayerWorldDelta(
 
     return result;
 }
+
+
+static int N3D_RE_Abs16(int16_t value)
+{
+    return value < 0 ? -(int)value : (int)value;
+}
+
+int N3D_RE_InitLineStateFromAngle(
+    int angle_degrees,
+    n3d_line_state* state)
+{
+    if(!state || !n3d_trig.loaded)
+        return 0;
+
+    const int angle = N3D_RE_NormalizeAngle(angle_degrees);
+    const int16_t sin_q10 = N3D_RE_SinQ10(angle);
+    const int16_t cos_q10 = N3D_RE_CosQ10(angle);
+
+    const int abs_sin = N3D_RE_Abs16(sin_q10);
+    const int abs_cos = N3D_RE_Abs16(cos_q10);
+
+    state->sin_q10 = sin_q10;
+    state->cos_q10 = cos_q10;
+
+    /*
+     * Exact E516 setup:
+     *   axis=1 when |cos| < |sin|, otherwise axis=0.
+     *   error = 2*minor - major
+     *   4C0A = 2*minor
+     *   4C0C = 2*(minor-major)
+     */
+    if(abs_cos < abs_sin)
+    {
+        state->axis_flag = 1;
+        state->error = (int16_t)(2 * abs_cos - abs_sin);
+        state->twice_minor = (int16_t)(2 * abs_cos);
+        state->twice_minor_minus_major =
+            (int16_t)(2 * (abs_cos - abs_sin));
+    }
+    else
+    {
+        state->axis_flag = 0;
+        state->error = (int16_t)(2 * abs_sin - abs_cos);
+        state->twice_minor = (int16_t)(2 * abs_sin);
+        state->twice_minor_minus_major =
+            (int16_t)(2 * (abs_sin - abs_cos));
+    }
+
+    /*
+     * Exact projectile spawn signs, shared with the same E516 line state:
+     *   +08 -> X step = sign(sin): + for angle<180, else -
+     *   +0A -> Y step = -sign(cos):
+     *          + for 90<angle<270, else -
+     * Zero components carry an unused sign, exactly as the original does.
+     */
+    state->step_x = angle < 180 ? 1 : -1;
+    state->step_y = (angle > 90 && angle < 270) ? 1 : -1;
+
+    return 1;
+}
+
+static void N3D_RE_RecordAxisAttempt(
+    n3d_player_move_result* result,
+    int is_x,
+    int signed_step,
+    int accepted,
+    int resolved)
+{
+    if(!result)
+        return;
+
+    if(!resolved)
+        result->unresolved_collision = 1;
+
+    if(is_x)
+    {
+        ++result->x_attempts;
+        if(accepted)
+            result->accepted_x += signed_step;
+        else
+            ++result->x_blocked;
+    }
+    else
+    {
+        ++result->y_attempts;
+        if(accepted)
+            result->accepted_y += signed_step;
+        else
+            ++result->y_blocked;
+    }
+}
+
+n3d_player_move_result N3D_RE_MovePlayerAngleSubsteps(
+    int angle_degrees,
+    uint16_t major_substeps,
+    const n3d_collision_callbacks* callbacks)
+{
+    n3d_player_move_result result = {0};
+    n3d_line_state line = {0};
+
+    if(major_substeps == 0 ||
+       !N3D_RE_InitLineStateFromAngle(angle_degrees, &line))
+    {
+        result.unresolved_collision = n3d_trig.loaded ? 0 : 1;
+        return result;
+    }
+
+    int32_t x = n3d_player.world_x;
+    int32_t y = n3d_player.world_y;
+
+    for(uint16_t i = 0; i < major_substeps; ++i)
+    {
+        /*
+         * Exact 9D30 axis meaning:
+         *   axis != 0 -> major X uses slot+08 (sign(sin))
+         *   axis == 0 -> major Y uses slot+0A (-sign(cos))
+         */
+        if(line.axis_flag != 0)
+        {
+            int resolved = 0;
+            const int accepted =
+                N3D_RE_TestPlayerXSubstep(
+                    x, y, line.step_x, callbacks, &resolved);
+
+            N3D_RE_RecordAxisAttempt(
+                &result, 1, line.step_x, accepted != 0, resolved);
+
+            if(accepted)
+                x += accepted;
+        }
+        else
+        {
+            int resolved = 0;
+            const int accepted =
+                N3D_RE_TestPlayerYSubstep(
+                    x, y, line.step_y, callbacks, &resolved);
+
+            N3D_RE_RecordAxisAttempt(
+                &result, 0, line.step_y, accepted != 0, resolved);
+
+            if(accepted)
+                y += accepted;
+        }
+
+        /*
+         * Exact 9D30 error update:
+         *   error < 0: error += 2*minor, no secondary step
+         *   otherwise: error += 2*(minor-major), then secondary axis step
+         */
+        if(line.error < 0)
+        {
+            line.error =
+                (int16_t)(line.error + line.twice_minor);
+        }
+        else
+        {
+            line.error =
+                (int16_t)(
+                    line.error + line.twice_minor_minus_major);
+
+            if(line.axis_flag != 0)
+            {
+                int resolved = 0;
+                const int accepted =
+                    N3D_RE_TestPlayerYSubstep(
+                        x, y, line.step_y, callbacks, &resolved);
+
+                N3D_RE_RecordAxisAttempt(
+                    &result, 0, line.step_y, accepted != 0, resolved);
+
+                if(accepted)
+                    y += accepted;
+            }
+            else
+            {
+                int resolved = 0;
+                const int accepted =
+                    N3D_RE_TestPlayerXSubstep(
+                        x, y, line.step_x, callbacks, &resolved);
+
+                N3D_RE_RecordAxisAttempt(
+                    &result, 1, line.step_x, accepted != 0, resolved);
+
+                if(accepted)
+                    x += accepted;
+            }
+        }
+    }
+
+    result.requested_x = result.accepted_x;
+    result.requested_y = result.accepted_y;
+
+    uint8_t event_id = 0;
+    if(N3D_RE_CommitPlayerWorldPosition(x, y, &event_id))
+        result.entered_tile_event = event_id;
+    else
+        result.unresolved_collision = 1;
+
+    return result;
+}
