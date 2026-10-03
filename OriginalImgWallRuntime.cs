@@ -302,6 +302,15 @@ namespace Nitemare3D
             return frame;
         }
 
+        public bool TryGetCacheIndexForWallId(
+            byte wallId,
+            out byte cacheIndex)
+        {
+            return cacheByWallId.TryGetValue(
+                wallId,
+                out cacheIndex);
+        }
+
         public SequenceCache CacheFor(
             OriginalRendererCore.Vec vec)
         {
