@@ -157,6 +157,26 @@ namespace Nitemare3D
                        point.DepthQ10 == 65536,
                     "E5D8 north/cardinal point projection mismatch.");
 
+                var vec = new OriginalRendererCore.Vec
+                {
+                    X1 = 68,
+                    Y1 = 36,
+                    X2 = 132,
+                    Y2 = 36
+                };
+
+                Assert(OriginalProjectionExact.ProjectVec(
+                           vec,
+                           100,
+                           100,
+                           0,
+                           trig) &&
+                       vec.ScreenX1 == 71 &&
+                       vec.ScreenX2 == 249 &&
+                       vec.ProjectedY1Q4 == 2526 &&
+                       vec.ProjectedY2Q4 == 2526,
+                    "E798 cardinal VEC projection coefficient order mismatch.");
+
                 var frame = new BitmapImage
                 {
                     width = 32,
