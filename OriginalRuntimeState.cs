@@ -115,6 +115,36 @@ namespace Nitemare3D
             set => StoryProgress51A6 = value ? (byte)1 : (byte)0;
         }
 
+        /// <summary>
+        /// Confirmed DAT_1048_4C2E producer from FUN_1010_BFD8.
+        /// In episode 1, level 9, semantic wall class 0x47 jams player firing
+        /// and class 0x48 clears the jam. The original emits event 0x44 only
+        /// when the latch actually changes.
+        /// </summary>
+        public static bool ApplyWeaponJamScriptTouchBFD8(
+            int episode,
+            int levelNumber,
+            byte wallClass)
+        {
+            if (episode != 1 || levelNumber != 9)
+                return false;
+
+            bool next;
+            if (wallClass == 0x47)
+                next = true;
+            else if (wallClass == 0x48)
+                next = false;
+            else
+                return false;
+
+            if (WeaponRuntime.Jammed == next)
+                return false;
+
+            WeaponRuntime.Jammed = next;
+            SoundEffect.PlayOriginalEvent(0x44);
+            return true;
+        }
+
         public static bool ApplyScriptTouchProgress51A6(
             int episode,
             int levelNumber,
