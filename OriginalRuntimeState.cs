@@ -56,6 +56,15 @@ namespace Nitemare3D
 
         static float guardLogicAccumulator;
         static float projectileLogicAccumulator;
+        static double runtimeClockFractionMs;
+
+        public static uint RuntimeClockMs { get; private set; }
+
+        public static bool ProjectileDefinitionsReady { get; private set; }
+        static byte projectilePlasmaFlightDefinition;
+        static byte projectilePlasmaImpactDefinition;
+        static byte projectileMagicFlightDefinition;
+        static byte projectileMagicImpactDefinition;
 
         public static bool SlowLogicTickDue { get; private set; }
         public static bool GuardLogicTickDue { get; private set; }
@@ -144,6 +153,17 @@ namespace Nitemare3D
             if (deltaSeconds <= 0)
                 return;
 
+            // Maintain the 32-bit absolute runtime clock used by OBJECT/projectile
+            // animation deadlines. Preserve fractional milliseconds so a fast host
+            // does not accumulate per-frame rounding drift.
+            runtimeClockFractionMs += deltaSeconds * 1000.0;
+            uint wholeMilliseconds = (uint)Math.Floor(runtimeClockFractionMs);
+            if (wholeMilliseconds != 0)
+            {
+                RuntimeClockMs = unchecked(RuntimeClockMs + wholeMilliseconds);
+                runtimeClockFractionMs -= wholeMilliseconds;
+            }
+
             // The calibrated Win16 frame path clamps its effective duration to
             // at least 40 ms. On a modern host this yields the 25-Hz baseline
             // projectile update with 53FA=20 one-world-unit DDA substeps.
@@ -201,6 +221,13 @@ namespace Nitemare3D
             GuardCount = 0;
             guardLogicAccumulator = 0;
             projectileLogicAccumulator = 0;
+            runtimeClockFractionMs = 0;
+            RuntimeClockMs = 0;
+            ProjectileDefinitionsReady = false;
+            projectilePlasmaFlightDefinition = 0;
+            projectilePlasmaImpactDefinition = 0;
+            projectileMagicFlightDefinition = 0;
+            projectileMagicImpactDefinition = 0;
             SlowLogicTickDue = false;
             GuardLogicTickDue = false;
             ProjectileLogicTickDue = false;
@@ -365,6 +392,72 @@ namespace Nitemare3D
         public static bool RegisterMapObjectDefinition(byte mapObjectId)
         {
             return RegisterMapObjectDefinition(mapObjectId, out _);
+        }
+
+        public static bool RegisterProjectileDefinitions()
+        {
+            if (Img.current == null)
+                return false;
+
+            if (!RegisterMapObjectDefinition(
+                    (byte)ObjectType.Missileflyingplasmabolt,
+                    out byte plasmaFlight) ||
+                !RegisterMapObjectDefinition(
+                    (byte)ObjectType.Missileexplodingplasmabolt,
+                    out byte plasmaImpact) ||
+                !RegisterMapObjectDefinition(
+                    (byte)ObjectType.Missileflyingspellstars,
+                    out byte magicFlight) ||
+                !RegisterMapObjectDefinition(
+                    (byte)ObjectType.Missileexplodingspellstars,
+                    out byte magicImpact))
+            {
+                ProjectileDefinitionsReady = false;
+                return false;
+            }
+
+            projectilePlasmaFlightDefinition = plasmaFlight;
+            projectilePlasmaImpactDefinition = plasmaImpact;
+            projectileMagicFlightDefinition = magicFlight;
+            projectileMagicImpactDefinition = magicImpact;
+            ProjectileDefinitionsReady = true;
+            return true;
+        }
+
+        public static bool TryGetProjectileDefinition(
+            OriginalWeaponSelector weaponSelector,
+            bool impact,
+            out byte definitionId,
+            out OriginalObjectDefinitionRecord definition)
+        {
+            definitionId = 0;
+            definition = default;
+
+            if (!ProjectileDefinitionsReady)
+                return false;
+
+            switch (weaponSelector)
+            {
+                case OriginalWeaponSelector.SingleShotLaser:
+                case OriginalWeaponSelector.ContinuousLaser:
+                    definitionId = impact
+                        ? projectilePlasmaImpactDefinition
+                        : projectilePlasmaFlightDefinition;
+                    break;
+
+                case OriginalWeaponSelector.MagicWand:
+                    definitionId = impact
+                        ? projectileMagicImpactDefinition
+                        : projectileMagicFlightDefinition;
+                    break;
+
+                default:
+                    return false;
+            }
+
+            return ObjectDefinitions.TryGetHeader(
+                definitionId,
+                out definition);
         }
 
         public static void SyncGuardPosition(Entity entity)
