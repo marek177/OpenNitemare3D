@@ -110,10 +110,17 @@ namespace Nitemare3D
             set => PlayerInvisible = value;
         }
 
-        // DAT_1048_51A5. FUN_0EF6 initializes it to 1 and the Win16 UI can
-        // toggle it. Keep the neutral address-backed name until the UI label is
-        // independently identified. Unlike per-level state, it survives Reset().
-        public static bool GuardState0E10Gate51A5 { get; set; } = true;
+        // DAT_1048_51A5. FUN_0EF6 initializes it to 1. Win16 menu commands
+        // 0x20/0x21 are literally "Enable remote cannons" / "Disable remote cannons"
+        // and toggle this byte. Cannon class 0x19 states 0E/0F/10 consume it.
+        public static bool RemoteCannonsEnabled { get; set; } = true;
+
+        // Compatibility alias retained for code written before the UI-label closure.
+        public static bool GuardState0E10Gate51A5
+        {
+            get => RemoteCannonsEnabled;
+            set => RemoteCannonsEnabled = value;
+        }
 
         // DAT_1048_4C1C. FUN_8A20 updates this only when the player's current
         // wall belongs to semantic class 0x44 (AREA marker), so the last value
@@ -1611,7 +1618,7 @@ namespace Nitemare3D
                         definition,
                         playerWorldX,
                         playerWorldY,
-                        GuardState0E10Gate51A5);
+                        RemoteCannonsEnabled);
                 }
 
                 case OriginalGuardState.Timed0F:
