@@ -208,10 +208,16 @@ namespace Nitemare3D
             // CC7C's raw pointer probes can reach outside the logical viewport
             // for heavily clipped sprites. Clamp to the framebuffer edge here
             // rather than reproducing adjacent-memory reads from Win16.
-            if (column < 0)
-                column = 0;
-            else if (column >= wallVisibilityQ4.Length)
-                column = wallVisibilityQ4.Length - 1;
+            if (column < OriginalRendererCore.ViewLeft)
+                column = OriginalRendererCore.ViewLeft;
+            else if (column > OriginalRendererCore.ViewRight)
+                column = OriginalRendererCore.ViewRight;
+
+            if (column < 0 ||
+                column >= wallVisibilityQ4.Length)
+            {
+                return false;
+            }
 
             return
                 wallVisibilityQ4[column] <=
