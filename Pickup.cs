@@ -136,23 +136,23 @@ namespace Nitemare3D
                     break;
                 case PickupType.PlasmaPistol:
                     SoundEffect.PlaySound(SoundConsts.PICKUP_WEAPON);
-                    Game.player.weaponIndex = 0;
-                    Game.player.weapons[0].hasWeapon = true;
+                    Game.player.AcquireWeapon(
+                        OriginalWeaponSelector.SingleShotLaser);
                     break;
                 case PickupType.MagicWand:
                     SoundEffect.PlaySound(SoundConsts.PICKUP_WEAPON);
-                    Game.player.weaponIndex = 1;
-                    Game.player.weapons[1].hasWeapon = true;
+                    Game.player.AcquireWeapon(
+                        OriginalWeaponSelector.MagicWand);
                     break;
                 case PickupType.Pistol:
                     SoundEffect.PlaySound(SoundConsts.PICKUP_WEAPON);
-                    Game.player.weaponIndex = 2;
-                    Game.player.weapons[2].hasWeapon = true;
+                    Game.player.AcquireWeapon(
+                        OriginalWeaponSelector.SilverPistol);
                     break;
                 case PickupType.AutoPlasmaPistol:
                     SoundEffect.PlaySound(SoundConsts.PICKUP_WEAPON);
-                    Game.player.weaponIndex = 3;
-                    Game.player.weapons[3].hasWeapon = true;
+                    Game.player.AcquireWeapon(
+                        OriginalWeaponSelector.ContinuousLaser);
                     break;
             }
             
