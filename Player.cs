@@ -73,6 +73,7 @@ namespace Nitemare3D
             // FUN_BA16 clears the player gameplay block, leaving no active or
             // owned weapon and zeroing all three ammo pools.
             OriginalRuntimeState.WeaponRuntime.ResetNewGame();
+            OriginalRuntimeState.PickupRuntime.ResetNewGame();
             weaponIndex = -1;
             for (int i = 0; i < weapons.Length; i++)
                 weapons[i].hasWeapon = false;
