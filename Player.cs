@@ -896,11 +896,20 @@ namespace Nitemare3D
 
         void RenderWeapon()
         {
-            bool fireDown = Input.IsKeyDown(KeyboardKey.LControl);
+            bool playerInteractive =
+                OriginalRuntimeState.GameplayState46B4 != 2 &&
+                OriginalRuntimeState.GameplayState46B4 != 3;
+
+            bool fireDown =
+                playerInteractive &&
+                Input.IsKeyDown(KeyboardKey.LControl);
             bool fireEdge = fireDown && !fireWasDown;
             fireWasDown = fireDown;
 
-            var input = Input.GetNumberInput();
+            var input =
+                playerInteractive
+                    ? Input.GetNumberInput()
+                    : 0;
             if (input > 0 && input <= weaponCount)
             {
                 var requested =
@@ -919,6 +928,9 @@ namespace Nitemare3D
             GameWindow.DrawImg(
                 ImageConsts.UI_FACE_START,
                 ImageConsts.UI_FACEPOSITION);
+
+            if (!playerInteractive)
+                return;
 
             var selector = (OriginalWeaponSelector)weaponIndex;
             if (!OriginalRuntimeState.WeaponRuntime.TryAcceptFireAttempt(
@@ -1016,40 +1028,50 @@ namespace Nitemare3D
         public override void Update()
         {
             direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
-            
-            float oldRot = rotation;
 
-            if (Input.IsKeyDown(KeyboardKey.Right))
+            bool deathCameraActive =
+                OriginalRuntimeState.GameplayState46B4 == 2;
+
+            if (deathCameraActive)
             {
-                rotation += 3 * Time.dt;
+                // FUN_D8FC owns view rotation while the player is dying.
+                OriginalRuntimeState.TickPlayerDeathCamera(this);
+            }
+            else if (OriginalRuntimeState.GameplayState46B4 != 3)
+            {
+                float oldRot = rotation;
+
+                if (Input.IsKeyDown(KeyboardKey.Right))
+                {
+                    rotation += 3 * Time.dt;
+                }
+
+                if (Input.IsKeyDown(KeyboardKey.Left))
+                {
+                    rotation -= 3 * Time.dt;
+                }
+
+                if (Input.IsKeyDown(KeyboardKey.Up))
+                {
+                    MoveWithCollision(Time.dt * walkSpeed);
+                }
+
+                if (Input.IsKeyDown(KeyboardKey.Down))
+                {
+                    MoveWithCollision(-(Time.dt * walkSpeed));
+                }
+
+                float oldPlaneX = plane.X;
+
+                plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
+                plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
+
+                UpdateAreaWakeSelector();
+                UpdateUse();
             }
 
-            if (Input.IsKeyDown(KeyboardKey.Left))
-            {
-                rotation -= 3 * Time.dt;
-            }
-
-            if (Input.IsKeyDown(KeyboardKey.Up))
-            {
-                MoveWithCollision(Time.dt * walkSpeed);
-            }
-
-            if (Input.IsKeyDown(KeyboardKey.Down))
-            {
-                MoveWithCollision(-(Time.dt * walkSpeed));
-            }
-
-            float oldPlaneX = plane.X;
-
-            plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
-            plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
-
-            UpdateAreaWakeSelector();
-            UpdateUse();
             RenderRaycaster();
             RenderWeapon();
-
-
         }
     }
 }
