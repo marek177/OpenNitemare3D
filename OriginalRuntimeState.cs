@@ -51,8 +51,10 @@ namespace Nitemare3D
         static float guardLogicAccumulator;
         public static bool GuardLogicTickDue { get; private set; }
 
-        // Opt-in while the remaining rare GUARD states are still being closed.
-        public static bool AutonomousGuardRuntimeEnabled { get; set; }
+        // All recovered GUARD states 0x00..0x15 now have production routing.
+        // Keep the original-runtime path enabled by default; callers may still
+        // disable it explicitly for A/B comparison against the legacy port AI.
+        public static bool AutonomousGuardRuntimeEnabled { get; set; } = true;
 
         // DAT_1048_4BE7 shared processing gate. No port-side producer is known
         // yet, so the default remains false; exposing it preserves the branch.
