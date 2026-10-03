@@ -375,6 +375,90 @@ int N3D_RE_EnterProjectileImpact(
     return 1;
 }
 
+int N3D_RE_EnterProjectileImpactFromFlight(int slot)
+{
+    if(slot < 0 || slot >= N3D_MAX_PROJECTILES)
+        return 0;
+
+    n3d_projectile_record* projectile = &n3d_projectiles[slot];
+    if(projectile->state != 1)
+        return 0;
+
+    /*
+     * Every recovered projectile weapon uses impact sequence = flight + 1:
+     * 0/3: 0 -> 1, Wand: 2 -> 3.
+     */
+    projectile->state = 2;
+    projectile->object.animation_frame = 0;
+    projectile->object.sequence_id =
+        (uint8_t)(projectile->object.sequence_id + 1);
+    projectile->object.flags |= 0x10;
+    return 1;
+}
+
+n3d_projectile_guard_resolution
+N3D_RE_ResolveProjectileGuardHit(
+    int slot,
+    const n3d_projectile_collision_result* collision,
+    int16_t view_reference_y,
+    uint8_t hamerstein_gate_value,
+    uint16_t rng_value)
+{
+    n3d_projectile_guard_resolution result = {0};
+
+    if(!collision ||
+       collision->kind != N3D_PROJECTILE_COLLISION_GUARD_HIT ||
+       collision->guard_slot < 0 ||
+       collision->object_slot < 0 ||
+       collision->guard_slot >= (int16_t)n3d_guard_count ||
+       collision->object_slot >= (int16_t)n3d_object_count ||
+       slot < 0 || slot >= N3D_MAX_PROJECTILES)
+    {
+        return result;
+    }
+
+    if(n3d_player.active_weapon >= N3D_WEAPON_COUNT)
+        return result;
+
+    const uint16_t guard_slot = (uint16_t)collision->guard_slot;
+    const uint16_t object_slot = (uint16_t)collision->object_slot;
+    const uint8_t object_class_before =
+        n3d_objects[object_slot].object_class;
+
+    const n3d_damage_result damage =
+        N3D_RE_ComputePlayerGuardDamage(
+            n3d_objects[object_slot].projected_y_base,
+            view_reference_y,
+            object_class_before,
+            n3d_player.active_weapon,
+            n3d_player.difficulty,
+            hamerstein_gate_value,
+            rng_value);
+
+    /*
+     * Original receiver ignores non-positive signed damage. Do not allow the
+     * stored byte representation of a negative intermediate to wrap positive.
+     */
+    const uint8_t applied_damage =
+        damage.difficulty_transformed > 0
+            ? damage.stored_byte
+            : 0;
+
+    result.resolved = 1;
+    result.applied_damage = applied_damage;
+    result.guard_result =
+        N3D_RE_ApplyGuardDamage(guard_slot, applied_damage);
+
+    if(result.guard_result == N3D_GUARD_HIT_KILLED)
+        result.score_delta =
+            N3D_RE_GuardScoreForClass(object_class_before);
+
+    if(N3D_RE_EnterProjectileImpactFromFlight(slot))
+        result.entered_impact = 1;
+
+    return result;
+}
+
 void N3D_RE_AdvanceProjectileAnimation(int slot, int frame_count)
 {
     if(slot < 0 || slot >= N3D_MAX_PROJECTILES || frame_count <= 0)
