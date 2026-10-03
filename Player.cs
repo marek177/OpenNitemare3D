@@ -367,11 +367,16 @@ namespace Nitemare3D
 
                 if (sprite is IOriginalSpriteFrameSource originalFrameSource)
                 {
-                    originalFrameSource.TryGetOriginalSpriteFrame(
-                        out spriteFrame);
+                    // Runtime-backed sprites deliberately do not fall back to
+                    // the historical flat spriteIndex list. A false return can
+                    // mean "not projected this frame" in the original engine.
+                    if (!originalFrameSource.TryGetOriginalSpriteFrame(
+                            out spriteFrame))
+                    {
+                        continue;
+                    }
                 }
-
-                if (spriteFrame == null)
+                else
                 {
                     if (Img.current == null ||
                         sprite.spriteIndex < 0 ||
