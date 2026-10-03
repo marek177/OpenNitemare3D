@@ -1040,6 +1040,49 @@ namespace Nitemare3D
         }
 
 
+        /// <summary>
+        /// Bridges the recovered D50A cell semantics to the current port.
+        /// Static wall/object blocking is executable-exact. Until the original
+        /// 22-byte DOOR runtime is integrated, a dynamic door allows sight only
+        /// when the current Tile has become non-obstructing.
+        /// </summary>
+        public static bool OriginalPerceptionIntermediateBlocked(
+            int x,
+            int y,
+            bool secondaryCellChecks)
+        {
+            if (originalMap == null)
+                return true;
+
+            return originalMap.IsPerceptionIntermediateBlocked(
+                x,
+                y,
+                secondaryCellChecks,
+                (doorX, doorY) =>
+                {
+                    var tile = tilemap[doorX, doorY];
+                    return tile != null && !tile.obstacle;
+                });
+        }
+
+        public static bool OriginalPerceptionLineTrace(
+            int startX,
+            int startY,
+            int deltaX,
+            int deltaY,
+            int maxSteps,
+            bool secondaryCellChecks)
+        {
+            return OriginalGuardDispatcher.TraceGuardGridLine(
+                startX,
+                startY,
+                deltaX,
+                deltaY,
+                maxSteps,
+                secondaryCellChecks,
+                OriginalPerceptionIntermediateBlocked);
+        }
+
         // Cell-level collision query used by legacy actor movement.
         // Player movement uses WorldCollision for the recovered 27-unit AABB.
         public static bool IsWalkable(int x, int y, Entity ent)
