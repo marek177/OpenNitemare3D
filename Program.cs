@@ -17,6 +17,8 @@ namespace Nitemare3D
 				return;
 			}
 
+			OriginalRendererStage4.Initialize(args);
+
 			foreach (string arg in args)
 			{
 				// Recovered GUARD runtime is the production default now.
