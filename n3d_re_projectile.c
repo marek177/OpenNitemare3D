@@ -1,4 +1,6 @@
 #include "n3d_re_projectile.h"
+#include "n3d_re_definitions.h"
+#include "n3d_re_collision.h"
 
 #include <string.h>
 
@@ -193,6 +195,122 @@ int N3D_RE_AdvanceProjectileLineSteps(int slot, uint16_t substeps)
         ++advanced;
     }
     return advanced;
+}
+
+n3d_projectile_collision_result
+N3D_RE_ClassifyProjectileCollision(int slot)
+{
+    n3d_projectile_collision_result result = {0};
+    result.object_slot = -1;
+    result.guard_slot = -1;
+
+    if(slot < 0 || slot >= N3D_MAX_PROJECTILES)
+    {
+        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        return result;
+    }
+
+    const n3d_projectile_record* projectile = &n3d_projectiles[slot];
+    if(projectile->state != 1)
+        return result;
+
+    const int tile_x =
+        (int)N3D_RE_WorldToTile(projectile->object.world_x);
+    const int tile_y =
+        (int)N3D_RE_WorldToTile(projectile->object.world_y);
+
+    if(tile_x < 0 || tile_y < 0 ||
+       tile_x >= N3D_MAP_WIDTH || tile_y >= N3D_MAP_HEIGHT)
+    {
+        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        return result;
+    }
+
+    result.cell_x = (uint8_t)tile_x;
+    result.cell_y = (uint8_t)tile_y;
+
+    const n3d_map_cell* cell =
+        N3D_RE_MapCell(result.cell_x, result.cell_y);
+    if(!cell)
+    {
+        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        return result;
+    }
+
+    result.raw_wall_id = cell->wall;
+    result.raw_object_id = cell->object;
+
+    if(!N3D_RE_WallPropertyKnown(cell->wall) ||
+       !N3D_RE_ObjectPropertyKnown(cell->object))
+    {
+        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        return result;
+    }
+
+    if(N3D_RE_WallMappingKnown(cell->wall))
+        result.mapped_wall_type = n3d_wall_mapped_type[cell->wall];
+
+    /*
+     * FUN_1010_9B64 first uses the visited cell's object property/class to
+     * select the GUARD path, then applies the +/-9 world-coordinate test.
+     */
+    if(n3d_object_property_resolved[cell->object] &
+       N3D_OBJECT_CREATES_GUARD)
+    {
+        const int object_slot =
+            N3D_RE_FindObjectSlotByCell(result.cell_x, result.cell_y);
+
+        if(object_slot >= 0)
+        {
+            const n3d_object_record* object =
+                &n3d_objects[object_slot];
+
+            const int guard_slot = object->guard_index;
+            if(guard_slot >= 0 &&
+               guard_slot < (int)n3d_guard_count &&
+               n3d_guards[guard_slot].strength != 0 &&
+               N3D_RE_ProjectileHitsGuard(
+                   projectile->object.world_x,
+                   projectile->object.world_y,
+                   object->world_x,
+                   object->world_y))
+            {
+                result.object_slot = (int16_t)object_slot;
+                result.guard_slot = (int16_t)guard_slot;
+                result.kind = N3D_PROJECTILE_COLLISION_GUARD_HIT;
+                result.enter_impact = 1;
+                return result;
+            }
+        }
+    }
+
+    const uint8_t wall_flags =
+        n3d_wall_property_resolved[cell->wall];
+
+    if(wall_flags & 0x10)
+    {
+        /*
+         * Explodable-wall path is verified: event 0x29 and transition toward
+         * runtime wall class 0x2D. Final map/collision cleanup stays deferred.
+         */
+        result.kind = N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL;
+        result.event_id = N3D_EXPLODABLE_WALL_EVENT;
+        result.enter_impact = 1;
+        return result;
+    }
+
+    /*
+     * Other collision-relevant wall classes are intentionally not assigned
+     * cleanup/state effects here until the remaining 9B64 branches are closed.
+     */
+    if(wall_flags & (0x01 | 0x02 | 0x04 | 0x08))
+    {
+        result.kind = N3D_PROJECTILE_COLLISION_WALL_DEFERRED;
+        return result;
+    }
+
+    result.kind = N3D_PROJECTILE_COLLISION_NONE;
+    return result;
 }
 
 int N3D_RE_EnterProjectileImpact(
