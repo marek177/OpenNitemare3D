@@ -81,8 +81,7 @@ n3d_guard_movement_result N3D_RE_TickGuardMovementCollisionCore(
     n3d_guard_record* guard,
     n3d_object_record* object,
     n3d_guard_block_callback is_blocked_at,
-    void* user,
-    uint32_t* rng_state);
+    void* user);
 
 n3d_guard_dispatch_result N3D_RE_TickState06Movement(
     n3d_guard_record* guard,
