@@ -213,6 +213,10 @@ namespace Nitemare3D
             map[0x0102 + 10] = 0x2A; // blocking family + LOS exception
             map[0x0102 + 11] = 0x00;
 
+            // Eight raw IDs sharing one class exercise FUN_2398-style variant math.
+            for (int i = 20; i <= 27; i++)
+                map[0x0102 + i] = 0x0F;
+
             int level = OriginalMapTables.HeaderBytes;
 
             // (0,0) hard wall + empty object
@@ -237,6 +241,12 @@ namespace Nitemare3D
                    tables.WallId[0, 0] == 5 &&
                    tables.ObjectId[2, 0] == 9,
                 "MAP header/raw cell parse mismatch.");
+
+            Assert(tables.TryGetObjectClassAndVariant(
+                       24, out byte mappedClass, out byte mappedVariant) &&
+                   mappedClass == 0x0F &&
+                   mappedVariant == 4,
+                "MAP object class/variant lookup mismatch.");
 
             Assert(tables.WallClassAt(0, 0) == 0x01 &&
                    (tables.WallPropertyAt(0, 0) &
@@ -1629,6 +1639,34 @@ namespace Nitemare3D
             Assert(cannon.Strategy == 4 &&
                    cannon.State == (byte)OriginalGuardState.Conditional0E,
                 "cannon guard initial profile mismatch.");
+
+            var spawned = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                State = (byte)OriginalGuardState.Active07
+            };
+            OriginalGuardProfiles.ApplySpawnVariantAndCell(
+                ref spawned, 4, 0x42);
+            Assert(spawned.Octant == 0 &&
+                   spawned.MoveX == 0 &&
+                   spawned.MoveY == -8 &&
+                   spawned.State == (byte)OriginalGuardState.Move08 &&
+                   spawned.Strategy == 2,
+                "moving north variant / wall-class-42 spawn override mismatch.");
+
+            spawned = new OriginalGuardRecord
+            {
+                Strategy = 0,
+                State = (byte)OriginalGuardState.Active07
+            };
+            OriginalGuardProfiles.ApplySpawnVariantAndCell(
+                ref spawned, 5, 0x43);
+            Assert(spawned.Octant == 2 &&
+                   spawned.MoveX == 8 &&
+                   spawned.MoveY == 0 &&
+                   spawned.State == (byte)OriginalGuardState.Move08 &&
+                   spawned.Strategy == 1,
+                "moving east variant / wall-class-43 spawn override mismatch.");
 
             OriginalGuardDispatcher.GetDirectionalStep(
                 1, 2, out sbyte moveX, out sbyte moveY);
