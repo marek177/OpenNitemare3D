@@ -6,8 +6,9 @@ namespace Nitemare3D
 {
     /// <summary>
     /// Production-side storage for the recovered fixed Win16 OBJECT/GUARD pools.
-    /// The historical Entity classes still drive gameplay; this pool is the bridge
-    /// used while behavior is migrated state-by-state to the original runtime model.
+    /// The legacy Entity classes remain the default/fallback shell, while the
+    /// opt-in autonomous path lets confirmed original GUARD states own gameplay
+    /// state and movement at the recovered 125-ms logic cadence.
     /// </summary>
     public static class OriginalRuntimeState
     {
@@ -552,6 +553,75 @@ namespace Nitemare3D
             return result;
         }
 
+        public static bool HasConfirmedAutonomousStateHandler(byte state)
+        {
+            switch ((OriginalGuardState)state)
+            {
+                case OriginalGuardState.AnimationTimer:
+                case OriginalGuardState.Delay:
+                case OriginalGuardState.Active02:
+                case OriginalGuardState.Detection03:
+                case OriginalGuardState.DetectionAttack04:
+                case OriginalGuardState.Transition05:
+                case OriginalGuardState.MoveThen03:
+                case OriginalGuardState.Active07:
+                case OriginalGuardState.DeathFinalize09:
+                case OriginalGuardState.NoLocalAction0A:
+                case OriginalGuardState.LethalPlayerContact0B:
+                case OriginalGuardState.Shared0C:
+                case OriginalGuardState.Shared0D:
+                case OriginalGuardState.WaitAnimation12:
+                case OriginalGuardState.Transition13:
+                case OriginalGuardState.Pain15:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        public static bool HasConfirmedAutonomousHandler(Entity entity)
+        {
+            if (!bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0)
+            {
+                return false;
+            }
+
+            return HasConfirmedAutonomousStateHandler(
+                Guards[binding.GuardSlot].State);
+        }
+
+        static OriginalGuardDispatchResult TickDormantDirectionalBridge(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (Game.player == null ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition))
+            {
+                // 0C/0D are retail-dormant compatibility states. Preserve the
+                // injected/restored state rather than falling into guessed AI.
+                return OriginalGuardDispatchResult.Waiting;
+            }
+
+            short playerWorldX =
+                ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY =
+                ToWorldCoordinate(Game.player.position.Y);
+
+            // FUN_7E54 is shared by 0C/0D and only forces the normal
+            // directional/sequence refresh; it does not leave the state.
+            return OriginalGuardDispatcher.RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                true);
+        }
+
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
@@ -734,6 +804,30 @@ namespace Nitemare3D
 
                     return OriginalGuardDispatchResult.NotHandled;
                 }
+
+                case OriginalGuardState.DeathFinalize09:
+                {
+                    // FUN_A0EE finalizes ordinary death to state 0A and performs
+                    // the recovered Dracula 0x11 -> 0x14 phase transition.
+                    // Dr. Hamerstein's additional end-game globals remain a
+                    // separate bridge, but the GUARD state itself is finalized.
+                    var finalization = FinalizeDeath09(entity);
+                    return finalization == GuardHitResult.NoRuntimeBinding
+                        ? OriginalGuardDispatchResult.NotHandled
+                        : OriginalGuardDispatchResult.Transitioned;
+                }
+
+                case OriginalGuardState.NoLocalAction0A:
+                case OriginalGuardState.LethalPlayerContact0B:
+                    // Both values share the original no-local-action dispatcher
+                    // target. Keeping them handled prevents legacy AI resurrection.
+                    return OriginalGuardDispatchResult.Waiting;
+
+                case OriginalGuardState.Shared0C:
+                case OriginalGuardState.Shared0D:
+                    return TickDormantDirectionalBridge(
+                        ref guard,
+                        ref obj);
 
                 case OriginalGuardState.WaitAnimation12:
                     return OriginalGuardDispatcher.TickWaitAnimation12(
