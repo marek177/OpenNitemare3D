@@ -410,9 +410,12 @@ namespace Nitemare3D
                     continue;
                 }
 
-                ulong sourceStep16_16 =
-                    ((ulong)frame.height << 16) /
-                    (ulong)screenHeight;
+                uint sourceStep16_16 =
+                    OriginalProjectedSpriteQueue
+                        .SpriteSourceStep16_16(
+                            frame.height,
+                            projected.Top,
+                            projected.Bottom);
 
                 bool bypassWall =
                     (entry.RuntimeObject.Flags & 0x10) != 0;
@@ -430,12 +433,12 @@ namespace Nitemare3D
                         continue;
                     }
 
-                    ulong sourceXFixed =
-                        (ulong)(screenX - projected.Left) *
-                        sourceStep16_16;
-
                     int texX =
-                        (int)(sourceXFixed >> 16);
+                        OriginalProjectedSpriteQueue
+                            .SpriteSourceCoordinate(
+                                screenX,
+                                projected.Left,
+                                sourceStep16_16);
 
                     if (texX < 0 ||
                         texX >= frame.width)
@@ -447,12 +450,12 @@ namespace Nitemare3D
                         screenY <= lastY;
                         screenY++)
                     {
-                        ulong sourceYFixed =
-                            (ulong)(screenY - projected.Top) *
-                            sourceStep16_16;
-
                         int texY =
-                            (int)(sourceYFixed >> 16);
+                            OriginalProjectedSpriteQueue
+                                .SpriteSourceCoordinate(
+                                    screenY,
+                                    projected.Top,
+                                    sourceStep16_16);
 
                         if (texY < 0 ||
                             texY >= frame.height)
