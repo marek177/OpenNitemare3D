@@ -36,6 +36,9 @@ namespace Nitemare3D
         public static readonly OriginalWeaponRuntime WeaponRuntime =
             new OriginalWeaponRuntime();
 
+        public static readonly OriginalShadeRuntime ShadeRuntime =
+            new OriginalShadeRuntime();
+
         public static readonly OriginalPickupRuntime PickupRuntime =
             new OriginalPickupRuntime();
 
@@ -236,6 +239,22 @@ namespace Nitemare3D
         /// D=max(raw,40); 53F4=(1000+D/2)/D; 53F6=max(1,(D+2)/4);
         /// 53F8=max(1,(360*D+1400)/2800); 53FA=2*53F6.
         /// </summary>
+        public static void ConfigureShadePalette(
+            byte[] palette)
+        {
+            ShadeRuntime.Rebuild(
+                palette,
+                ShadeRuntime.ShadeIndex);
+        }
+
+        public static void SetShadeIndex(
+            int shadeIndex)
+        {
+            ShadeRuntime.Rebuild(
+                GameWindow.pal,
+                shadeIndex);
+        }
+
         public static void ConfigureFrameCalibration(uint rawMeanMs)
         {
             RawFrameMeanMs = unchecked((ushort)rawMeanMs);
