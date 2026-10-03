@@ -4,26 +4,31 @@ using System.IO;
 namespace Nitemare3D
 {
     /// <summary>
-    /// Exact runtime classification tables used by the original Win16 engine.
+    /// Exact Win16 cell-classification tables loaded by FUN_1010_4868.
     ///
-    /// DS:8196[256] maps first MAP-cell bytes to wall/runtime semantic classes.
-    /// DS:8296[256] maps second MAP-cell bytes to object/runtime semantic classes.
+    /// FUN_4868 reads the 0x202-byte MAP.n header directly to DS:8194:
+    ///   DS:8194      = uint16 level count
+    ///   DS:8196[256] = raw wall-id -> semantic wall class
+    ///   DS:8296[256] = raw object-id -> semantic object class
     ///
-    /// Current static exports expose these addresses as zero-filled, while all
-    /// gameplay code reads them as populated tables. This class intentionally
-    /// separates acquisition of the 512 bytes from the now-closed property and
-    /// LOS semantics that consume them.
+    /// FUN_24BC/FUN_2556 then derive DS:7E94/7F94 property bytes from these
+    /// two classification tables. No EXE data-segment or runtime memory dump is
+    /// required to reconstruct them.
     /// </summary>
     public sealed class OriginalCellClassificationTables
     {
         public const int TableBytes = 256;
-        public const int CombinedDumpBytes = TableBytes * 2;
+        public const int CombinedTableBytes = TableBytes * 2;
+        public const int MapHeaderBytes = 0x202;
+        public const int MapWallClassOffset = 0x0002;
+        public const int MapObjectClassOffset = 0x0102;
 
         readonly byte[] primaryMappedTypes = new byte[TableBytes];
         readonly byte[] secondaryMappedTypes = new byte[TableBytes];
         readonly byte[] primaryFlags = new byte[TableBytes];
         readonly byte[] secondaryFlags = new byte[TableBytes];
 
+        public ushort LevelCount { get; private set; }
         public bool IsLoaded { get; private set; }
 
         public byte PrimaryMappedType(byte id)
@@ -50,16 +55,29 @@ namespace Nitemare3D
             return secondaryFlags[id];
         }
 
-        public void LoadCombinedDump(byte[] dump)
+        public void LoadMapHeader(byte[] mapHeaderOrFile)
         {
-            if (dump == null)
-                throw new ArgumentNullException(nameof(dump));
-            if (dump.Length != CombinedDumpBytes)
-                throw new InvalidDataException(
-                    "Expected exactly 512 bytes: DS:8196[256] followed by DS:8296[256].");
+            if (mapHeaderOrFile == null)
+                throw new ArgumentNullException(nameof(mapHeaderOrFile));
+            if (mapHeaderOrFile.Length < MapHeaderBytes)
+                throw new InvalidDataException("MAP data is shorter than the 0x202-byte header.");
 
-            Array.Copy(dump, 0, primaryMappedTypes, 0, TableBytes);
-            Array.Copy(dump, TableBytes, secondaryMappedTypes, 0, TableBytes);
+            LevelCount = (ushort)(
+                mapHeaderOrFile[0] |
+                (mapHeaderOrFile[1] << 8));
+
+            Array.Copy(
+                mapHeaderOrFile,
+                MapWallClassOffset,
+                primaryMappedTypes,
+                0,
+                TableBytes);
+            Array.Copy(
+                mapHeaderOrFile,
+                MapObjectClassOffset,
+                secondaryMappedTypes,
+                0,
+                TableBytes);
 
             RebuildFlags();
             IsLoaded = true;
@@ -74,6 +92,7 @@ namespace Nitemare3D
             if (primary.Length != TableBytes || secondary.Length != TableBytes)
                 throw new InvalidDataException("Each classification table must be exactly 256 bytes.");
 
+            LevelCount = 0;
             Array.Copy(primary, primaryMappedTypes, TableBytes);
             Array.Copy(secondary, secondaryMappedTypes, TableBytes);
 
@@ -103,15 +122,6 @@ namespace Nitemare3D
             generatedPrimaryFlags = primaryFlags[primaryId];
             generatedSecondaryFlags = secondaryFlags[secondaryId];
             return true;
-        }
-
-        public byte[] ExportCombinedDump()
-        {
-            EnsureLoaded();
-            byte[] result = new byte[CombinedDumpBytes];
-            Array.Copy(primaryMappedTypes, 0, result, 0, TableBytes);
-            Array.Copy(secondaryMappedTypes, 0, result, TableBytes, TableBytes);
-            return result;
         }
 
         void RebuildFlags()
