@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build isolated recovered runtime test
-        run: gcc -std=c11 -Wall -Wextra -Werror tests/n3d_re_runtime_test.c n3d_re_runtime.c n3d_re_guard.c n3d_re_collision.c n3d_re_player.c n3d_re_projectile.c n3d_re_combat.c n3d_re_definitions.c n3d_re_door.c n3d_re_special_runtime.c n3d_re_use.c n3d_re_pickup.c n3d_re_trig.c n3d_re_movement.c n3d_re_timing.c n3d_re_controls.c n3d_re_weapon.c -o n3d_re_runtime_test
+        run: gcc -std=c11 -Wall -Wextra -Werror tests/n3d_re_runtime_test.c n3d_re_runtime.c n3d_re_guard.c n3d_re_collision.c n3d_re_player.c n3d_re_projectile.c n3d_re_combat.c n3d_re_definitions.c n3d_re_door.c n3d_re_special_runtime.c n3d_re_use.c n3d_re_pickup.c n3d_re_trig.c n3d_re_movement.c n3d_re_timing.c n3d_re_controls.c n3d_re_weapon.c n3d_re_save.c -o n3d_re_runtime_test
 
       - name: Run recovered runtime test
         run: ./n3d_re_runtime_test
