@@ -58,6 +58,16 @@ namespace Nitemare3D
         // yet, so the default remains false; exposing it preserves the branch.
         public static bool GuardProcessingGate { get; set; }
 
+        // DAT_1048_51A5. FUN_0EF6 initializes it to 1 and the Win16 UI can
+        // toggle it. Keep the neutral address-backed name until the UI label is
+        // independently identified. Unlike per-level state, it survives Reset().
+        public static bool GuardState0E10Gate51A5 { get; set; } = true;
+
+        // DAT_1048_4C1C. FUN_8A20 updates this only when the player's current
+        // wall belongs to semantic class 0x44 (AREA marker), so the last value
+        // persists while crossing ordinary cells.
+        public static byte PlayerAreaSelector { get; private set; }
+
         // Mirrors the second half of the class-0x16 damage gate:
         // (episode == 3 || DAT_1048_51A6 != 0). The exact producer of 51A6 is
         // still separate, so production defaults this override to false.
@@ -66,6 +76,7 @@ namespace Nitemare3D
         public static void BeginFrame(float deltaSeconds)
         {
             GuardLogicTickDue = false;
+            RefreshPlayerAreaSelectorFromMap();
 
             if (!AutonomousGuardRuntimeEnabled || deltaSeconds <= 0)
                 return;
@@ -79,6 +90,31 @@ namespace Nitemare3D
             // D70A observes the current 125-ms bin rather than replaying every
             // skipped bin. Preserve phase but drop catch-up iterations.
             guardLogicAccumulator %= GuardLogicTickSeconds;
+        }
+
+        static void RefreshPlayerAreaSelectorFromMap()
+        {
+            if (Game.player == null || Level.originalMap == null)
+                return;
+
+            int tileX = (int)Game.player.position.X;
+            int tileY = (int)Game.player.position.Y;
+
+            if (tileX < 0 || tileY < 0 ||
+                tileX >= OriginalRuntime.MapWidth ||
+                tileY >= OriginalRuntime.MapHeight)
+            {
+                return;
+            }
+
+            byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+            if (Level.originalMap.TryGetWallClassVariant(
+                    rawWallId,
+                    0x44,
+                    out byte areaId))
+            {
+                PlayerAreaSelector = areaId;
+            }
         }
 
         public static void SetDifficulty(byte difficulty)
@@ -937,6 +973,105 @@ namespace Nitemare3D
                         ref guard,
                         ref obj);
 
+                case OriginalGuardState.Conditional0E:
+                {
+                    if (Game.player == null ||
+                        !ObjectDefinitions.TryGetHeader(
+                            obj.DefinitionId,
+                            out var definition))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    short playerWorldX =
+                        ToWorldCoordinate(Game.player.position.X);
+                    short playerWorldY =
+                        ToWorldCoordinate(Game.player.position.Y);
+
+                    return OriginalGuardDispatcher.TickState0E(
+                        ref guard,
+                        ref obj,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        GuardState0E10Gate51A5);
+                }
+
+                case OriginalGuardState.Timed0F:
+                {
+                    if (Game.player == null ||
+                        !ObjectDefinitions.TryGetHeader(
+                            obj.DefinitionId,
+                            out var definition))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    short playerWorldX =
+                        ToWorldCoordinate(Game.player.position.X);
+                    short playerWorldY =
+                        ToWorldCoordinate(Game.player.position.Y);
+
+                    var result = OriginalGuardDispatcher.TickState0F(
+                        ref guard,
+                        ref obj,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        GuardState0E10Gate51A5,
+                        guard.DefinitionLookup == PlayerAreaSelector,
+                        out bool attackSoundRequested);
+
+                    if (attackSoundRequested)
+                        ConsumeOriginalAttackSoundSelection(obj.ObjectClass);
+
+                    return result;
+                }
+
+                case OriginalGuardState.Timed10:
+                {
+                    if (Game.player == null ||
+                        !ObjectDefinitions.TryGetHeader(
+                            obj.DefinitionId,
+                            out var definition))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    short playerWorldX =
+                        ToWorldCoordinate(Game.player.position.X);
+                    short playerWorldY =
+                        ToWorldCoordinate(Game.player.position.Y);
+
+                    if (!OriginalGuardDispatcher.State10AttackDue(
+                            ref guard,
+                            ref obj,
+                            definition,
+                            playerWorldX,
+                            playerWorldY))
+                    {
+                        return OriginalGuardDispatchResult.Waiting;
+                    }
+
+                    if (!TryEvaluateAttackEligibility(
+                            ref guard,
+                            ref obj,
+                            out bool attackEligible))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    if (attackEligible)
+                        ApplyGuardAttackDamageToPlayer(ref obj);
+
+                    return OriginalGuardDispatcher.CompleteState10AttackCycle(
+                        ref guard,
+                        ref obj,
+                        definition,
+                        playerWorldX,
+                        playerWorldY);
+                }
+
                 case OriginalGuardState.RecoverMove11:
                     return TickState11Bridge(
                         entity,
@@ -1067,6 +1202,9 @@ namespace Nitemare3D
                 case OriginalGuardState.LethalPlayerContact0B:
                 case OriginalGuardState.Shared0C:
                 case OriginalGuardState.Shared0D:
+                case OriginalGuardState.Conditional0E:
+                case OriginalGuardState.Timed0F:
+                case OriginalGuardState.Timed10:
                 case OriginalGuardState.RecoverMove11:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
