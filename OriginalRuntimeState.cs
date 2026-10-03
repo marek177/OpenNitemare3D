@@ -451,6 +451,20 @@ namespace Nitemare3D
             PlayerDeathLatch46AC = false;
             PlayerDeathSource4C1A = 0;
             PlayerDamageSuppressed4BE5 = false;
+
+            if (playerDeathBasePalette != null &&
+                playerDeathBasePalette.Length >= 768 &&
+                GameWindow.pal != null &&
+                GameWindow.pal.Length >= 768)
+            {
+                Array.Copy(
+                    playerDeathBasePalette,
+                    0,
+                    GameWindow.pal,
+                    0,
+                    768);
+            }
+
             playerDeathBasePalette = null;
             PlayerDeathRedFadeStep = 0;
         }
