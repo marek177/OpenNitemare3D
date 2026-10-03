@@ -19,6 +19,7 @@
 #include "../n3d_re_wall_explosion.h"
 #include "../n3d_re_map_archive.h"
 #include "../n3d_re_object_defs.h"
+#include "../n3d_re_guard_sounds.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -3915,6 +3916,116 @@ int main(void)
         N3D_RE_ResetGuardLogicClock();
         assert(!n3d_guard_clock.tick_due);
         assert(n3d_guard_clock.accumulator_ms == 0);
+    }
+
+    /* Packed GUARD state-00/02/03/04 sequence transitions. */
+    {
+        n3d_guard_record guard = {0};
+        n3d_object_record object = {0};
+
+        guard.state = N3D_GUARD_STATE_02;
+        assert(N3D_RE_BeginState02AlertSequence(
+            &guard, &object, 0x0342));
+        assert(guard.definition_value == 0x0342);
+        assert((uint8_t)object.animation_frame == 0x42);
+        assert(guard.timer == 2);
+        assert(guard.next_state == N3D_GUARD_STATE_03);
+        assert(guard.state == N3D_GUARD_STATE_00);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 1);
+        assert((uint8_t)object.animation_frame == 0x43);
+        assert(guard.timer == 1);
+        assert(guard.state == N3D_GUARD_STATE_00);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 2);
+        assert((uint8_t)object.animation_frame == 0x44);
+        assert(guard.timer == 0);
+        assert(guard.state == N3D_GUARD_STATE_03);
+
+        assert(N3D_RE_BeginState03AttackSequence(
+            &guard, &object, 0x0250));
+        assert(guard.definition_value == 0x0250);
+        assert((uint8_t)object.animation_frame == 0x50);
+        assert(guard.timer == 1);
+        assert(guard.next_state == N3D_GUARD_STATE_04);
+        assert(guard.state == N3D_GUARD_STATE_00);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 2);
+        assert((uint8_t)object.animation_frame == 0x51);
+        assert(guard.state == N3D_GUARD_STATE_04);
+
+        assert(N3D_RE_BeginState04RecoverySequence(
+            &guard, &object, 0x0330));
+        assert(guard.definition_value == 0x0330);
+        assert((uint8_t)object.animation_frame == 0x30);
+        assert(guard.timer == 2);
+        assert(guard.next_state == N3D_GUARD_STATE_05);
+        assert(guard.state == N3D_GUARD_STATE_00);
+
+        /* Generic state-00 looping uses packed first-frame/frame-count. */
+        guard.definition_value = 0x0320;
+        guard.timer = 4;
+        guard.next_state = N3D_GUARD_STATE_07;
+        guard.state = N3D_GUARD_STATE_00;
+        object.animation_frame = 0x22;
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 1);
+        assert((uint8_t)object.animation_frame == 0x20);
+        assert(guard.timer == 3);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 1);
+        assert((uint8_t)object.animation_frame == 0x21);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 1);
+        assert((uint8_t)object.animation_frame == 0x22);
+
+        assert(N3D_RE_TickAnimationTimer(
+            &guard, &object) == 2);
+        assert((uint8_t)object.animation_frame == 0x20);
+        assert(guard.state == N3D_GUARD_STATE_07);
+    }
+
+    /* Exact class-specific alert/attack/death SND selectors and RNG classes. */
+    {
+        assert(!N3D_RE_GuardAlertUsesRandom(0x08));
+        assert(N3D_RE_GuardAlertUsesRandom(0x09));
+        assert(N3D_RE_GuardAlertUsesRandom(0x0A));
+        assert(N3D_RE_GuardAlertUsesRandom(0x0F));
+        assert(N3D_RE_GuardAlertUsesRandom(0x10));
+
+        assert(N3D_RE_GuardAlertSoundId(0x08, 0) == 0x22);
+        assert(N3D_RE_GuardAlertSoundId(0x09, 0) == 0x38);
+        assert(N3D_RE_GuardAlertSoundId(0x09, 1) == 0x39);
+        assert(N3D_RE_GuardAlertSoundId(0x09, 2) == 0x3A);
+        assert(N3D_RE_GuardAlertSoundId(0x0F, 0) == 0x36);
+        assert(N3D_RE_GuardAlertSoundId(0x0F, 1) == 0x37);
+
+        assert(N3D_RE_GuardAttackUsesRandom(0x16));
+        assert(N3D_RE_GuardAttackUsesRandom(0x1B));
+        assert(!N3D_RE_GuardAttackUsesRandom(0x12));
+        assert(N3D_RE_GuardAttackSoundId(0x16, 2) == 0x19);
+        assert(N3D_RE_GuardAttackSoundId(0x1B, 3) == 0x4E);
+
+        assert(N3D_RE_GuardDeathUsesRandom(0x0F));
+        assert(!N3D_RE_GuardDeathUsesRandom(0x0E));
+        assert(N3D_RE_GuardDeathSoundId(0x0F, 2) == 0x0D);
+        assert(N3D_RE_GuardDeathSoundId(0x08, 0) == 0x23);
+
+        /* RNG consumption parity for state-02 alert classes. */
+        N3D_RE_ResetOriginalRng();
+        const uint16_t alert_random =
+            N3D_RE_GuardAlertUsesRandom(0x09)
+                ? N3D_RE_RngNextGlobal()
+                : 0;
+        assert(alert_random == 41);
+        assert(N3D_RE_GuardAlertSoundId(
+            0x09, alert_random) == 0x3A);
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");

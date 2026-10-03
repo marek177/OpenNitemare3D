@@ -47,6 +47,111 @@ uint16_t N3D_RE_State13InitialTimer(uint16_t random_value)
     return (uint16_t)(random_value % N3D_STATE13_RANDOM_RANGE + N3D_STATE13_TIMER_MIN);
 }
 
+int N3D_RE_TickAnimationTimer(
+    n3d_guard_record* guard,
+    n3d_object_record* object)
+{
+    if(!guard ||
+       !object ||
+       guard->state != N3D_GUARD_STATE_00)
+        return 0;
+
+    const int first_frame =
+        guard->definition_value & 0xFF;
+    const int frame_count =
+        (guard->definition_value >> 8) & 0xFF;
+
+    int frame =
+        ((uint8_t)object->animation_frame + 1) & 0xFF;
+
+    if(first_frame + frame_count <= frame)
+        frame = first_frame;
+
+    object->animation_frame =
+        (int8_t)(uint8_t)frame;
+
+    --guard->timer;
+
+    if(guard->timer <= 0)
+    {
+        guard->state = guard->next_state;
+        return 2; /* transitioned */
+    }
+
+    return 1; /* waiting */
+}
+
+int N3D_RE_BeginPackedSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t sequence_value,
+    uint8_t state,
+    uint8_t next_state)
+{
+    if(!guard || !object)
+        return 0;
+
+    guard->definition_value = sequence_value;
+    object->animation_frame =
+        (int8_t)(uint8_t)sequence_value;
+    guard->timer =
+        (int16_t)(((sequence_value >> 8) & 0xFFu) - 1);
+    guard->next_state = next_state;
+    guard->state = state;
+    return 1;
+}
+
+int N3D_RE_BeginState02AlertSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_34)
+{
+    if(!guard ||
+       guard->state != N3D_GUARD_STATE_02)
+        return 0;
+
+    return N3D_RE_BeginPackedSequence(
+        guard,
+        object,
+        class_sequence_34,
+        N3D_GUARD_STATE_00,
+        N3D_GUARD_STATE_03);
+}
+
+int N3D_RE_BeginState03AttackSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_36)
+{
+    if(!guard ||
+       guard->state != N3D_GUARD_STATE_03)
+        return 0;
+
+    return N3D_RE_BeginPackedSequence(
+        guard,
+        object,
+        class_sequence_36,
+        N3D_GUARD_STATE_00,
+        N3D_GUARD_STATE_04);
+}
+
+int N3D_RE_BeginState04RecoverySequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_38)
+{
+    if(!guard ||
+       guard->state != N3D_GUARD_STATE_04)
+        return 0;
+
+    return N3D_RE_BeginPackedSequence(
+        guard,
+        object,
+        class_sequence_38,
+        N3D_GUARD_STATE_00,
+        N3D_GUARD_STATE_05);
+}
+
 int N3D_RE_TickState01(n3d_guard_record* guard)
 {
     if (!guard || guard->state != N3D_GUARD_STATE_01)

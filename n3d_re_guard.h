@@ -33,6 +33,33 @@ void N3D_RE_ResetOriginalRng(void);
 uint16_t N3D_RE_RngNextGlobal(void);
 n3d_guard_move_vector N3D_RE_GuardDirectionalStep(uint8_t facing, uint8_t strategy);
 uint16_t N3D_RE_State13InitialTimer(uint16_t random_value);
+
+int N3D_RE_TickAnimationTimer(
+    n3d_guard_record* guard,
+    n3d_object_record* object);
+
+int N3D_RE_BeginPackedSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t sequence_value,
+    uint8_t state,
+    uint8_t next_state);
+
+int N3D_RE_BeginState02AlertSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_34);
+
+int N3D_RE_BeginState03AttackSequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_36);
+
+int N3D_RE_BeginState04RecoverySequence(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    uint16_t class_sequence_38);
+
 int N3D_RE_TickState01(n3d_guard_record* guard);
 int N3D_RE_CompleteDeferredState(n3d_guard_record* guard);
 int N3D_RE_CompleteState06(n3d_guard_record* guard);
