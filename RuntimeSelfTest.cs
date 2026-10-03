@@ -14,6 +14,7 @@ namespace Nitemare3D
         public static void Run()
         {
             TestRecordSizes();
+            TestGuardLogicClock();
             TestObjectDefinitionCatalog();
             TestImgResourceLoader();
             TestOriginalMapTables();
@@ -55,6 +56,41 @@ namespace Nitemare3D
                 "GUARD record must be 26 bytes.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
+        }
+
+        static void TestGuardLogicClock()
+        {
+            bool previous = OriginalRuntimeState.AutonomousGuardRuntimeEnabled;
+            OriginalRuntimeState.AutonomousGuardRuntimeEnabled = true;
+            OriginalRuntimeState.Reset();
+
+            OriginalRuntimeState.BeginFrame(0.100f);
+            Assert(!OriginalRuntimeState.GuardLogicTickDue,
+                "GUARD clock must not tick before 125 ms.");
+
+            OriginalRuntimeState.BeginFrame(0.024f);
+            Assert(!OriginalRuntimeState.GuardLogicTickDue,
+                "GUARD clock must still wait at 124 ms.");
+
+            OriginalRuntimeState.BeginFrame(0.001f);
+            Assert(OriginalRuntimeState.GuardLogicTickDue,
+                "GUARD clock must tick at 125 ms.");
+
+            OriginalRuntimeState.BeginFrame(0.001f);
+            Assert(!OriginalRuntimeState.GuardLogicTickDue,
+                "GUARD clock must emit at most one pulse per frame.");
+
+            // A long frame advances to the current time bin but does not replay
+            // every skipped 125-ms interval as multiple same-frame ticks.
+            OriginalRuntimeState.BeginFrame(0.400f);
+            Assert(OriginalRuntimeState.GuardLogicTickDue,
+                "long frame must produce one GUARD tick.");
+            OriginalRuntimeState.BeginFrame(0.001f);
+            Assert(!OriginalRuntimeState.GuardLogicTickDue,
+                "long frame must drop catch-up GUARD ticks.");
+
+            OriginalRuntimeState.AutonomousGuardRuntimeEnabled = previous;
+            OriginalRuntimeState.Reset();
         }
 
         static void TestObjectDefinitionCatalog()
