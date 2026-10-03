@@ -478,6 +478,8 @@ namespace Nitemare3D
 
             img[streamOffset + 0] = 32;
             img[streamOffset + 1] = 32;
+            img[streamOffset + 10] = 0x2A;
+            img[streamOffset + 10 + (32 * 32) - 1] = 0x5C;
 
             Assert(OriginalImgDefinitionLoader.TryReadObjectDefinition(
                        img,
@@ -520,6 +522,25 @@ namespace Nitemare3D
                    registered.Interval == 0x5678 &&
                    registered.State03Sequence == 0x0320,
                 "synthetic IMG definition registration mismatch.");
+
+            Assert(catalog.TryGetBitmapFrame(
+                       definitionId,
+                       0,
+                       img,
+                       out BitmapImage bitmap) &&
+                   bitmap.width == 32 &&
+                   bitmap.height == 32 &&
+                   bitmap.data[0, 0] == 0x2A &&
+                   bitmap.data[31, 31] == 0x5C,
+                "original IMG bitmap-frame decode mismatch.");
+
+            Assert(catalog.TryGetBitmapFrame(
+                       definitionId,
+                       0,
+                       img,
+                       out BitmapImage cachedBitmap) &&
+                   Object.ReferenceEquals(bitmap, cachedBitmap),
+                "original IMG bitmap frame must be cached per definition/frame.");
         }
 
         static void TestOriginalMapTables()
