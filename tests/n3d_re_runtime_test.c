@@ -21,6 +21,7 @@
 #include "../n3d_re_object_defs.h"
 #include "../n3d_re_guard_sounds.h"
 #include "../n3d_re_guard_perception.h"
+#include "../n3d_re_guard_plan.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -4167,6 +4168,199 @@ int main(void)
         assert(N3D_RE_InstantiateMapObject(0x90, 1, 1, NULL));
         assert(n3d_guard_count == 1);
         assert(n3d_guards[0].transition_flag == 1);
+    }
+
+    /* Exact FUN_76FC strategy movement planner + RNG consumption. */
+    {
+        n3d_guard_record guard = {0};
+        n3d_object_record object = {0};
+
+        object.world_x = 128;
+        object.world_y = 128;
+
+        assert(N3D_RE_GuardSignedStepFromDelta(-1) == -8);
+        assert(N3D_RE_GuardSignedStepFromDelta(0) == 0);
+        assert(N3D_RE_GuardSignedStepFromDelta(1) == 8);
+
+        guard.octant = 4;
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, 8, -8);
+        assert(guard.octant == 1);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, 8, 0);
+        assert(guard.octant == 2);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, 8, 8);
+        assert(guard.octant == 3);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, 0, 8);
+        assert(guard.octant == 4);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, -8, 8);
+        assert(guard.octant == 5);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, -8, 0);
+        assert(guard.octant == 6);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, -8, -8);
+        assert(guard.octant == 7);
+        N3D_RE_UpdateGuardOctantFromMovement(&guard, 0, -8);
+        assert(guard.octant == 0);
+
+        /*
+         * Strategy 0: unknown17=0 means first RNG is &3, timer fixed 0x18,
+         * so only one RNG value is consumed.
+         */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 0;
+        guard.unknown_17 = 0;
+        guard.unknown_18 = 0;
+        uint32_t rng = 1;
+        uint32_t expected_rng = rng;
+        const uint16_t first_rand =
+            N3D_RE_RngNext(&expected_rng);
+        assert(first_rand == 41);
+
+        assert(N3D_RE_PlanStrategy0MovementWithRng(
+            &guard, &object,
+            64, 64,
+            1, &rng));
+        assert(rng == expected_rng);
+        assert(guard.timer == 0x18);
+        assert(guard.state == N3D_GUARD_STATE_06);
+        assert(guard.octant <= 7);
+
+        /*
+         * With cached perception and no proximity, pursuit consumes a second
+         * RNG for timer 8..15 and applies difficulty scaling.
+         */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 0;
+        guard.unknown_17 = 1;
+        guard.unknown_18 = 0;
+        rng = 1;
+        expected_rng = rng;
+        (void)N3D_RE_RngNext(&expected_rng);
+        const uint16_t timer_rand =
+            N3D_RE_RngNext(&expected_rng);
+
+        assert(N3D_RE_PlanStrategy0MovementWithRng(
+            &guard, &object,
+            64, 64,
+            1, &rng));
+        assert(rng == expected_rng);
+        assert(guard.timer ==
+               (int16_t)(timer_rand % 8u + 8u));
+
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 0;
+        guard.unknown_17 = 1;
+        rng = 1;
+        assert(N3D_RE_PlanStrategy0MovementWithRng(
+            &guard, &object, 64, 64, 0, &rng));
+        assert(guard.timer >= 16 && guard.timer <= 30);
+
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 0;
+        guard.unknown_17 = 1;
+        rng = 1;
+        assert(N3D_RE_PlanStrategy0MovementWithRng(
+            &guard, &object, 64, 64, 2, &rng));
+        assert(guard.timer >= 4 && guard.timer <= 7);
+
+        /* Proximity cache forces timer 8 and suppresses second timer RNG. */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 0;
+        guard.unknown_17 = 1;
+        guard.unknown_18 = 1;
+        rng = 1;
+        expected_rng = rng;
+        (void)N3D_RE_RngNext(&expected_rng);
+        assert(N3D_RE_PlanStrategy0MovementWithRng(
+            &guard, &object, 64, 64, 1, &rng));
+        assert(rng == expected_rng);
+        assert(guard.timer == 8);
+
+        /*
+         * Strategy 1 low-strength FLEE consumes no RNG. With no door it keeps
+         * the old vector; with a door it aims 32 units inside the target.
+         */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 1;
+        guard.strength = 126;
+        guard.move_x = 0;
+        guard.move_y = -8;
+        rng = 1234;
+        expected_rng = rng;
+
+        assert(N3D_RE_PlanStrategy1MovementWithRng(
+            &guard, &object,
+            0, 0, 1, &rng,
+            0, 0, 0));
+        assert(rng == expected_rng);
+        assert(guard.move_x == 0 && guard.move_y == -8);
+        assert(guard.timer == 0x10);
+        assert(guard.state == N3D_GUARD_STATE_06);
+        assert(guard.octant == 0);
+
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 1;
+        guard.strength = 126;
+        rng = 1234;
+        assert(N3D_RE_PlanStrategy1MovementWithRng(
+            &guard, &object,
+            0, 0, 1, &rng,
+            1, 192, 64));
+        assert(rng == 1234);
+        assert(guard.move_x == 8);
+        assert(guard.move_y == -8);
+        assert(guard.timer == 0x10);
+        assert(guard.octant == 1);
+
+        /* Strength >=127 reuses pursuit and therefore consumes RNG. */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 1;
+        guard.strength = 127;
+        guard.unknown_17 = 1;
+        guard.unknown_18 = 1;
+        rng = 1;
+        expected_rng = rng;
+        (void)N3D_RE_RngNext(&expected_rng);
+        assert(N3D_RE_PlanStrategy1MovementWithRng(
+            &guard, &object,
+            64, 64, 1, &rng,
+            0, 0, 0));
+        assert(rng == expected_rng);
+        assert(guard.timer == 8);
+
+        /* Strategy 2 consumes exactly one RNG for timer. */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 2;
+        guard.move_x = -8;
+        guard.move_y = 0;
+        rng = 1;
+        expected_rng = rng;
+        const uint16_t strategy2_rand =
+            N3D_RE_RngNext(&expected_rng);
+
+        assert(N3D_RE_PlanStrategy2MovementWithRng(
+            &guard, &rng));
+        assert(rng == expected_rng);
+        assert(guard.timer ==
+               (int16_t)(strategy2_rand % 8u + 8u));
+        assert(guard.state == N3D_GUARD_STATE_06);
+        assert(guard.octant == 6);
+
+        /* Strategy 3+ keeps timer/vector and consumes no RNG. */
+        memset(&guard, 0, sizeof(guard));
+        guard.strategy = 3;
+        guard.timer = 23;
+        guard.move_x = 8;
+        guard.move_y = -8;
+        rng = 9876;
+
+        assert(N3D_RE_PlanMovement76FCWithRng(
+            &guard, &object,
+            0, 0, 1, &rng,
+            0, 0, 0));
+        assert(rng == 9876);
+        assert(guard.timer == 23);
+        assert(guard.move_x == 8 && guard.move_y == -8);
+        assert(guard.state == N3D_GUARD_STATE_06);
+        assert(guard.octant == 1);
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
