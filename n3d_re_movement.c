@@ -320,6 +320,7 @@ static void N3D_RE_RecordAxisAttempt(
 
     if(is_x)
     {
+        result->requested_x += signed_step;
         ++result->x_attempts;
         if(accepted)
             result->accepted_x += signed_step;
@@ -328,6 +329,7 @@ static void N3D_RE_RecordAxisAttempt(
     }
     else
     {
+        result->requested_y += signed_step;
         ++result->y_attempts;
         if(accepted)
             result->accepted_y += signed_step;
@@ -432,9 +434,6 @@ n3d_player_move_result N3D_RE_MovePlayerAngleSubsteps(
             }
         }
     }
-
-    result.requested_x = result.accepted_x;
-    result.requested_y = result.accepted_y;
 
     uint8_t event_id = 0;
     if(N3D_RE_CommitPlayerWorldPosition(x, y, &event_id))
