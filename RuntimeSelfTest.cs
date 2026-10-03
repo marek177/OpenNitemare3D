@@ -55,6 +55,7 @@ namespace Nitemare3D
             TestMovementPlanning();
             TestMovementCell700A();
             TestMovementCollisionCore();
+            TestGuardDirectionalControlMode();
             TestDirectionalSequenceRefresh();
             TestGuardMapClassMapping();
             TestGuardInitialProfiles();
@@ -3332,6 +3333,31 @@ namespace Nitemare3D
                    unchecked((byte)obj.Component03) == 4 &&
                    guard.Octant == 2,
                 "double-block state-6 X bounce/compiler-byte behavior mismatch.");
+        }
+
+        static void TestGuardDirectionalControlMode()
+        {
+            var sameLowBytes =
+                new OriginalObjectDefinitionRecord
+                {
+                    DirectionalA1 = 0x1203,
+                    DirectionalA2 = 0x2203
+                };
+
+            var differentLowBytes =
+                new OriginalObjectDefinitionRecord
+                {
+                    DirectionalA1 = 0x1203,
+                    DirectionalA2 = 0x2204
+                };
+
+            Assert(OriginalGuardProfiles.DirectionalControlMode(
+                       sameLowBytes) == 0,
+                "GUARD+0x0F must clear when SEQDEF bytes +6/+8 match.");
+
+            Assert(OriginalGuardProfiles.DirectionalControlMode(
+                       differentLowBytes) == 1,
+                "GUARD+0x0F must set when SEQDEF bytes +6/+8 differ.");
         }
 
         static void TestDirectionalSequenceRefresh()
