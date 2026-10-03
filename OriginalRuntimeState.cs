@@ -643,18 +643,18 @@ namespace Nitemare3D
                     OriginalMapTables.ObjectRuntimePresent) == 0 ||
                 !ObjectDefinitions.TryGetHeader(
                     obj.DefinitionId,
-                    out var definition) ||
-                definition.ExtensionFlag != 0)
+                    out var definition))
             {
                 return false;
             }
 
             bool advanced =
                 OriginalWorldObjectRuntime
-                    .AdvanceSimpleAnimationIfDue(
+                    .AdvancePresentationAnimationIfDue(
                         ref obj,
                         definition,
-                        RuntimeClockMs);
+                        RuntimeClockMs,
+                        OriginalRandom.Next);
 
             if (advanced)
             {
