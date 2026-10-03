@@ -4768,6 +4768,8 @@ int main(void)
         definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_B_OFFSET + 2 * 2 + 1] = 0x02;
         definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2] = 0x33;
         definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 2 * 2 + 1] = 0x03;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 4 * 2] = 0x44;
+        definition.raw[N3D_OBJECT_DEF_DIRECTIONAL_C_OFFSET + 4 * 2 + 1] = 0x04;
 
         assert(N3D_RE_GetGuardDirectionalSequence(
             &definition, N3D_GUARD_STATE_06, 0, 2) == 0x0333);
@@ -4784,10 +4786,9 @@ int main(void)
         assert(N3D_RE_RefreshGuardDirectionalSequence(
             &guard, &object, &definition, 128, 64, 0) ==
                N3D_GUARD_DISPATCH_TRANSITIONED);
-        assert(guard.result_octant <= 7);
-        assert(guard.definition_value != 0);
-        assert((uint8_t)object.animation_frame ==
-               (uint8_t)guard.definition_value);
+        assert(guard.result_octant == 4);
+        assert(guard.definition_value == 0x0444);
+        assert((uint8_t)object.animation_frame == 0x44);
 
         /* Vertical bob is restricted to 08/14/1A and clamps 10..35. */
         memset(&guard, 0, sizeof(guard));
