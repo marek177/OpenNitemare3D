@@ -1061,12 +1061,7 @@ namespace Nitemare3D
                 x,
                 y,
                 secondaryCellChecks,
-                (doorX, doorY) =>
-                {
-                    var door = originalWalls?.FindPairedWall(doorX, doorY);
-                    return door != null &&
-                           (door.State == 0 || door.State == 4);
-                });
+                originalWalls);
         }
 
         public static bool TryGetOriginalDoorCollisionInfo(
@@ -1140,9 +1135,8 @@ namespace Nitemare3D
 
         public static bool OriginalDoorAllowsSight(int x, int y)
         {
-            var door = originalWalls?.FindPairedWall(x, y);
-            return door != null &&
-                   (door.State == 0 || door.State == 4);
+            return originalWalls != null &&
+                   originalWalls.DoorAllowsSight(x, y);
         }
 
         public static bool TryGetNearestRetreatDoorTarget(
@@ -1160,7 +1154,7 @@ namespace Nitemare3D
             if (!originalMap.TryFindNearestReachableDoor(
                     startTileX,
                     startTileY,
-                    OriginalDoorAllowsSight,
+                    originalWalls,
                     out int doorX,
                     out int doorY))
             {
