@@ -43,10 +43,42 @@ namespace Nitemare3D
         public static byte Difficulty { get; private set; } =
             OriginalRuntime.DefaultDifficulty;
 
+        // FUN_D70A/D9C6: gameplay/GUARD update clock is floor(ms*8/1000),
+        // i.e. one global logic step every 125 ms. Extra missed intervals are
+        // not replayed as catch-up ticks.
+        public const float GuardLogicTickSeconds = 0.125f;
+        static float guardLogicAccumulator;
+        public static bool GuardLogicTickDue { get; private set; }
+
+        // Opt-in while the remaining rare GUARD states are still being closed.
+        public static bool AutonomousGuardRuntimeEnabled { get; set; }
+
+        // DAT_1048_4BE7 shared processing gate. No port-side producer is known
+        // yet, so the default remains false; exposing it preserves the branch.
+        public static bool GuardProcessingGate { get; set; }
+
         // Mirrors the second half of the class-0x16 damage gate:
         // (episode == 3 || DAT_1048_51A6 != 0). The exact producer of 51A6 is
         // still separate, so production defaults this override to false.
         public static bool GuardAttackClass16FullDamageOverride { get; set; }
+
+        public static void BeginFrame(float deltaSeconds)
+        {
+            GuardLogicTickDue = false;
+
+            if (!AutonomousGuardRuntimeEnabled || deltaSeconds <= 0)
+                return;
+
+            guardLogicAccumulator += deltaSeconds;
+            if (guardLogicAccumulator < GuardLogicTickSeconds)
+                return;
+
+            GuardLogicTickDue = true;
+
+            // D70A observes the current 125-ms bin rather than replaying every
+            // skipped bin. Preserve phase but drop catch-up iterations.
+            guardLogicAccumulator %= GuardLogicTickSeconds;
+        }
 
         public static void SetDifficulty(byte difficulty)
         {
@@ -71,6 +103,9 @@ namespace Nitemare3D
             ObjectCount = 0;
             GuardCount = 0;
             GuardAttackClass16FullDamageOverride = false;
+            guardLogicAccumulator = 0;
+            GuardLogicTickDue = false;
+            GuardProcessingGate = false;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -628,6 +663,55 @@ namespace Nitemare3D
                         binding,
                         ref guard,
                         ref obj);
+
+                case OriginalGuardState.Active07:
+                {
+                    if (!ObjectDefinitions.TryGetHeader(
+                            obj.DefinitionId,
+                            out var definition))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    short playerWorldX =
+                        ToWorldCoordinate(Game.player.position.X);
+                    short playerWorldY =
+                        ToWorldCoordinate(Game.player.position.Y);
+
+                    // FUN_7B56 state 07 calls FUN_6EE0 before the processing
+                    // gate and FUN_7494 perception test.
+                    OriginalGuardDispatcher.RefreshDirectionalSequence(
+                        ref guard,
+                        ref obj,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        false);
+
+                    if (GuardProcessingGate)
+                        return OriginalGuardDispatchResult.Waiting;
+
+                    bool perceived =
+                        OriginalGuardDispatcher.EvaluateGuardPerception(
+                            ref guard,
+                            ref obj,
+                            playerWorldX,
+                            playerWorldY,
+                            false,
+                            false,
+                            Level.OriginalPerceptionLineTrace);
+
+                    ushort randomValue =
+                        perceived && guard.Strategy == 3
+                            ? OriginalRandom.Next()
+                            : (ushort)0;
+
+                    return OriginalGuardDispatcher.ResolveState07Perception(
+                        ref guard,
+                        GuardProcessingGate,
+                        perceived,
+                        randomValue);
+                }
 
                 case OriginalGuardState.WaitAnimation12:
                     return OriginalGuardDispatcher.TickWaitAnimation12(
