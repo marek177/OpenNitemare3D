@@ -102,6 +102,19 @@ namespace Nitemare3D
         float[] spriteDistance = new float[maxSprites];
         float[] zBuffer;
 
+        // Win16 0x58FE: 320 WORD per-column wall visibility values. While the
+        // legacy DDA still draws walls, populate this buffer in the original
+        // Q4 projection domain so runtime-backed sprites can use the recovered
+        // CC7C/3F80 wall tests instead of float zBuffer comparisons.
+        readonly ushort[] originalWallVisibilityQ4 =
+            new ushort[OriginalRendererCore.ScreenWidth];
+
+        static readonly OriginalRendererCore.ProjectionConstants
+            originalProjectionConstants =
+                OriginalRendererCore.BuildProjectionConstants(
+                    OriginalRendererCore.ViewportWidth,
+                    OriginalRendererCore.ViewportHeight);
+
 
         class DecendingComparer<TKey>: IComparer<float>
         {
@@ -220,10 +233,18 @@ namespace Nitemare3D
                 return true;
             }
 
-            double depthTiles =
-                projected.DepthQ10 /
-                (1024.0 *
-                 OriginalRuntime.WorldUnitsPerTile);
+            if (!OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
+                    originalWallVisibilityQ4,
+                    projected.Left,
+                    projected.CenterX,
+                    projected.Right,
+                    projected.ProjectedYQ4))
+            {
+                return true;
+            }
+
+            bool bypassWall =
+                (runtimeObject.Flags & 0x10) != 0;
 
             bool projectedVisible = false;
 
@@ -231,14 +252,11 @@ namespace Nitemare3D
                 screenX < lastXExclusive;
                 screenX++)
             {
-                int localX =
-                    screenX -
-                    OriginalRuntime.ViewportX;
-
-                if (localX < 0 ||
-                    localX >= zBuffer.Length ||
-                    depthTiles <= 0 ||
-                    depthTiles >= zBuffer[localX])
+                if (!OriginalProjectedSpriteQueue.ColumnPassesWall(
+                        originalWallVisibilityQ4,
+                        screenX,
+                        projected.ProjectedYQ4,
+                        bypassWall))
                 {
                     continue;
                 }
@@ -315,6 +333,10 @@ namespace Nitemare3D
         public void RenderRaycaster()
         {
             OriginalRuntimeState.BeginRenderGeneration();
+            Array.Clear(
+                originalWallVisibilityQ4,
+                0,
+                originalWallVisibilityQ4.Length);
 
             //var direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
 
@@ -506,6 +528,39 @@ namespace Nitemare3D
                 }
 
                 zBuffer[x] = perpWallDist;
+
+                if (Math.Abs(GameWindow.scale - 1.0f) <= 0.0001f &&
+                    perpWallDist > 0)
+                {
+                    int screenColumn =
+                        OriginalRuntime.ViewportX + x;
+
+                    if (screenColumn >= 0 &&
+                        screenColumn < originalWallVisibilityQ4.Length)
+                    {
+                        long depthQ10 =
+                            (long)Math.Round(
+                                perpWallDist *
+                                OriginalRuntime.WorldUnitsPerTile *
+                                1024.0);
+
+                        if (depthQ10 < OriginalRendererCore.NearDepthQ10)
+                            depthQ10 = OriginalRendererCore.NearDepthQ10;
+
+                        long projectedWallYQ4 =
+                            originalProjectionConstants.VerticalNumerator /
+                            depthQ10 +
+                            OriginalRendererCore.CenterYQ4;
+
+                        if (projectedWallYQ4 < 0)
+                            projectedWallYQ4 = 0;
+                        else if (projectedWallYQ4 > ushort.MaxValue)
+                            projectedWallYQ4 = ushort.MaxValue;
+
+                        originalWallVisibilityQ4[screenColumn] =
+                            (ushort)projectedWallYQ4;
+                    }
+                }
 
 
             }
