@@ -19,7 +19,11 @@ namespace Nitemare3D
 
 			foreach (string arg in args)
 			{
-				if (arg == "--n3d-original-guards")
+				// Recovered GUARD runtime is the production default now.
+				// Keep an explicit legacy switch for A/B behavior comparison.
+				if (arg == "--legacy-guards")
+					OriginalRuntimeState.AutonomousGuardRuntimeEnabled = false;
+				else if (arg == "--n3d-original-guards")
 					OriginalRuntimeState.AutonomousGuardRuntimeEnabled = true;
 			}
 
