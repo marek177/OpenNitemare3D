@@ -16,6 +16,7 @@ namespace Nitemare3D
             public int Top;
             public int Bottom;
             public int BaselineRow;
+            public ushort ProjectedYQ4;
             public int Width;
             public int Height;
             public long DepthQ10;
@@ -138,6 +139,8 @@ namespace Nitemare3D
                 Top = top,
                 Bottom = bottom,
                 BaselineRow = baseline,
+                ProjectedYQ4 =
+                    unchecked((ushort)point.ProjectedYQ4),
                 Width = width,
                 Height = height,
                 DepthQ10 = point.DepthQ10
