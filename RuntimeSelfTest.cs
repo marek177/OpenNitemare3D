@@ -30,6 +30,7 @@ namespace Nitemare3D
             TestExplodingWallRuntime();
             TestOriginalRandom();
             TestDamageMatrix();
+            TestGuardKillScoreTable();
             TestScriptProgress51A6();
             TestWeaponJamScriptBFD8();
             TestGuardSounds();
@@ -1168,6 +1169,31 @@ namespace Nitemare3D
             Assert(OriginalDamage.ApplyClassWeaponTransform(
                        80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 3) == 3,
                 "Hamerstein gate value 3 must yield literal damage 3.");
+        }
+
+        static void TestGuardKillScoreTable()
+        {
+            Assert(OriginalRuntime.GuardScore(0x08) == 25,
+                "class 08 kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x09) == 75,
+                "class 09 kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x0C) == 250,
+                "class 0C kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x11) == 0,
+                "Dracula phase-1 kill score must be zero.");
+            Assert(OriginalRuntime.GuardScore(0x14) == 200,
+                "Dracula bat-phase kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x15) == -1000,
+                "Penelope signed negative kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x16) == 1000,
+                "Dr. Hamerstein kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x19) == 0,
+                "Cannon kill score must be zero.");
+            Assert(OriginalRuntime.GuardScore(0x20) == 50,
+                "class 20 kill score mismatch.");
+            Assert(OriginalRuntime.GuardScore(0x07) == 0 &&
+                   OriginalRuntime.GuardScore(0x21) == 0,
+                "out-of-range kill scores must be zero.");
         }
 
         static void TestScriptProgress51A6()
