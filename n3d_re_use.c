@@ -290,11 +290,83 @@ n3d_use_execution N3D_RE_ExecuteUse(uint8_t octant)
         {
             const uint8_t wall_type = execution.target.mapped_wall_type;
 
+            if(wall_type == 0x03)
+            {
+                /*
+                 * seg4:21D8: ID-card-controlled remote doors/cannons terminal.
+                 * Associated OBJECT+01 selects Red/Yellow ID-card bit 0/1.
+                 */
+                const int object_slot =
+                    N3D_RE_FindObjectSlotByCell(
+                        execution.target.x,
+                        execution.target.y);
+
+                if(object_slot < 0)
+                {
+                    execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                    return execution;
+                }
+
+                const uint8_t required_bit =
+                    n3d_objects[object_slot].variant;
+
+                if(required_bit >= 2)
+                {
+                    execution.kind = N3D_USE_EXEC_UNRESOLVED;
+                    return execution;
+                }
+
+                execution.required_inventory_bit = required_bit;
+                execution.runtime_slot = object_slot;
+                execution.kind =
+                    N3D_RE_HasInventoryBit(
+                        n3d_player.id_cards,
+                        required_bit)
+                        ? N3D_USE_EXEC_REMOTE_TERMINAL_PASSED
+                        : N3D_USE_EXEC_REMOTE_TERMINAL_BLOCKED;
+                return execution;
+            }
+
+            if(wall_type == 0x08)
+            {
+                execution.kind = N3D_USE_EXEC_SCRIPTED_WALL_REQUEST;
+                return execution;
+            }
+
             if(wall_type == 0x09 || wall_type == 0x0A)
             {
                 execution.level_delta =
                     (uint8_t)(wall_type == 0x09 ? 1 : 2);
                 execution.kind = N3D_USE_EXEC_LEVEL_CHANGE_REQUEST;
+                return execution;
+            }
+
+            if(wall_type >= 0x0D && wall_type <= 0x14)
+            {
+                execution.menu_first_wall_type = 0x0D;
+                execution.menu_last_wall_type = 0x14;
+                execution.menu_variant_index =
+                    (uint8_t)(wall_type - 0x0D);
+                execution.kind = N3D_USE_EXEC_CLIMB_MENU_REQUEST;
+                return execution;
+            }
+
+            if(wall_type >= 0x15 && wall_type <= 0x18)
+            {
+                if(wall_type == 0x15)
+                {
+                    execution.kind =
+                        N3D_RE_HasAllPentagrams()
+                            ? N3D_USE_EXEC_PENTAGRAM_GATE_PASSED
+                            : N3D_USE_EXEC_PENTAGRAM_GATE_BLOCKED;
+                    return execution;
+                }
+
+                execution.menu_first_wall_type = 0x15;
+                execution.menu_last_wall_type = 0x18;
+                execution.menu_variant_index =
+                    (uint8_t)(wall_type - 0x15);
+                execution.kind = N3D_USE_EXEC_OTHER_SIDE_REQUEST;
                 return execution;
             }
 
@@ -313,12 +385,23 @@ n3d_use_execution N3D_RE_ExecuteUse(uint8_t octant)
                 return execution;
             }
 
-            if(wall_type == 0x15)
+            if(wall_type >= 0x1D && wall_type <= 0x24)
             {
-                execution.kind =
-                    N3D_RE_HasAllPentagrams()
-                        ? N3D_USE_EXEC_PENTAGRAM_GATE_PASSED
-                        : N3D_USE_EXEC_PENTAGRAM_GATE_BLOCKED;
+                execution.menu_first_wall_type = 0x1D;
+                execution.menu_last_wall_type = 0x24;
+                execution.menu_variant_index =
+                    (uint8_t)(wall_type - 0x1D);
+                execution.kind = N3D_USE_EXEC_FLOOR_MENU_REQUEST;
+                return execution;
+            }
+
+            if(wall_type >= 0x25 && wall_type <= 0x2C)
+            {
+                execution.menu_first_wall_type = 0x25;
+                execution.menu_last_wall_type = 0x2C;
+                execution.menu_variant_index =
+                    (uint8_t)(wall_type - 0x25);
+                execution.kind = N3D_USE_EXEC_GO_DOWN_MENU_REQUEST;
                 return execution;
             }
 
