@@ -100,11 +100,9 @@ namespace Nitemare3D
             foreach (OriginalRendererCore.Vec vec
                 in vectors)
             {
-                uint stream =
-                    wallDirectory[
-                        vec.WallId];
-
-                if (stream == 0)
+                if (!EnsureWallIdCached(
+                        vec.WallId,
+                        out byte cacheIndex))
                 {
                     throw new InvalidDataException(
                         "Renderable VEC wall ID " +
@@ -112,39 +110,63 @@ namespace Nitemare3D
                         " has a null IMG wall-directory offset.");
                 }
 
-                if (!cacheByStream.TryGetValue(
-                    stream,
-                    out byte cacheIndex))
-                {
-                    if (caches.Count >= 256)
-                    {
-                        throw new InvalidOperationException(
-                            "Wall sequence cache exceeds byte selector range.");
-                    }
-
-                    cacheIndex =
-                        (byte)caches.Count;
-
-                    SequenceCache cache =
-                        LoadLowWallSequence(
-                            vec.WallId,
-                            stream);
-
-                    caches.Add(
-                        cache);
-
-                    cacheByStream[
-                        stream] =
-                        cacheIndex;
-                }
-
                 vec.TextureSet =
                     cacheIndex;
+            }
+        }
 
-                cacheByWallId[
-                    vec.WallId] =
+        public bool EnsureWallIdCached(
+            byte wallId,
+            out byte cacheIndex)
+        {
+            if (cacheByWallId.TryGetValue(
+                    wallId,
+                    out cacheIndex))
+            {
+                return true;
+            }
+
+            uint stream =
+                wallDirectory[
+                    wallId];
+
+            if (stream == 0)
+            {
+                cacheIndex = 0;
+                return false;
+            }
+
+            if (!cacheByStream.TryGetValue(
+                    stream,
+                    out cacheIndex))
+            {
+                if (caches.Count >= 256)
+                {
+                    throw new InvalidOperationException(
+                        "Wall sequence cache exceeds byte selector range.");
+                }
+
+                cacheIndex =
+                    (byte)caches.Count;
+
+                SequenceCache cache =
+                    LoadLowWallSequence(
+                        wallId,
+                        stream);
+
+                caches.Add(
+                    cache);
+
+                cacheByStream[
+                    stream] =
                     cacheIndex;
             }
+
+            cacheByWallId[
+                wallId] =
+                cacheIndex;
+
+            return true;
         }
 
         SequenceCache LoadLowWallSequence(
