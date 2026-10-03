@@ -9,6 +9,7 @@
 #include "../n3d_re_special_runtime.h"
 #include "../n3d_re_use.h"
 #include "../n3d_re_pickup.h"
+#include "../n3d_re_trig.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -28,8 +29,51 @@ static void test_touch(uint8_t x, uint8_t y, void* user)
     ++*(int*)user;
 }
 
+static void write_s16_le(uint8_t* bytes, int offset, int16_t value)
+{
+    const uint16_t raw = (uint16_t)value;
+    bytes[offset] = (uint8_t)(raw & 0xFF);
+    bytes[offset + 1] = (uint8_t)(raw >> 8);
+}
+
 int main(void)
 {
+    uint8_t trig_fixture[N3D_TRIG_FILE_BYTES] = {0};
+    write_s16_le(trig_fixture, 45 * 2, 724);
+    write_s16_le(trig_fixture, 90 * 2, 1024);
+    write_s16_le(
+        trig_fixture,
+        N3D_TRIG_ANGLE_COUNT * 2 + 0 * 2,
+        1024);
+    write_s16_le(
+        trig_fixture,
+        N3D_TRIG_ANGLE_COUNT * 2 + 45 * 2,
+        724);
+
+    FILE* trig_file = fopen("N3D_TRIG_Q10_TEST.BIN", "wb");
+    assert(trig_file != NULL);
+    assert(fwrite(
+        trig_fixture, 1, sizeof(trig_fixture), trig_file) ==
+        sizeof(trig_fixture));
+    fclose(trig_file);
+
+    assert(N3D_RE_LoadTrigQ10("N3D_TRIG_Q10_TEST.BIN"));
+    assert(n3d_trig.loaded);
+    assert(N3D_RE_NormalizeAngle(-1) == 359);
+    assert(N3D_RE_NormalizeAngle(360) == 0);
+    assert(N3D_RE_SinQ10(45) == 724);
+    assert(N3D_RE_SinQ10(90) == 1024);
+    assert(N3D_RE_CosQ10(0) == 1024);
+    assert(N3D_RE_CosQ10(45) == 724);
+    assert(N3D_RE_CosQ10(90) == 0);
+    assert(N3D_RE_CoarseOctant(44) == 0);
+    assert(N3D_RE_CoarseOctant(45) == 1);
+    assert(N3D_RE_RoundedOctant(22) == 0);
+    assert(N3D_RE_RoundedOctant(23) == 1);
+    assert(N3D_RE_RoundedOctant(359) == 0);
+
+    remove("N3D_TRIG_Q10_TEST.BIN");
+
     uint8_t object_class = 0;
 
     assert(N3D_RE_GuardClassFromMapObject(128, &object_class) && object_class == 0x08);
