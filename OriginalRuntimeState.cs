@@ -130,6 +130,12 @@ namespace Nitemare3D
         // Class-0x16 enemy damage tests only whether it is nonzero.
         public static byte StoryProgress51A6 { get; private set; }
 
+        // DAT_1048_46B4 / DAT_1048_51AA ending bridge.
+        // Hamerstein state-09 clears 46B4 and sets 51AA; the outer original
+        // dispatcher consumes 51AA and transitions into ending.fli playback.
+        public static byte GameplayState46B4 { get; private set; }
+        public static bool EndingRequested51AA { get; private set; }
+
         // Compatibility surface kept for callers written before the 51A6 closure.
         public static bool GuardAttackClass16FullDamageOverride
         {
@@ -361,6 +367,8 @@ namespace Nitemare3D
             ProjectileLogicTickDue = false;
             PlayerInvisible = false;
             CurrentRenderGeneration = 0;
+            GameplayState46B4 = 0;
+            EndingRequested51AA = false;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -2179,10 +2187,15 @@ namespace Nitemare3D
                     return GuardHitResult.DraculaTransformed;
 
                 case OriginalRuntime.DrHamersteinClass:
-                    // The same function also mutates end-game globals for
-                    // Hamerstein. Keep that global side effect outside this
-                    // bridge until those globals are represented explicitly.
-                    return GuardHitResult.SpecialReactionRequired;
+                    // FUN_A0EE Hamerstein terminal hook:
+                    // event 0x12, gameplay state 46B4=0, ending latch 51AA=1.
+                    // The outer dispatcher later consumes 51AA and starts
+                    // ending.fli; this runtime bridge exposes that latch while
+                    // presentation remains owned by the scene layer.
+                    SoundEffect.PlayOriginalEvent(0x12);
+                    GameplayState46B4 = 0;
+                    EndingRequested51AA = true;
+                    return GuardHitResult.Killed;
 
                 default:
                     return GuardHitResult.Killed;
