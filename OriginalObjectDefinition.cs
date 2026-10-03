@@ -13,6 +13,7 @@ namespace Nitemare3D
         // Runtime cache entry +0/+2 are sourced from these first SEQDEF bytes.
         [FieldOffset(0x00)] public ushort Interval;
         [FieldOffset(0x02)] public byte FrameCount;
+        [FieldOffset(0x03)] public byte ExtensionFlag;
 
         [FieldOffset(0x04)] public ushort DirectionalA0;
         [FieldOffset(0x06)] public ushort DirectionalA1;
@@ -387,6 +388,7 @@ namespace Nitemare3D
             {
                 Interval = ReadUInt16LittleEndian(headerBytes, offset + 0x00),
                 FrameCount = headerBytes[offset + 0x02],
+                ExtensionFlag = headerBytes[offset + 0x03],
                 State02Sequence = ReadUInt16LittleEndian(headerBytes, offset + 0x34),
                 State03Sequence = ReadUInt16LittleEndian(headerBytes, offset + 0x36),
                 State04Sequence = ReadUInt16LittleEndian(headerBytes, offset + 0x38)
