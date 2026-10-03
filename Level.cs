@@ -15,6 +15,9 @@ namespace Nitemare3D
 
         // Raw MAP ids plus original header translation/property tables.
         public static OriginalMapTables originalMap;
+        public static List<OriginalRendererCore.Vec> originalVectors =
+            new List<OriginalRendererCore.Vec>();
+        public static OriginalWallRuntime originalWalls;
 
         static void SpawnMapObject(int id, int x, int y)
         {
@@ -1060,9 +1063,70 @@ namespace Nitemare3D
                 secondaryCellChecks,
                 (doorX, doorY) =>
                 {
-                    var tile = tilemap[doorX, doorY];
-                    return tile != null && !tile.obstacle;
+                    var door = originalWalls?.FindPairedWall(doorX, doorY);
+                    return door != null &&
+                           (door.State == 0 || door.State == 4);
                 });
+        }
+
+        public static bool TryGetOriginalDoorCollisionInfo(
+            int x,
+            int y,
+            out OriginalDoorCollisionInfo info)
+        {
+            info = default;
+            var door = originalWalls?.FindPairedWall(x, y);
+            if (door == null || door.First == null)
+                return false;
+
+            info = new OriginalDoorCollisionInfo
+            {
+                Exists = true,
+                State = door.State,
+                RenderClass = door.First.RenderClass,
+                Orientation = door.First.Orientation,
+                TargetX = door.TargetX,
+                TargetY = door.TargetY
+            };
+            return true;
+        }
+
+        public static bool OriginalDoorAllowsSight(int x, int y)
+        {
+            var door = originalWalls?.FindPairedWall(x, y);
+            return door != null &&
+                   (door.State == 0 || door.State == 4);
+        }
+
+        public static bool TryGetNearestRetreatDoorTarget(
+            int startTileX,
+            int startTileY,
+            out short targetX,
+            out short targetY)
+        {
+            targetX = 0;
+            targetY = 0;
+
+            if (originalMap == null || originalWalls == null)
+                return false;
+
+            if (!originalMap.TryFindNearestReachableDoor(
+                    startTileX,
+                    startTileY,
+                    OriginalDoorAllowsSight,
+                    out int doorX,
+                    out int doorY))
+            {
+                return false;
+            }
+
+            var door = originalWalls.FindPairedWall(doorX, doorY);
+            if (door == null)
+                return false;
+
+            targetX = door.TargetX;
+            targetY = door.TargetY;
+            return true;
         }
 
         public static bool OriginalPerceptionLineTrace(
@@ -1136,17 +1200,34 @@ namespace Nitemare3D
                 }
             }
 
-            // Preserve raw IDs for rendering/orientation/spawn identity. The
-            // translated class/property layers remain available through originalMap.
+            // Pass 1: preserve raw wall IDs and build the legacy Tile bridge.
             for (int y = 0; y < OriginalRuntime.MapHeight; y++)
             {
                 for (int x = 0; x < OriginalRuntime.MapWidth; x++)
                 {
-                    byte rawWallId = originalMap.WallId[x, y];
+                    CreateTile(x, y, originalMap.WallId[x, y]);
+                }
+            }
+
+            // Original renderer/runtime geometry. FUN_14A8 builds the 22-byte
+            // paired-wall/DOOR controllers from this VEC list.
+            originalVectors = originalMap.BuildVectors(
+                (x, y) =>
+                {
+                    var tile = tilemap[x, y];
+                    return tile != null ? tile.textureID : -1;
+                });
+            originalWalls = new OriginalWallRuntime(
+                originalMap,
+                originalVectors);
+
+            // Pass 2: object IDs remain raw for directional spawn identity while
+            // OriginalRuntimeState consumes the parallel class/property tables.
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
+            {
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
+                {
                     byte rawObjectId = originalMap.ObjectId[x, y];
-
-                    CreateTile(x, y, rawWallId);
-
                     OriginalRuntimeState.RegisterMapObjectDefinition(rawObjectId);
                     SpawnMapObject(rawObjectId, x, y);
                 }
