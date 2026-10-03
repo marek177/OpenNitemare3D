@@ -148,6 +148,38 @@ int main(void)
     assert(timing.turn_degrees == 6);
     assert(timing.projectile_substeps == 26);
 
+    N3D_RE_ResetTimingCalibration();
+    assert(!N3D_RE_SampleTimingFrame(0));
+    assert(n3d_timing_calibration_state.sample_count == 0);
+
+    for(int i = 0; i < 4; ++i)
+    {
+        assert(!N3D_RE_SampleTimingFrame(10));
+        assert(!n3d_timing_calibration_state.complete);
+    }
+    assert(N3D_RE_SampleTimingFrame(10));
+    assert(n3d_timing_calibration_state.complete);
+    assert(n3d_timing_calibration_state.sample_count == 5);
+    assert(n3d_timing.raw_mean_ms == 10);
+    assert(n3d_timing.effective_ms == 40);
+    assert(n3d_timing.movement_substeps == 10);
+    assert(n3d_timing.turn_degrees == 5);
+    assert(n3d_timing.projectile_substeps == 20);
+    assert(!N3D_RE_SampleTimingFrame(100));
+
+    N3D_RE_ResetTimingCalibration();
+    assert(!N3D_RE_SampleTimingFrame(40));
+    assert(!N3D_RE_SampleTimingFrame(40));
+    assert(!N3D_RE_SampleTimingFrame(50));
+    assert(!N3D_RE_SampleTimingFrame(50));
+    assert(N3D_RE_SampleTimingFrame(60));
+    /* Integer elapsed/5: (40+40+50+50+60)/5 == 48. */
+    assert(n3d_timing.raw_mean_ms == 48);
+    assert(n3d_timing.effective_ms == 48);
+    assert(n3d_timing.movement_substeps == 12);
+    assert(n3d_timing.turn_degrees == 6);
+    assert(n3d_timing.projectile_substeps == 24);
+
     N3D_RE_SetTimingFromRawMean(40);
     assert(n3d_timing.movement_substeps == 10);
     assert(n3d_timing.turn_degrees == 5);
