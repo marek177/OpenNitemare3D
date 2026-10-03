@@ -3,7 +3,8 @@ namespace Nitemare3D
     /// <summary>
     /// Exact class-specific SND selectors recovered from NITE3W.EXE V1.10:
     /// B862 = alert, B5E4 = attack, B6A0 = death.
-    /// The returned values are original SND.DAT indices.
+    /// The returned values are Win16 sound-event IDs. The physical SND.DAT
+    /// slot is event + 32; SoundEffect.PlayOriginalEvent performs that mapping.
     /// </summary>
     public static class OriginalGuardSounds
     {
