@@ -1579,6 +1579,78 @@ namespace Nitemare3D
             OriginalProjectileRuntime.AdvanceAnimationFrame(ref projectile, 2);
             Assert(projectile.State == (byte)OriginalProjectileState.Free,
                 "impact animation must free slot after final frame.");
+
+            projectile = new OriginalProjectileRecord();
+            OriginalProjectileRuntime.InitializeSpawnWithDefinition(
+                ref projectile,
+                7,
+                100,
+                200,
+                1000,
+                40);
+
+            Assert(projectile.State == (byte)OriginalProjectileState.Flying &&
+                   projectile.RenderObject.DefinitionId == 7 &&
+                   projectile.RenderObject.RuntimeValue == 1040 &&
+                   projectile.RenderObject.Runtime1A == 5,
+                "exact projectile spawn definition/deadline mismatch.");
+
+            Assert(!OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                       ref projectile,
+                       1039,
+                       2,
+                       40) &&
+                   projectile.RenderObject.Component03 == 0 &&
+                   projectile.RenderObject.RuntimeValue == 1040,
+                "projectile animation must not advance before its absolute deadline.");
+
+            Assert(OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                       ref projectile,
+                       1040,
+                       2,
+                       40) &&
+                   projectile.RenderObject.Component03 == 1 &&
+                   projectile.RenderObject.RuntimeValue == 1080,
+                "due projectile animation must advance exactly one frame and reschedule.");
+
+            OriginalProjectileRuntime.EnterImpactWithDefinition(
+                ref projectile,
+                8,
+                1100,
+                25);
+
+            Assert(projectile.State == (byte)OriginalProjectileState.Impact &&
+                   projectile.RenderObject.DefinitionId == 8 &&
+                   projectile.RenderObject.Component03 == 0 &&
+                   projectile.RenderObject.RuntimeValue == 1125 &&
+                   (projectile.RenderObject.Flags & 0x10) != 0,
+                "exact projectile impact transition/deadline mismatch.");
+
+            Assert(!OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                       ref projectile,
+                       1124,
+                       2,
+                       25) &&
+                   projectile.State == (byte)OriginalProjectileState.Impact,
+                "impact must remain allocated before its deadline.");
+
+            Assert(OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                       ref projectile,
+                       1125,
+                       2,
+                       25) &&
+                   projectile.State == (byte)OriginalProjectileState.Impact &&
+                   projectile.RenderObject.Component03 == 1 &&
+                   projectile.RenderObject.RuntimeValue == 1150,
+                "impact first due frame/deadline mismatch.");
+
+            Assert(OriginalProjectileRuntime.AdvanceAnimationIfDue(
+                       ref projectile,
+                       1150,
+                       2,
+                       25) &&
+                   projectile.State == (byte)OriginalProjectileState.Free,
+                "impact must free the slot only after its final frame.");
         }
 
         static void TestDelayState()
