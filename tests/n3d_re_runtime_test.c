@@ -3350,6 +3350,157 @@ int main(void)
         remove("N3D_IMG_WALL_EXPLOSION_TEST.BIN");
     }
 
+    /* Special-wall USE families: exact handler classification only. */
+    {
+        uint8_t special_use_payload[N3D_MAP_LEVEL_BYTES] = {0};
+        const int special_adjacent = 10 * N3D_MAP_WIDTH + 11;
+
+        /* Wall type 8 -> scripted Episode-1 interaction family. */
+        n3d_wall_mapping_known[0xA0] = 1;
+        n3d_wall_property_known[0xA0] = 1;
+        n3d_wall_mapped_type[0xA0] = 0x08;
+        n3d_wall_property_resolved[0xA0] =
+            N3D_RE_WallPropertiesForMappedType(0x08);
+
+        special_use_payload[special_adjacent * N3D_MAP_CELL_BYTES] = 0xA0;
+        assert(N3D_RE_LoadMapPayload(
+            special_use_payload, sizeof(special_use_payload)));
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+
+        n3d_use_execution special_use =
+            N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_SCRIPTED_WALL_REQUEST);
+
+        /* 0x0D..0x14 -> climb up/down menu family. */
+        memset(special_use_payload, 0, sizeof(special_use_payload));
+        n3d_wall_mapping_known[0xA1] = 1;
+        n3d_wall_property_known[0xA1] = 1;
+        n3d_wall_mapped_type[0xA1] = 0x10;
+        n3d_wall_property_resolved[0xA1] =
+            N3D_RE_WallPropertiesForMappedType(0x10);
+        special_use_payload[special_adjacent * N3D_MAP_CELL_BYTES] = 0xA1;
+
+        assert(N3D_RE_LoadMapPayload(
+            special_use_payload, sizeof(special_use_payload)));
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_CLIMB_MENU_REQUEST);
+        assert(special_use.menu_first_wall_type == 0x0D);
+        assert(special_use.menu_last_wall_type == 0x14);
+        assert(special_use.menu_variant_index == 3);
+
+        /* 0x16..0x18 -> Other Side/mirror family request. */
+        memset(special_use_payload, 0, sizeof(special_use_payload));
+        n3d_wall_mapping_known[0xA2] = 1;
+        n3d_wall_property_known[0xA2] = 1;
+        n3d_wall_mapped_type[0xA2] = 0x16;
+        n3d_wall_property_resolved[0xA2] =
+            N3D_RE_WallPropertiesForMappedType(0x16);
+        special_use_payload[special_adjacent * N3D_MAP_CELL_BYTES] = 0xA2;
+
+        assert(N3D_RE_LoadMapPayload(
+            special_use_payload, sizeof(special_use_payload)));
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_OTHER_SIDE_REQUEST);
+        assert(special_use.menu_first_wall_type == 0x15);
+        assert(special_use.menu_last_wall_type == 0x18);
+        assert(special_use.menu_variant_index == 1);
+
+        /* 0x1D..0x24 -> Floor 1..10 selector family. */
+        memset(special_use_payload, 0, sizeof(special_use_payload));
+        n3d_wall_mapping_known[0xA3] = 1;
+        n3d_wall_property_known[0xA3] = 1;
+        n3d_wall_mapped_type[0xA3] = 0x20;
+        n3d_wall_property_resolved[0xA3] =
+            N3D_RE_WallPropertiesForMappedType(0x20);
+        special_use_payload[special_adjacent * N3D_MAP_CELL_BYTES] = 0xA3;
+
+        assert(N3D_RE_LoadMapPayload(
+            special_use_payload, sizeof(special_use_payload)));
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_FLOOR_MENU_REQUEST);
+        assert(special_use.menu_first_wall_type == 0x1D);
+        assert(special_use.menu_last_wall_type == 0x24);
+        assert(special_use.menu_variant_index == 3);
+
+        /* 0x25..0x2C -> Go down / Cancel family. */
+        memset(special_use_payload, 0, sizeof(special_use_payload));
+        n3d_wall_mapping_known[0xA4] = 1;
+        n3d_wall_property_known[0xA4] = 1;
+        n3d_wall_mapped_type[0xA4] = 0x29;
+        n3d_wall_property_resolved[0xA4] =
+            N3D_RE_WallPropertiesForMappedType(0x29);
+        special_use_payload[special_adjacent * N3D_MAP_CELL_BYTES] = 0xA4;
+
+        assert(N3D_RE_LoadMapPayload(
+            special_use_payload, sizeof(special_use_payload)));
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_GO_DOWN_MENU_REQUEST);
+        assert(special_use.menu_first_wall_type == 0x25);
+        assert(special_use.menu_last_wall_type == 0x2C);
+        assert(special_use.menu_variant_index == 4);
+
+        /*
+         * Wall type 3 remote terminal: associated OBJECT+01 selects ID-card
+         * bit. Build a synthetic runtime object bound to the same cell.
+         */
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0xA5] = 1;
+        n3d_wall_property_known[0xA5] = 1;
+        n3d_wall_mapped_type[0xA5] = 0x03;
+        n3d_wall_property_resolved[0xA5] =
+            N3D_RE_WallPropertiesForMappedType(0x03);
+
+        n3d_object_mapping_known[0xB0] = 1;
+        n3d_object_property_known[0xB0] = 1;
+        n3d_object_mapped_type[0xB0] = 0x06;
+        n3d_object_property_resolved[0xB0] =
+            N3D_RE_ObjectPropertiesForMappedType(0x06);
+
+        n3d_map[special_adjacent].wall = 0xA5;
+        n3d_map[special_adjacent].object = 0xB0;
+
+        int terminal_object_slot = -1;
+        assert(N3D_RE_InstantiateMapObject(
+            0xB0, 11, 10, &terminal_object_slot));
+        assert(terminal_object_slot >= 0);
+
+        n3d_objects[terminal_object_slot].variant = 1;
+        n3d_player.tile_x = 10;
+        n3d_player.tile_y = 10;
+        n3d_player.id_cards = 0;
+
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_REMOTE_TERMINAL_BLOCKED);
+        assert(special_use.required_inventory_bit == 1);
+        assert(special_use.runtime_slot == terminal_object_slot);
+
+        n3d_player.id_cards = 0x02;
+        special_use = N3D_RE_ExecuteUse(1);
+        assert(special_use.kind ==
+               N3D_USE_EXEC_REMOTE_TERMINAL_PASSED);
+        assert(special_use.required_inventory_bit == 1);
+        assert(special_use.runtime_slot == terminal_object_slot);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
