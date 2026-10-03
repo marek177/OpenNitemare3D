@@ -163,6 +163,23 @@ namespace Nitemare3D
             return false;
         }
 
+        /// <summary>
+        /// Exact FUN_1000_6258 / Win16 sibling writer for GUARD+0x0F.
+        /// The runtime sequence cache points at the 90-byte SEQDEF and compares
+        /// bytes +6 and +8. In the clean-room struct these are the low bytes of
+        /// DirectionalA1 and DirectionalA2.
+        /// </summary>
+        public static byte DirectionalControlMode(
+            OriginalObjectDefinitionRecord definition)
+        {
+            return
+                (byte)(
+                    ((byte)definition.DirectionalA1 !=
+                     (byte)definition.DirectionalA2)
+                        ? 1
+                        : 0);
+        }
+
         public static void ApplySpawnVariantAndCell(
             ref OriginalGuardRecord guard,
             byte variant,
