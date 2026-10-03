@@ -24,6 +24,7 @@ namespace Nitemare3D
             TestPickupRuntime();
             TestAutonomousGuardStateCoverage();
             TestObjectDefinitionCatalog();
+            TestWorldObjectRuntime();
             TestImgResourceLoader();
             TestOriginalMapTables();
             TestOriginalWallRuntime();
@@ -603,6 +604,7 @@ namespace Nitemare3D
             header[0x00] = 0x34;
             header[0x01] = 0x12;
             header[0x02] = 6;
+            header[0x03] = 1;
             header[0x34] = 0x12;
             header[0x35] = 0x04;
             header[0x36] = 0x20;
@@ -613,6 +615,7 @@ namespace Nitemare3D
             var parsed = OriginalObjectDefinitionCatalog.ParseHeader(header, 0);
             Assert(parsed.Interval == 0x1234 &&
                    parsed.FrameCount == 6 &&
+                   parsed.ExtensionFlag == 1 &&
                    parsed.State02Sequence == 0x0412 &&
                    parsed.State03Sequence == 0x0320 &&
                    parsed.State04Sequence == 0x0230,
@@ -667,6 +670,101 @@ namespace Nitemare3D
                        new byte[OriginalRuntime.ObjectResourceEntryBytes],
                        out _),
                 "frame table byte count must match header frame-count*10.");
+        }
+
+        static void TestWorldObjectRuntime()
+        {
+            var obj = new OriginalObjectRecord
+            {
+                ProjectedBaseRow = 321
+            };
+
+            OriginalWorldObjectRuntime.InitializeMapObject(
+                ref obj,
+                0x19,
+                2,
+                (byte)(
+                    OriginalMapTables.ObjectRuntimePresent |
+                    OriginalMapTables.ObjectBlocksMovementOrLos),
+                0x3B,
+                7,
+                10 * OriginalRuntime.WorldUnitsPerTile +
+                    OriginalRuntime.TileCenterOffset,
+                20 * OriginalRuntime.WorldUnitsPerTile +
+                    OriginalRuntime.TileCenterOffset);
+
+            Assert(obj.MapObjectId == 0x19 &&
+                   obj.Variant == 2 &&
+                   obj.Component02 == 0 &&
+                   obj.Component03 == 0 &&
+                   obj.DefinitionId == 7 &&
+                   obj.ObjectClass == 0x3B &&
+                   obj.WorldX == 672 &&
+                   obj.WorldY == 1312 &&
+                   obj.MapCellBinding ==
+                       OriginalMapTables.CellBindingHandle(10, 20) &&
+                   obj.ProjectedBaseRow == 321,
+                "world OBJECT spawn fields / stale +0x18 preservation mismatch.");
+
+            var definition = new OriginalObjectDefinitionRecord
+            {
+                Interval = 100,
+                FrameCount = 4,
+                ExtensionFlag = 0
+            };
+
+            obj.RuntimeValue = 1000;
+
+            Assert(!OriginalWorldObjectRuntime.AdvanceSimpleAnimationIfDue(
+                       ref obj,
+                       definition,
+                       999) &&
+                   obj.Component03 == 0 &&
+                   obj.RuntimeValue == 1000,
+                "world OBJECT animation must wait for absolute deadline.");
+
+            Assert(OriginalWorldObjectRuntime.AdvanceSimpleAnimationIfDue(
+                       ref obj,
+                       definition,
+                       1000) &&
+                   obj.Component03 == 1 &&
+                   obj.RuntimeValue == 1100,
+                "world OBJECT due animation/deadline mismatch.");
+
+            obj.Component03 = 3;
+            obj.RuntimeValue = 1100;
+            Assert(OriginalWorldObjectRuntime.AdvanceSimpleAnimationIfDue(
+                       ref obj,
+                       definition,
+                       1100) &&
+                   obj.Component03 == 0 &&
+                   obj.RuntimeValue == 1200,
+                "world OBJECT simple sequence must loop at frame count.");
+
+            obj.ObjectClass = 0x2E;
+            Assert(OriginalWorldObjectRuntime.UpdateKnownVerticalAnchor(
+                       ref obj,
+                       20) &&
+                   obj.Runtime1A == 44,
+                "class 0x2E vertical anchor must be 64-frameHeight.");
+
+            obj.ObjectClass = 0x3B;
+            Assert(OriginalWorldObjectRuntime.UpdateKnownVerticalAnchor(
+                       ref obj,
+                       18) &&
+                   obj.Runtime1A == 23,
+                "class 0x3B vertical anchor must be (64-frameHeight)/2.");
+
+            obj.Flags =
+                (byte)(
+                    OriginalMapTables.ObjectRuntimePresent |
+                    OriginalMapTables.ObjectBlocksMovementOrLos);
+            OriginalWorldObjectRuntime.DeactivateCollected(
+                ref obj);
+
+            Assert((obj.Flags & OriginalMapTables.ObjectRuntimePresent) == 0 &&
+                   (obj.Flags & OriginalMapTables.ObjectBlocksMovementOrLos) != 0,
+                "collected OBJECT must clear only runtime-present bit 0.");
         }
 
         static void TestImgResourceLoader()
