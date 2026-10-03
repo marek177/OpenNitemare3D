@@ -41,6 +41,7 @@ namespace Nitemare3D
 
         public ushort LevelCount { get; private set; }
         public int LevelIndex { get; private set; }
+        public string SourcePath { get; private set; }
 
         public readonly byte[] WallClass = new byte[256];
         public readonly byte[] ObjectClass = new byte[256];
@@ -56,7 +57,11 @@ namespace Nitemare3D
         public static OriginalMapTables Load(string path, int levelIndex)
         {
             byte[] bytes = File.ReadAllBytes(path);
-            return Parse(bytes, levelIndex);
+            OriginalMapTables result =
+                Parse(bytes, levelIndex);
+            result.SourcePath =
+                Path.GetFullPath(path);
+            return result;
         }
 
         public static OriginalMapTables Parse(byte[] bytes, int levelIndex)
