@@ -1229,6 +1229,15 @@ namespace Nitemare3D
             // MAP.N and IMG.N are episode-coupled in the original runtime.
             Img.LoadEpisode(episode);
 
+            // The four projectile resources are runtime sequence-cache entries,
+            // not ordinary map spawns. Load them explicitly so flight/impact
+            // selectors and deadlines come from IMG.N instead of placeholder IDs.
+            if (!OriginalRuntimeState.RegisterProjectileDefinitions())
+            {
+                throw new InvalidDataException(
+                    "IMG projectile resources 0xFB..0xFE could not be registered.");
+            }
+
             string mapPath = "data/MAP." + episode;
             originalMap = OriginalMapTables.Load(mapPath, id);
             levelCount = originalMap.LevelCount;
