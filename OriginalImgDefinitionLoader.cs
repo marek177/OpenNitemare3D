@@ -90,8 +90,9 @@ namespace Nitemare3D
                     return false;
                 }
 
-                byte width = imgData[cursor + 0];
-                byte height = imgData[cursor + 1];
+                int rawOffset = checked((int)cursor);
+                byte width = imgData[rawOffset + 0];
+                byte height = imgData[rawOffset + 1];
 
                 if (tileBank)
                 {
