@@ -418,12 +418,12 @@ namespace Nitemare3D
             int left =
                 Math.Max(
                     OriginalRendererCore.ViewLeft,
-                    vec.ScreenX1);
+                    (int)vec.ScreenX1);
 
             int right =
                 Math.Min(
                     OriginalRendererCore.ViewRight,
-                    vec.ScreenX2);
+                    (int)vec.ScreenX2);
 
             if (left > right)
             {
