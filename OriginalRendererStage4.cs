@@ -16,7 +16,7 @@ namespace Nitemare3D
     /// </summary>
     public static class OriginalRendererStage4
     {
-        public static bool Enabled { get; private set; }
+        public static bool Enabled { get; private set; } = true;
 
         public static bool ForceNativeResolution
         {
@@ -75,19 +75,25 @@ namespace Nitemare3D
         public static void Initialize(
             string[] args)
         {
+            bool explicitlyRequested = false;
+
             if (args == null)
-            {
-                return;
-            }
+                args = Array.Empty<string>();
 
             for (int i = 0;
                 i < args.Length;
                 i++)
             {
                 if (args[i] ==
+                    "--legacy-renderer")
+                {
+                    Enabled = false;
+                }
+                else if (args[i] ==
                     "--n3d-renderer-stage4")
                 {
                     Enabled = true;
+                    explicitlyRequested = true;
                 }
                 else if (
                     args[i] ==
@@ -124,9 +130,19 @@ namespace Nitemare3D
             if (!OriginalRuntimeState.TryLoadExactTrigQ10(
                     trigPath))
             {
-                throw new FileNotFoundException(
-                    "Exact Nitemare3D Q10 trig table is required.",
-                    trigPath);
+                // The recovered renderer is the production default when its
+                // exact extracted tables are available. A checkout without the
+                // original-data-derived trig table may still run the historical
+                // renderer unless Stage 4 was explicitly requested.
+                if (explicitlyRequested)
+                {
+                    throw new FileNotFoundException(
+                        "Exact Nitemare3D Q10 trig table is required.",
+                        trigPath);
+                }
+
+                Enabled = false;
+                return;
             }
 
             trig =
