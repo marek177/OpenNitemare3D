@@ -247,8 +247,13 @@ namespace Nitemare3D
 
         public void ShootPlasma()
         {
-            OriginalRuntimeState.SetGuardStrength(this, 0);
-            state = GuardState.dead;
+            // Compatibility entrypoint retained for older callers. Route it
+            // through the recovered player->GUARD damage producer/receiver
+            // instead of the historical port's unconditional instant kill.
+            OriginalRuntimeState.ApplyPlayerWeaponDamage(
+                this,
+                OriginalWeaponSelector.SingleShotLaser,
+                false);
         }
 
         void UpdateAttack()
