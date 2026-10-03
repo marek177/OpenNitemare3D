@@ -56,13 +56,15 @@ namespace Nitemare3D
             int dy2 =
                 playerY - vec.Y2;
 
+            // Raw E798/E5D8 coefficient order:
+            // DAT_4C46 = original sine table, DAT_4C48 = cosine table.
             long rawDepth1 =
-                (long)dx1 * cosQ10 +
-                (long)dy1 * sinQ10;
+                (long)dx1 * sinQ10 +
+                (long)dy1 * cosQ10;
 
             long rawDepth2 =
-                (long)dx2 * cosQ10 +
-                (long)dy2 * sinQ10;
+                (long)dx2 * sinQ10 +
+                (long)dy2 * cosQ10;
 
             bool clipped1 =
                 rawDepth1 <
@@ -138,12 +140,12 @@ namespace Nitemare3D
             }
 
             long lateral1 =
-                (long)sinQ10 * adjustedDx1 -
-                (long)cosQ10 * adjustedDy1;
+                (long)cosQ10 * adjustedDx1 -
+                (long)sinQ10 * adjustedDy1;
 
             long lateral2 =
-                (long)sinQ10 * adjustedDx2 -
-                (long)cosQ10 * adjustedDy2;
+                (long)cosQ10 * adjustedDx2 -
+                (long)sinQ10 * adjustedDy2;
 
             long projectedX1 =
                 lateral1 *
@@ -201,6 +203,114 @@ namespace Nitemare3D
                     OriginalRendererCore.ViewLeft;
         }
 
+        public struct PointProjection
+        {
+            public short ScreenX;
+            public short ProjectedYQ4;
+            public long DepthQ10;
+            public long LateralQ10;
+        }
+
+        /// <summary>
+        /// Literal E5D8 point/object projection arithmetic. dx is worldX-playerX;
+        /// dy is playerY-worldY. Mode 0 is the path used by CC7C for OBJECTs.
+        /// </summary>
+        public static bool ProjectPoint(
+            int mode,
+            int dx,
+            int dy,
+            int angleDegrees,
+            OriginalTrigQ10 trig,
+            out PointProjection projection)
+        {
+            projection = default;
+
+            if (trig == null)
+                throw new ArgumentNullException(nameof(trig));
+
+            int angle =
+                OriginalTrigQ10.Normalize(angleDegrees);
+
+            int sinQ10 = trig.Sin(angle);
+            int cosQ10 = trig.Cos(angle);
+
+            long adjustedDx = dx;
+            long adjustedDy = dy;
+
+            long depth =
+                (long)sinQ10 * adjustedDx +
+                (long)cosQ10 * adjustedDy;
+
+            if (depth < OriginalRendererCore.NearDepthQ10)
+            {
+                long near = OriginalRendererCore.NearDepthQ10;
+
+                if (mode == 2 || mode == 3)
+                {
+                    if (angle == 0x5A || angle == 0x10E)
+                    {
+                        adjustedDy = near;
+                    }
+                    else
+                    {
+                        if (cosQ10 == 0)
+                            return false;
+
+                        adjustedDy =
+                            (near -
+                             (long)sinQ10 * adjustedDx) /
+                            cosQ10;
+                    }
+                }
+                else
+                {
+                    if (angle == 0 || angle == 0xB4)
+                    {
+                        adjustedDx = near;
+                    }
+                    else
+                    {
+                        if (sinQ10 == 0)
+                            return false;
+
+                        adjustedDx =
+                            (near -
+                             (long)cosQ10 * adjustedDy) /
+                            sinQ10;
+                    }
+                }
+
+                depth = near;
+            }
+
+            long lateral =
+                (long)cosQ10 * adjustedDx -
+                (long)sinQ10 * adjustedDy;
+
+            long screenX =
+                lateral *
+                constants.HorizontalScale /
+                depth +
+                OriginalRendererCore.CenterX;
+
+            long projectedYQ4 =
+                constants.VerticalNumerator /
+                depth +
+                OriginalRendererCore.CenterYQ4;
+
+            projection = new PointProjection
+            {
+                ScreenX = ClampProjectedX(screenX),
+                ProjectedYQ4 =
+                    OriginalRendererCore.Wrap16(
+                        (int)projectedYQ4),
+                DepthQ10 = depth,
+                LateralQ10 = lateral
+            };
+
+            return true;
+        }
+
         static void MoveEndpointToNearPlane(
             bool verticalWall,
             int angle,
@@ -222,16 +332,16 @@ namespace Nitemare3D
                 }
                 else
                 {
-                    if (sinQ10 == 0)
+                    if (cosQ10 == 0)
                     {
                         throw new DivideByZeroException(
-                            "E798 vertical-wall near-plane branch reached with zero sine.");
+                            "E798 vertical-wall near-plane branch reached with zero cosine.");
                     }
 
                     dy =
                         (near -
-                         (long)cosQ10 * dx) /
-                        sinQ10;
+                         (long)sinQ10 * dx) /
+                        cosQ10;
                 }
 
                 return;
@@ -245,16 +355,16 @@ namespace Nitemare3D
             }
             else
             {
-                if (cosQ10 == 0)
+                if (sinQ10 == 0)
                 {
                     throw new DivideByZeroException(
-                        "E798 horizontal-wall near-plane branch reached with zero cosine.");
+                        "E798 horizontal-wall near-plane branch reached with zero sine.");
                 }
 
                 dx =
                     (near -
-                     (long)sinQ10 * dy) /
-                    cosQ10;
+                     (long)cosQ10 * dy) /
+                    sinQ10;
             }
         }
 
