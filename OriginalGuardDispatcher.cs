@@ -213,6 +213,91 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Exact range/FOV prefilter from FUN_1010_7494 before the D50A line trace.
+        /// World positions are converted to 64-unit tile coordinates. The original
+        /// rejects targets farther than 8 tiles independently on either axis.
+        /// When ignoreFacing is false, the original 8-bit octant mask is applied.
+        /// </summary>
+        public static bool GuardPerceptionPrefilter(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            bool ignoreFacing)
+        {
+            int guardTileX = obj.WorldX >> 6;
+            int guardTileY = obj.WorldY >> 6;
+            int playerTileX = playerWorldX >> 6;
+            int playerTileY = playerWorldY >> 6;
+
+            int dx = playerTileX - guardTileX;
+            int dy = playerTileY - guardTileY;
+
+            int absX = Math.Abs(dx);
+            int absY = Math.Abs(dy);
+            if (absX > 8 || absY > 8)
+                return false;
+
+            if (ignoreFacing)
+                return true;
+
+            int octant = guard.Octant & 7;
+            int facingMask =
+                (1 << ((octant - 1) & 7)) |
+                (1 << octant) |
+                (1 << ((octant + 1) & 7));
+
+            int dominantAxisMask = absX < absY ? 0x99 : 0x66;
+            int candidateMask = facingMask & dominantAxisMask;
+
+            candidateMask &= dy >= 0 ? 0x3C : 0xC3;
+            int xSideMask = dx >= 0 ? 0x0F : 0xF0;
+
+            return (candidateMask & xSideMask) != 0;
+        }
+
+        /// <summary>
+        /// Executable-backed FUN_1010_7494 wrapper with the D50A map trace supplied
+        /// by the caller. The trace callback receives start tile, signed deltas,
+        /// the fixed maximum of 8 steps and the original secondary-cell flag.
+        /// </summary>
+        public static bool EvaluateGuardPerception(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            short playerWorldX,
+            short playerWorldY,
+            bool secondaryCellChecks,
+            bool ignoreFacing,
+            Func<int, int, int, int, int, bool, bool> lineTrace)
+        {
+            if (!GuardPerceptionPrefilter(
+                    ref guard,
+                    ref obj,
+                    playerWorldX,
+                    playerWorldY,
+                    ignoreFacing))
+            {
+                return false;
+            }
+
+            if (lineTrace == null)
+                return false;
+
+            int guardTileX = obj.WorldX >> 6;
+            int guardTileY = obj.WorldY >> 6;
+            int playerTileX = playerWorldX >> 6;
+            int playerTileY = playerWorldY >> 6;
+
+            return lineTrace(
+                guardTileX,
+                guardTileY,
+                playerTileX - guardTileX,
+                playerTileY - guardTileY,
+                8,
+                secondaryCellChecks);
+        }
+
+        /// <summary>
         /// Recovered FUN_1010_7594 decision tail. The helper caches LOS/perception
         /// at +0x17 and one-tile proximity at +0x18. +0x16 selects which result is
         /// used by states 0x03 and 0x04: 0 = one-tile proximity, 1/2 = perception.
