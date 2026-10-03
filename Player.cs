@@ -249,6 +249,15 @@ namespace Nitemare3D
 
                     if (hit == 1)
                     {
+                        // FUN_66B0 -> 65A6 updates animated/exploding VECs only
+                        // after a visible wall span. The legacy DDA renderer is
+                        // still the presentation path, so use its visible hit as
+                        // the equivalent trigger for the recovered 0x2D lifecycle.
+                        Level.UpdateOriginalExplodingWallVisibleAt(
+                            mapX,
+                            mapY,
+                            OriginalRuntimeState.RuntimeClockMs);
+
                         flipped = Level.tilemap[mapX, mapY].flip;
 
                         var hitWall = Level.tilemap[mapX, mapY];
