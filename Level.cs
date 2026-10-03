@@ -71,19 +71,19 @@ namespace Nitemare3D
 
                     break;
                 case ObjectType.Diningroomtable:
-                    ent = new DumbObject(199);
+                    ent = new DumbObject(199, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Globeceilinglamp:
-                    ent = new DumbObject(200, true, false);
+                    ent = new DumbObject(200, true, false, (byte)id);
                     break;
                 case ObjectType.Chandelierceilinglamp:
-                    ent = new DumbObject(201, true, false);
+                    ent = new DumbObject(201, true, false, (byte)id);
                     break;
                 case ObjectType.Livingroomstandardlamp:
-                    ent = new DumbObject(202);
+                    ent = new DumbObject(202, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Hallstandardlamp:
-                    ent = new DumbObject(203);
+                    ent = new DumbObject(203, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Redpotionfullstrength:
                     ent = new Pickup(PickupType.RedPotion, (byte)id);
@@ -106,16 +106,16 @@ namespace Nitemare3D
                     ent = new Pickup(PickupType.CrystallBall, (byte)id);
                     break;
                 case ObjectType.Couch:
-                    ent = new DumbObject(227);
+                    ent = new DumbObject(227, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Easychair:
-                    ent = new DumbObject(228);
+                    ent = new DumbObject(228, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Bedsideview:
-                    ent = new DumbObject(229);
+                    ent = new DumbObject(229, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Bedfrontview:
-                    ent = new DumbObject(230);
+                    ent = new DumbObject(230, rawObjectId: (byte)id);
                     break;
                 case ObjectType.Pentagramred:
                     ent = new Pickup(PickupType.PentagramRed, (byte)id);
