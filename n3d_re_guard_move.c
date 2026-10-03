@@ -200,7 +200,7 @@ int N3D_RE_GuardMovementCandidateTouchesPlayer(
             player_world_y) < 0x2A;
 }
 
-static int16_t N3D_RE_GuardDirectionPadding(
+int16_t N3D_RE_GuardDirectionPadding(
     int8_t component)
 {
     if(component < 0)
@@ -228,7 +228,8 @@ static void N3D_RE_AdvanceGuardMovementFrame(
         (int8_t)(uint8_t)frame;
 }
 
-n3d_guard_movement_result N3D_RE_TickGuardMovementCollisionCore(
+n3d_guard_movement_result
+N3D_RE_TickGuardMovementCollisionCoreWithRng(
     n3d_guard_record* guard,
     n3d_object_record* object,
     n3d_guard_block_callback is_blocked_at,
@@ -358,6 +359,20 @@ n3d_guard_movement_result N3D_RE_TickGuardMovementCollisionCore(
     return result;
 }
 
+n3d_guard_movement_result N3D_RE_TickGuardMovementCollisionCore(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    n3d_guard_block_callback is_blocked_at,
+    void* user)
+{
+    return N3D_RE_TickGuardMovementCollisionCoreWithRng(
+        guard,
+        object,
+        is_blocked_at,
+        user,
+        &n3d_original_rng_state);
+}
+
 n3d_guard_dispatch_result N3D_RE_TickState06Movement(
     n3d_guard_record* guard,
     n3d_object_record* object,
@@ -392,7 +407,7 @@ n3d_guard_dispatch_result N3D_RE_TickState06Movement(
         0);
 
     const n3d_guard_movement_result movement =
-        N3D_RE_TickGuardMovementCollisionCore(
+        N3D_RE_TickGuardMovementCollisionCoreWithRng(
             guard,
             object,
             is_blocked_at,
