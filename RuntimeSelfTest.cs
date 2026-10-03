@@ -24,6 +24,7 @@ namespace Nitemare3D
             TestHitTransitionRouting();
             TestAttackGate();
             TestPerceptionPrefilter();
+            TestGuardGridTrace();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -790,6 +791,52 @@ namespace Nitemare3D
 
             Assert(!perceived && !traceCalled,
                 "failed FOV prefilter must not call the map trace.");
+        }
+
+        static void TestGuardGridTrace()
+        {
+            int blockerCalls = 0;
+            Assert(OriginalGuardDispatcher.TraceGuardGridLine(
+                       0, 0, 1, 0, 8, false,
+                       (x, y, secondary) =>
+                       {
+                           blockerCalls++;
+                           return true;
+                       }) &&
+                   blockerCalls == 0,
+                "destination cell must be accepted before intermediate blocking.");
+
+            blockerCalls = 0;
+            Assert(!OriginalGuardDispatcher.TraceGuardGridLine(
+                       0, 0, 3, 0, 8, true,
+                       (x, y, secondary) =>
+                       {
+                           blockerCalls++;
+                           return x == 1 && y == 0 && secondary;
+                       }) &&
+                   blockerCalls == 1,
+                "first blocked intermediate cell must abort D50A trace.");
+
+            blockerCalls = 0;
+            Assert(OriginalGuardDispatcher.TraceGuardGridLine(
+                       0, 0, 2, 2, 8, false,
+                       (x, y, secondary) =>
+                       {
+                           blockerCalls++;
+                           return false;
+                       }) &&
+                   blockerCalls == 1,
+                "2x2 diagonal trace must inspect only the intermediate cell.");
+
+            Assert(!OriginalGuardDispatcher.TraceGuardGridLine(
+                       0, 0, 3, 0, 2, false,
+                       (x, y, secondary) => false),
+                "trace must fail when target is beyond maxSteps.");
+
+            Assert(OriginalGuardDispatcher.TraceGuardGridLine(
+                       5, 5, -3, -1, 8, false,
+                       (x, y, secondary) => false),
+                "negative-delta Bresenham trace mismatch.");
         }
 
         static void TestProjectileRuntime()
