@@ -101,6 +101,44 @@ namespace Nitemare3D
             return result;
         }
 
+        public bool TryGetObjectClassAndVariant(
+            byte rawObjectId,
+            out byte objectClass,
+            out byte variant)
+        {
+            objectClass = ObjectClass[rawObjectId];
+
+            for (int i = 0; i <= rawObjectId; i++)
+            {
+                if (ObjectClass[i] == objectClass)
+                {
+                    variant = (byte)(rawObjectId - i);
+                    return true;
+                }
+            }
+
+            variant = 0;
+            return false;
+        }
+
+        public bool TryFindObjectIdByClass(
+            byte objectClass,
+            byte startId,
+            out byte rawObjectId)
+        {
+            for (int i = startId; i < 256; i++)
+            {
+                if (ObjectClass[i] == objectClass)
+                {
+                    rawObjectId = (byte)i;
+                    return true;
+                }
+            }
+
+            rawObjectId = 0;
+            return false;
+        }
+
         public byte WallClassAt(int x, int y)
         {
             return WallClass[WallId[x, y]];
