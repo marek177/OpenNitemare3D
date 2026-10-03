@@ -1127,6 +1127,32 @@ namespace Nitemare3D
             return delta;
         }
 
+        public static int StepOriginalAngleToward(
+            int currentAngle,
+            int targetAngle,
+            int maxStep)
+        {
+            currentAngle = NormalizeOriginalAngle(currentAngle);
+            targetAngle = NormalizeOriginalAngle(targetAngle);
+
+            int delta =
+                ShortestOriginalAngleDelta(
+                    targetAngle,
+                    currentAngle);
+
+            if (delta == 0)
+                return currentAngle;
+
+            int step = Math.Max(1, maxStep);
+            int applied =
+                Math.Abs(delta) < step
+                    ? delta
+                    : (delta < 0 ? -step : step);
+
+            return NormalizeOriginalAngle(
+                currentAngle + applied);
+        }
+
         /// <summary>
         /// Recovered FUN_1010_D8FC player-death camera phase.
         /// State 2 rotates the view toward the OBJECT slot saved by FUN_8C0A.
@@ -1173,15 +1199,11 @@ namespace Nitemare3D
                 return true;
             }
 
-            int step = TurnStep53F8;
-            int applied =
-                Math.Abs(delta) < step
-                    ? delta
-                    : (delta < 0 ? -step : step);
-
             int nextAngle =
-                NormalizeOriginalAngle(
-                    currentAngle + applied);
+                StepOriginalAngleToward(
+                    currentAngle,
+                    targetAngle,
+                    TurnStep53F8);
 
             // Port rotation convention: 0=east, original: 0=north.
             player.SetRotation(nextAngle - 90);
