@@ -67,6 +67,16 @@ int N3D_RE_GuardMovementCandidateTouchesPlayer(
     int16_t player_world_x,
     int16_t player_world_y);
 
+int16_t N3D_RE_GuardDirectionPadding(int8_t component);
+
+n3d_guard_movement_result
+N3D_RE_TickGuardMovementCollisionCoreWithRng(
+    n3d_guard_record* guard,
+    n3d_object_record* object,
+    n3d_guard_block_callback is_blocked_at,
+    void* user,
+    uint32_t* rng_state);
+
 n3d_guard_movement_result N3D_RE_TickGuardMovementCollisionCore(
     n3d_guard_record* guard,
     n3d_object_record* object,
