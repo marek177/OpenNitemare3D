@@ -1325,6 +1325,67 @@ namespace Nitemare3D
             Assert(!OriginalProjectileRuntime.NeedsProjection(20, -20, 0, 0),
                 "projectile projection threshold must not trigger at +/-20.");
 
+            Assert(OriginalProjectileRuntime.AngleFromDirection(0, -1) == 0 &&
+                   OriginalProjectileRuntime.AngleFromDirection(1, 0) == 90 &&
+                   OriginalProjectileRuntime.AngleFromDirection(0, 1) == 180 &&
+                   OriginalProjectileRuntime.AngleFromDirection(-1, 0) == 270,
+                "projectile direction-to-original-angle mapping mismatch.");
+
+            var dda = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying,
+                RenderObject = new OriginalObjectRecord
+                {
+                    WorldX = 100,
+                    WorldY = 100
+                }
+            };
+
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(ref dda, 0);
+            Assert(dda.XIsMajorAxis == 0 &&
+                   dda.StepY == -1 &&
+                   dda.LineError == -1024 &&
+                   dda.MinorErrorStep == 0 &&
+                   dda.MajorErrorFixup == -2048,
+                "north Q10 DDA initialization mismatch.");
+            Assert(OriginalProjectileRuntime.AdvanceDdaSubstep(ref dda) &&
+                   dda.RenderObject.WorldX == 100 &&
+                   dda.RenderObject.WorldY == 99,
+                "north DDA substep mismatch.");
+
+            dda = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying,
+                RenderObject = new OriginalObjectRecord
+                {
+                    WorldX = 100,
+                    WorldY = 100
+                }
+            };
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(ref dda, 90);
+            Assert(dda.XIsMajorAxis == 1 &&
+                   dda.StepX == 1,
+                "east Q10 DDA initialization mismatch.");
+            Assert(OriginalProjectileRuntime.AdvanceDdaSubstep(ref dda) &&
+                   dda.RenderObject.WorldX == 101 &&
+                   dda.RenderObject.WorldY == 100,
+                "east DDA substep mismatch.");
+
+            dda = new OriginalProjectileRecord
+            {
+                State = (byte)OriginalProjectileState.Flying,
+                RenderObject = new OriginalObjectRecord
+                {
+                    WorldX = 100,
+                    WorldY = 100
+                }
+            };
+            OriginalProjectileRuntime.ConfigureDdaFromAngle(ref dda, 45);
+            Assert(OriginalProjectileRuntime.AdvanceDdaSubstep(ref dda) &&
+                   dda.RenderObject.WorldX == 101 &&
+                   dda.RenderObject.WorldY == 99,
+                "45-degree DDA substep must advance both axes.");
+
             var pool = new OriginalProjectileRecord[OriginalRuntime.MaxProjectiles];
             Assert(OriginalProjectileRuntime.FirstFreeSlot(pool) == 0,
                 "empty projectile pool must allocate slot 0.");
