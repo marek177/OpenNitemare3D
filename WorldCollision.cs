@@ -14,10 +14,23 @@ namespace Nitemare3D
 
         public static bool CanOccupyPlayer(Vec2 position, Entity ignore)
         {
-            return CanOccupy(position, PlayerHalfExtentTiles, ignore);
+            return CanOccupyCore(
+                position,
+                PlayerHalfExtentTiles,
+                ignore,
+                true);
         }
 
         public static bool CanOccupy(Vec2 position, float halfExtent, Entity ignore)
+        {
+            return CanOccupyCore(position, halfExtent, ignore, false);
+        }
+
+        static bool CanOccupyCore(
+            Vec2 position,
+            float halfExtent,
+            Entity ignore,
+            bool applyPlayerWallScripts)
         {
             float minX = position.X - halfExtent;
             float maxX = position.X + halfExtent;
@@ -44,6 +57,40 @@ namespace Nitemare3D
                     if (tile == null || tile.obstacle)
                     {
                         return false;
+                    }
+                }
+            }
+
+            // FUN_84F4 performs primary wall/door passability first, then invokes
+            // FUN_BFD8 for semantic wall classes 0x47/0x48, before secondary
+            // object blocking. Mirror that ordering for the player's AABB probe.
+            if (applyPlayerWallScripts && Level.originalMap != null)
+            {
+                int levelNumber = Game.level + 1;
+
+                for (int x = minTileX; x <= maxTileX; x++)
+                {
+                    for (int y = minTileY; y <= maxTileY; y++)
+                    {
+                        byte rawWallId = Level.originalMap.WallId[x, y];
+                        byte wallFlags =
+                            Level.originalMap.WallProperty[rawWallId];
+
+                        if ((wallFlags & OriginalMapTables.WallScriptTouch) == 0)
+                            continue;
+
+                        byte wallClass =
+                            Level.originalMap.WallClass[rawWallId];
+
+                        OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8(
+                            Game.episode,
+                            levelNumber,
+                            wallClass);
+
+                        OriginalRuntimeState.ApplyScriptTouchProgress51A6(
+                            Game.episode,
+                            levelNumber,
+                            wallClass);
                     }
                 }
             }
