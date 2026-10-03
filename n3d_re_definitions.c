@@ -180,6 +180,41 @@ int N3D_RE_DefinitionVariantIndex(
     return 1;
 }
 
+int N3D_RE_WallClassVariant(
+    uint8_t raw_wall_id,
+    uint8_t expected_mapped_type,
+    uint8_t* variant_index)
+{
+    if(!variant_index ||
+       !N3D_RE_WallMappingKnown(raw_wall_id) ||
+       n3d_wall_mapped_type[raw_wall_id] != expected_mapped_type)
+    {
+        return 0;
+    }
+
+    for(int raw = 0; raw <= raw_wall_id; ++raw)
+    {
+        if(n3d_wall_mapping_known[raw] &&
+           n3d_wall_mapped_type[raw] == expected_mapped_type)
+        {
+            *variant_index = (uint8_t)(raw_wall_id - raw);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int N3D_RE_AreaIdFromWallId(
+    uint8_t raw_wall_id,
+    uint8_t* area_id)
+{
+    return N3D_RE_WallClassVariant(
+        raw_wall_id,
+        0x44,
+        area_id);
+}
+
 int N3D_RE_KnownWallMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type)
