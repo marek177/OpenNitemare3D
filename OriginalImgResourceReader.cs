@@ -17,7 +17,8 @@ namespace Nitemare3D
     /// FUN_1010_4C8A -> FUN_1010_4B86 -> FUN_1010_4AB0.
     ///
     /// Layout used here:
-    /// - file +0x0000: 256 dword frame-stream offsets
+    /// - file +0x0000: 256 dword tile/VEC frame-stream offsets
+    /// - file +0x0400: 256 dword object frame-stream offsets
     /// - file +0x0800: 256 x 0x5A tile/VEC headers
     /// - immediately following: 256 x 0x5A object headers
     /// - each directory offset points at a sequence of raw 10-byte frame records
@@ -39,7 +40,12 @@ namespace Nitemare3D
                 if (stream.Length < OriginalRuntime.ImgDirectoryBytes)
                     return false;
 
-                stream.Position = imageId * 4L;
+                long directoryOffset =
+                    (tileBank
+                        ? OriginalRuntime.ImgWallDirectoryOffset
+                        : OriginalRuntime.ImgObjectDirectoryOffset) +
+                    imageId * 4L;
+                stream.Position = directoryOffset;
                 uint frameStreamOffset = reader.ReadUInt32();
                 if (frameStreamOffset == 0 ||
                     frameStreamOffset >= stream.Length)
