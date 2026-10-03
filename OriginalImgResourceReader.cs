@@ -8,7 +8,7 @@ namespace Nitemare3D
         public byte ImageId;
         public bool TileBank;
         public uint FrameStreamOffset;
-        public OriginalObjectResourceHeader Header;
+        public OriginalObjectDefinitionRecord Header;
         public byte[] RuntimeFrameTable;
     }
 
