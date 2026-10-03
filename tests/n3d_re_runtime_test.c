@@ -10,6 +10,7 @@
 #include "../n3d_re_use.h"
 #include "../n3d_re_pickup.h"
 #include "../n3d_re_trig.h"
+#include "../n3d_re_movement.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -1682,6 +1683,135 @@ int main(void)
     n3d_player.tile_y = 10;
     use_execution = N3D_RE_ExecuteUse(1);
     assert(use_execution.kind == N3D_USE_EXEC_WALL_DEFERRED);
+
+    /*
+     * Player movement kernel: one-unit axis attempts with 28-unit leading
+     * probes, 27-unit perpendicular corners and independent-axis sliding.
+     */
+    N3D_RE_ResetRuntime();
+    N3D_RE_InitPlayerAtTile(10, 10);
+
+    /* Empty raw cell 0 is a known zero-property cell. */
+    n3d_wall_mapping_known[0] = 1;
+    n3d_wall_property_known[0] = 1;
+    n3d_wall_mapped_type[0] = 0;
+    n3d_wall_property_resolved[0] = 0;
+    n3d_object_mapping_known[0] = 1;
+    n3d_object_property_known[0] = 1;
+    n3d_object_mapped_type[0] = 0;
+    n3d_object_property_resolved[0] = 0;
+
+    n3d_collision_callbacks player_move_callbacks = {
+        N3D_RE_DoorCellPassableCallback,
+        NULL,
+        N3D_RE_PlayerPickupTouchCallback,
+        NULL
+    };
+
+    const int16_t move_start_x = n3d_player.world_x;
+    const int16_t move_start_y = n3d_player.world_y;
+
+    n3d_player_move_result move_result =
+        N3D_RE_MovePlayerWorldDelta(
+            10, 0, &player_move_callbacks);
+    assert(move_result.requested_x == 10);
+    assert(move_result.requested_y == 0);
+    assert(move_result.accepted_x == 10);
+    assert(move_result.accepted_y == 0);
+    assert(move_result.x_attempts == 10);
+    assert(move_result.x_blocked == 0);
+    assert(!move_result.unresolved_collision);
+    assert(n3d_player.world_x == move_start_x + 10);
+    assert(n3d_player.world_y == move_start_y);
+
+    N3D_RE_InitPlayerAtTile(10, 10);
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        10, 5, &player_move_callbacks);
+    assert(move_result.accepted_x == 10);
+    assert(move_result.accepted_y == 5);
+    assert(move_result.x_attempts == 10);
+    assert(move_result.y_attempts == 5);
+
+    /*
+     * Adjacent hard wall: X advances only until the +28 leading probe reaches
+     * tile 11; Y continues, demonstrating the original independent-axis slide.
+     */
+    N3D_RE_InitPlayerAtTile(10, 10);
+    n3d_map[10 * N3D_MAP_WIDTH + 11].wall = 1;
+    n3d_wall_mapping_known[1] = 1;
+    n3d_wall_property_known[1] = 1;
+    n3d_wall_mapped_type[1] = 0x01;
+    n3d_wall_property_resolved[1] =
+        N3D_RE_WallPropertiesForMappedType(0x01);
+
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        10, 10, &player_move_callbacks);
+    assert(move_result.accepted_x == 3);
+    assert(move_result.x_blocked == 7);
+    assert(move_result.accepted_y == 10);
+    assert(move_result.y_blocked == 0);
+    assert(n3d_player.world_x ==
+           10 * N3D_WORLD_UNITS_PER_TILE +
+           N3D_TILE_CENTER_OFFSET + 3);
+    assert(n3d_player.world_y ==
+           10 * N3D_WORLD_UNITS_PER_TILE +
+           N3D_TILE_CENTER_OFFSET + 10);
+
+    /*
+     * Forced-closed door at the player's own cell: normal center (32,32) lies
+     * in the recovered 8x8 trap core, so all four cardinal +/-1 attempts block.
+     */
+    N3D_RE_ResetRuntime();
+    N3D_RE_InitPlayerAtTile(10, 10);
+    n3d_wall_mapping_known[0] = 1;
+    n3d_wall_property_known[0] = 1;
+    n3d_wall_mapped_type[0] = 0;
+    n3d_wall_property_resolved[0] = 0;
+    n3d_object_mapping_known[0] = 1;
+    n3d_object_property_known[0] = 1;
+    n3d_object_mapped_type[0] = 0;
+    n3d_object_property_resolved[0] = 0;
+
+    n3d_wall_mapping_known[0x70] = 1;
+    n3d_wall_property_known[0x70] = 1;
+    n3d_wall_mapped_type[0x70] = 0x31;
+    n3d_wall_property_resolved[0x70] =
+        N3D_RE_WallPropertiesForMappedType(0x31);
+    n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0x70;
+
+    const int trap_door_slot =
+        N3D_RE_RegisterDoorCell(10, 10);
+    assert(trap_door_slot >= 0);
+    assert(N3D_RE_SetDoorCellState(10, 10, 3));
+
+    const int16_t trap_x = n3d_player.world_x;
+    const int16_t trap_y = n3d_player.world_y;
+
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        1, 0, &player_move_callbacks);
+    assert(move_result.accepted_x == 0);
+    assert(n3d_player.world_x == trap_x);
+
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        -1, 0, &player_move_callbacks);
+    assert(move_result.accepted_x == 0);
+    assert(n3d_player.world_x == trap_x);
+
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        0, 1, &player_move_callbacks);
+    assert(move_result.accepted_y == 0);
+    assert(n3d_player.world_y == trap_y);
+
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        0, -1, &player_move_callbacks);
+    assert(move_result.accepted_y == 0);
+    assert(n3d_player.world_y == trap_y);
+
+    assert(N3D_RE_SetDoorCellState(10, 10, 0));
+    move_result = N3D_RE_MovePlayerWorldDelta(
+        1, 0, &player_move_callbacks);
+    assert(move_result.accepted_x == 1);
+    assert(n3d_player.world_x == trap_x + 1);
 
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
