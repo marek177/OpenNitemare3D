@@ -39,6 +39,13 @@ typedef struct n3d_projectile_collision_result
     uint8_t enter_impact;
 } n3d_projectile_collision_result;
 
+typedef struct n3d_projectile_advance_result
+{
+    uint16_t requested_substeps;
+    uint16_t advanced_substeps;
+    n3d_projectile_collision_result collision;
+} n3d_projectile_advance_result;
+
 #define N3D_EXPLODABLE_WALL_EVENT 0x29
 #define N3D_EXPLODABLE_WALL_RUNTIME_CLASS 0x2D
 
@@ -78,6 +85,11 @@ int N3D_RE_AdvanceProjectileLineSteps(int slot, uint16_t substeps);
 
 n3d_projectile_collision_result
 N3D_RE_ClassifyProjectileCollision(int slot);
+
+n3d_projectile_advance_result
+N3D_RE_AdvanceProjectileUntilCollision(
+    int slot,
+    uint16_t substeps);
 
 int N3D_RE_EnterProjectileImpact(
     int slot,
