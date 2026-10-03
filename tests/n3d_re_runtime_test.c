@@ -2259,6 +2259,28 @@ int main(void)
         remove("N3D_TRIG_Q10_PROJECTILE_TEST.BIN");
     }
 
+    /* Scripted weapon jam events are exact and deterministic. */
+    N3D_RE_ResetPlayer();
+    n3d_weapon_jam_event_result jam_event =
+        N3D_RE_ApplyWeaponJamEvent(N3D_WEAPON_JAM_ENABLE_EVENT);
+    assert(jam_event.handled == 1);
+    assert(jam_event.jammed == 1);
+    assert(jam_event.sound_id == N3D_WEAPON_JAM_SOUND_ID);
+    assert(n3d_player.weapon_jam == 1);
+
+    jam_event = N3D_RE_ApplyWeaponJamEvent(0x46);
+    assert(jam_event.handled == 0);
+    assert(jam_event.jammed == 1);
+    assert(jam_event.sound_id == 0);
+    assert(n3d_player.weapon_jam == 1);
+
+    jam_event =
+        N3D_RE_ApplyWeaponJamEvent(N3D_WEAPON_JAM_DISABLE_EVENT);
+    assert(jam_event.handled == 1);
+    assert(jam_event.jammed == 0);
+    assert(jam_event.sound_id == N3D_WEAPON_JAM_SOUND_ID);
+    assert(n3d_player.weapon_jam == 0);
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
