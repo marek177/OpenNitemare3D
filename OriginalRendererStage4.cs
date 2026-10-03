@@ -708,6 +708,11 @@ namespace Nitemare3D
                 firstY +
                 1;
 
+            byte[] remap =
+                OriginalRuntimeState.ShadeRuntime.ShadeIndex == 0
+                    ? null
+                    : OriginalRuntimeState.ShadeRuntime.Remap;
+
             OriginalRendererCore.DrawIndexedColumn(
                 GameWindow.frameBuffer,
                 screenX,
@@ -716,7 +721,7 @@ namespace Nitemare3D
                 column,
                 source,
                 step,
-                null);
+                remap);
         }
 
         public static void CopyWallVisibilityQ4(
