@@ -549,6 +549,28 @@ namespace Nitemare3D
                 }
             }
 
+            // FUN_6258 runs after GUARD construction: derive +0x0F from
+            // SEQDEF bytes +6/+8 and force the initial directional sequence.
+            if (ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var directionDefinition))
+            {
+                guard.Control =
+                    OriginalGuardProfiles.DirectionalControlMode(
+                        directionDefinition);
+
+                if (Game.player != null)
+                {
+                    OriginalGuardDispatcher.RefreshDirectionalSequence(
+                        ref guard,
+                        ref obj,
+                        directionDefinition,
+                        ToWorldCoordinate(Game.player.position.X),
+                        ToWorldCoordinate(Game.player.position.Y),
+                        true);
+                }
+            }
+
             bindings[entity] = new Binding
             {
                 ObjectSlot = objectSlot,
@@ -556,6 +578,36 @@ namespace Nitemare3D
             };
 
             return true;
+        }
+
+        public static bool RegisterMapGuard(
+            Entity entity,
+            byte mapObjectId)
+        {
+            if (entity == null ||
+                mapObjectId == 0 ||
+                Level.originalMap == null)
+            {
+                return false;
+            }
+
+            byte propertyFlags =
+                Level.originalMap.ObjectProperty[
+                    mapObjectId];
+
+            if ((propertyFlags &
+                    OriginalMapTables.ObjectCreatesGuard) == 0)
+            {
+                return false;
+            }
+
+            // Map semantics were validated above, so RegisterGuard cannot reach
+            // its legacy GuardType fallback. The enum value is intentionally
+            // irrelevant on this path.
+            return RegisterGuard(
+                entity,
+                default(GuardType),
+                mapObjectId);
         }
 
         public static bool RegisterWorldObject(
