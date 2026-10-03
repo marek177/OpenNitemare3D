@@ -46,6 +46,7 @@ namespace Nitemare3D
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
+            TestState13MapCellTransfer();
             TestState11Movement();
             TestMovementPlanning();
             TestMovementCell700A();
@@ -2254,10 +2255,15 @@ namespace Nitemare3D
                 WorldY = 100
             };
 
+            int triggerCount = 0;
             Assert(OriginalGuardDispatcher.TickState13(
-                       ref guard, ref obj, (x, y) => true) ==
-                   OriginalGuardDispatchResult.SoundPoint,
-                "state 13 should emit sound point at remaining timer 8.");
+                       ref guard,
+                       ref obj,
+                       (x, y) => true,
+                       () => triggerCount++) ==
+                   OriginalGuardDispatchResult.MapTrigger &&
+                   triggerCount == 1,
+                "state 13 should activate the ONE_SHOT map trigger at remaining timer 8.");
 
             int moved = 0;
             while (guard.State == (byte)OriginalGuardState.Transition13)
@@ -2306,6 +2312,62 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "blocked state 13 must still terminate normally.");
+        }
+
+        static void TestState13MapCellTransfer()
+        {
+            var map = new OriginalMapTables();
+
+            map.ObjectId[1, 1] = 0xB4;
+
+            Assert(map.TryTransferState13ObjectCell(
+                       1, 1, 1, 1, 1, 1) &&
+                   map.ObjectId[1, 1] == 0xB4,
+                "state 13 same-cell movement must bypass occupancy/player checks.");
+
+            map.ObjectId[2, 1] = 0x55;
+            Assert(!map.TryTransferState13ObjectCell(
+                       1, 1, 2, 1, 10, 10) &&
+                   map.ObjectId[1, 1] == 0xB4 &&
+                   map.ObjectId[2, 1] == 0x55,
+                "state 13 must reject occupied destination object cells.");
+
+            map.ObjectId[2, 1] = 0;
+            Assert(!map.TryTransferState13ObjectCell(
+                       1, 1, 2, 1, 2, 1) &&
+                   map.ObjectId[1, 1] == 0xB4 &&
+                   map.ObjectId[2, 1] == 0,
+                "state 13 must reject the player's destination cell.");
+
+            Assert(map.TryTransferState13ObjectCell(
+                       1, 1, 2, 1, 10, 10) &&
+                   map.ObjectId[1, 1] == 0 &&
+                   map.ObjectId[2, 1] == 0xB4,
+                "state 13 must transfer the raw MAP object byte on cell crossing.");
+
+            Assert(OriginalMapTables.CellBindingHandle(0, 0) == 1 &&
+                   OriginalMapTables.CellBindingHandle(63, 63) == 4096 &&
+                   OriginalMapTables.CellBindingHandle(-1, 0) == 0,
+                "clean-room MAP cell binding handle mismatch.");
+
+            for (byte octant = 0; octant < 8; octant++)
+            {
+                byte expectedOrientation =
+                    octant == 0 || octant == 7 ? (byte)0 :
+                    octant == 3 || octant == 4 ? (byte)1 :
+                    octant == 1 || octant == 2 ? (byte)2 :
+                    (byte)3;
+
+                for (byte orientation = 0; orientation < 4; orientation++)
+                {
+                    Assert(
+                        OriginalGuardDispatcher.State13TriggerOrientationMatches(
+                            orientation,
+                            octant) ==
+                        (orientation == expectedOrientation),
+                        "state 13 ONE_SHOT orientation filter mismatch.");
+                }
+            }
         }
 
         static void TestState11Movement()
