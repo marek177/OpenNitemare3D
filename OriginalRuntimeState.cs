@@ -50,6 +50,11 @@ namespace Nitemare3D
         public static byte Difficulty { get; private set; } =
             OriginalRuntime.DefaultDifficulty;
 
+        // DAT_1048_4C16. FUN_1010_80F8 sign-extends the class-specific
+        // kill-score result and adds it here on the lethal GUARD path.
+        // Level Reset() intentionally does not clear it.
+        public static int PlayerScore { get; private set; }
+
         // FUN_D70A/D9C6: gameplay/GUARD update clock is floor(ms*8/1000),
         // i.e. one global logic step every 125 ms. Extra missed intervals are
         // not replayed as catch-up ticks.
@@ -1978,6 +1983,21 @@ namespace Nitemare3D
             DraculaTransformed
         }
 
+        public static void ResetPlayerScoreNewGame()
+        {
+            PlayerScore = 0;
+        }
+
+        static int CommitGuardKillScore(byte objectClass)
+        {
+            int delta = OriginalRuntime.GuardScore(objectClass);
+            unchecked
+            {
+                PlayerScore += delta;
+            }
+            return delta;
+        }
+
         /// <summary>
         /// Compatibility overload. The original selector is RNG-driven; callers
         /// requiring exact RNG-stream parity should use the overload that supplies
@@ -2021,6 +2041,11 @@ namespace Nitemare3D
 
             if (damage >= guard.Strength)
             {
+                // FUN_1010_80F8 commits score on lethal defeat before the
+                // death-animation/state-09 finalizer. Strength was nonzero on
+                // entry, so this path can award the class score only once.
+                CommitGuardKillScore(obj.ObjectClass);
+
                 if (!ObjectDefinitions.TryGetHeader(
                         obj.DefinitionId,
                         out var deathDefinition))
