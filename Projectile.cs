@@ -164,7 +164,17 @@ namespace Nitemare3D
                 Level.originalMap.WallPropertyAt(tileX, tileY);
 
             if ((wallFlags & OriginalMapTables.WallHardBlock) != 0)
+            {
+                if ((wallFlags & OriginalMapTables.WallClass2E2F) != 0)
+                {
+                    Level.TryBeginOriginalExplodingWall(
+                        tileX,
+                        tileY,
+                        OriginalRuntimeState.RuntimeClockMs);
+                }
+
                 return true;
+            }
 
             if ((wallFlags & OriginalMapTables.WallDynamicDoor) != 0)
             {
