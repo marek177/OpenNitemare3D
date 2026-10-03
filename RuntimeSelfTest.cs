@@ -674,6 +674,18 @@ namespace Nitemare3D
 
         static void TestWorldObjectRuntime()
         {
+            Assert(OriginalWorldObjectRuntime.ShouldUseGenericShell(
+                       OriginalMapTables.ObjectRuntimePresent),
+                "active non-GUARD OBJECT must be eligible for generic runtime shell.");
+            Assert(!OriginalWorldObjectRuntime.ShouldUseGenericShell(
+                       (byte)(
+                           OriginalMapTables.ObjectRuntimePresent |
+                           OriginalMapTables.ObjectCreatesGuard)),
+                "GUARD-linked OBJECT must never be replaced by inert generic shell.");
+            Assert(!OriginalWorldObjectRuntime.ShouldUseGenericShell(
+                       OriginalMapTables.ObjectSpecialTouch),
+                "non-runtime special marker must not receive generic shell.");
+
             var obj = new OriginalObjectRecord
             {
                 ProjectedBaseRow = 321
