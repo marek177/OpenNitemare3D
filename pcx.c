@@ -6,8 +6,6 @@ typedef struct pcxImage
 
 }pcxImage;
 
-void* pcx_images[14];
-
 
 //we only need like one variable from the header lol
 typedef struct pcxHeader
