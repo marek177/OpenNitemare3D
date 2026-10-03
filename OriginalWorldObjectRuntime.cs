@@ -60,6 +60,85 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Exact DOS B17E directional OBJECT animation used by classes 0x2C/0x2D.
+        ///
+        /// phaseCount = frameCount/8 for class 0x2D, otherwise frameCount/4.
+        /// localPhase is the current frame modulo phaseCount. When due, exactly
+        /// one frame is advanced and the deadline becomes now+interval.
+        ///
+        /// BAAA supplies the player-relative octant. B17E then transforms it as:
+        ///   group = (-(octant + 4)) & 7
+        /// and ordinary directional objects reduce that to four groups via >>1;
+        /// class 0x2D retains all eight groups.
+        /// </summary>
+        public static bool AdvanceDirectionalAnimation(
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            uint now,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            bool eightGroups =
+                obj.ObjectClass == 0x2D;
+
+            if (!eightGroups &&
+                obj.ObjectClass != 0x2C)
+            {
+                return false;
+            }
+
+            int phaseCount =
+                definition.FrameCount >>
+                (eightGroups ? 3 : 2);
+
+            if (phaseCount <= 0)
+                return false;
+
+            bool due =
+                now >= obj.RuntimeValue;
+
+            if (due)
+            {
+                obj.Component03 =
+                    unchecked(
+                        (sbyte)(
+                            unchecked((byte)obj.Component03) +
+                            1));
+
+                obj.RuntimeValue =
+                    unchecked(
+                        now +
+                        definition.Interval);
+            }
+
+            int localPhase =
+                unchecked((byte)obj.Component03) %
+                phaseCount;
+
+            byte octant =
+                OriginalGuardDispatcher.ComputePlayerOctant(
+                    eightGroups ? (byte)1 : (byte)0,
+                    obj.WorldX,
+                    obj.WorldY,
+                    playerWorldX,
+                    playerWorldY);
+
+            int group =
+                (-(octant + 4)) & 7;
+
+            if (!eightGroups)
+                group >>= 1;
+
+            obj.Component03 =
+                unchecked(
+                    (sbyte)(
+                        group * phaseCount +
+                        localPhase));
+
+            return due;
+        }
+
+        /// <summary>
         /// General timestamped world-OBJECT animation path from B22C:
         /// one due frame per call, simple loop when no alternatives exist,
         /// otherwise use OBJECT+0x02 as the 0..7 branch selector. Each branch
