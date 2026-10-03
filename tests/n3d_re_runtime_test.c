@@ -2383,6 +2383,172 @@ int main(void)
         assert(projectile_collision.enter_impact == 0);
     }
 
+    /* 9D30 traversal driver: move one unit, classify, stop on first collision. */
+    {
+        N3D_RE_ResetRuntime();
+
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            10 * 64 + 32, 10 * 64 + 32, 20));
+
+        n3d_projectiles[0].x_is_major_axis = 1;
+        n3d_projectiles[0].line_error = -1;
+        n3d_projectiles[0].minor_error_step = 0;
+        n3d_projectiles[0].major_error_fixup = 0;
+        n3d_projectiles[0].step_x = 1;
+        n3d_projectiles[0].step_y = -1;
+
+        n3d_projectile_advance_result advance =
+            N3D_RE_AdvanceProjectileUntilCollision(0, 5);
+        assert(advance.requested_substeps == 5);
+        assert(advance.advanced_substeps == 5);
+        assert(advance.collision.kind ==
+               N3D_PROJECTILE_COLLISION_NONE);
+        assert(n3d_projectiles[0].object.world_x ==
+               10 * 64 + 32 + 5);
+
+        /* Enter a normal blocking wall on the first step. */
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        n3d_wall_mapping_known[1] = 1;
+        n3d_wall_property_known[1] = 1;
+        n3d_wall_mapped_type[1] = 0x01;
+        n3d_wall_property_resolved[1] =
+            N3D_RE_WallPropertiesForMappedType(0x01);
+        n3d_map[10 * N3D_MAP_WIDTH + 11].wall = 1;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            11 * 64 - 1, 10 * 64 + 32, 20));
+        n3d_projectiles[0].x_is_major_axis = 1;
+        n3d_projectiles[0].line_error = -1;
+        n3d_projectiles[0].step_x = 1;
+        n3d_projectiles[0].step_y = -1;
+
+        advance = N3D_RE_AdvanceProjectileUntilCollision(0, 8);
+        assert(advance.advanced_substeps == 1);
+        assert(advance.collision.kind ==
+               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+        assert(n3d_projectiles[0].object.world_x == 11 * 64);
+
+        /* Unknown cell mapping also stops traversal immediately. */
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+        n3d_map[10 * N3D_MAP_WIDTH + 11].wall = 0x71;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            11 * 64 - 1, 10 * 64 + 32, 20));
+        n3d_projectiles[0].x_is_major_axis = 1;
+        n3d_projectiles[0].line_error = -1;
+        n3d_projectiles[0].step_x = 1;
+        n3d_projectiles[0].step_y = -1;
+
+        advance = N3D_RE_AdvanceProjectileUntilCollision(0, 8);
+        assert(advance.advanced_substeps == 1);
+        assert(advance.collision.kind ==
+               N3D_PROJECTILE_COLLISION_UNRESOLVED);
+
+        /* Explodable wall produces exact event 0x29 on the first entered step. */
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        n3d_wall_mapping_known[0xFE] = 1;
+        n3d_wall_property_known[0xFE] = 1;
+        n3d_wall_mapped_type[0xFE] = 0x2E;
+        n3d_wall_property_resolved[0xFE] =
+            N3D_RE_WallPropertiesForMappedType(0x2E);
+        n3d_map[10 * N3D_MAP_WIDTH + 11].wall = 0xFE;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            11 * 64 - 1, 10 * 64 + 32, 20));
+        n3d_projectiles[0].x_is_major_axis = 1;
+        n3d_projectiles[0].line_error = -1;
+        n3d_projectiles[0].step_x = 1;
+        n3d_projectiles[0].step_y = -1;
+
+        advance = N3D_RE_AdvanceProjectileUntilCollision(0, 8);
+        assert(advance.advanced_substeps == 1);
+        assert(advance.collision.kind ==
+               N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL);
+        assert(advance.collision.event_id == 0x29);
+        assert(advance.collision.enter_impact == 1);
+
+        /* GUARD proximity hit stops on the first post-step 9B64 test. */
+        N3D_RE_ResetRuntime();
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        n3d_object_mapping_known[0x80] = 1;
+        n3d_object_property_known[0x80] = 1;
+        n3d_object_mapped_type[0x80] = 0x08;
+        n3d_object_property_resolved[0x80] =
+            N3D_RE_ObjectPropertiesForMappedType(0x08);
+        n3d_map[10 * N3D_MAP_WIDTH + 11].object = 0x80;
+
+        int traversal_guard_object = -1;
+        assert(N3D_RE_InstantiateMapObject(
+            0x80, 11, 10, &traversal_guard_object));
+        assert(traversal_guard_object >= 0);
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            n3d_objects[traversal_guard_object].world_x - 10,
+            n3d_objects[traversal_guard_object].world_y,
+            20));
+        n3d_projectiles[0].x_is_major_axis = 1;
+        n3d_projectiles[0].line_error = -1;
+        n3d_projectiles[0].step_x = 1;
+        n3d_projectiles[0].step_y = -1;
+
+        advance = N3D_RE_AdvanceProjectileUntilCollision(0, 8);
+        assert(advance.advanced_substeps == 1);
+        assert(advance.collision.kind ==
+               N3D_PROJECTILE_COLLISION_GUARD_HIT);
+        assert(advance.collision.object_slot == traversal_guard_object);
+        assert(advance.collision.guard_slot ==
+               n3d_objects[traversal_guard_object].guard_index);
+        assert(advance.collision.enter_impact == 1);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
