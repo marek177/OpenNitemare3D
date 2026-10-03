@@ -25,11 +25,27 @@ namespace Nitemare3D
 
         const float speed = 4;
         ProjectileType type;
+        readonly OriginalWeaponSelector weaponSelector;
         Vec2 direction;
+
         public Projectile(Vec2 direction, ProjectileType type)
+            : this(
+                direction,
+                type,
+                type == ProjectileType.Magic
+                    ? OriginalWeaponSelector.MagicWand
+                    : OriginalWeaponSelector.SingleShotLaser)
+        {
+        }
+
+        public Projectile(
+            Vec2 direction,
+            ProjectileType type,
+            OriginalWeaponSelector weaponSelector)
         {
             this.direction = direction;
             this.type = type;
+            this.weaponSelector = weaponSelector;
             anim.LoadAnimation(animations[(int)type]);
             Game.player.AddSprite(this);
             hasCollision = false;
@@ -54,7 +70,10 @@ namespace Nitemare3D
                     projectileWorldY,
                     out Entity hitGuard))
             {
-                hitGuard.SendMessage("ShootPlasma");
+                OriginalRuntimeState.ApplyPlayerWeaponDamage(
+                    hitGuard,
+                    weaponSelector,
+                    false);
                 Entity.Remove(this);
                 visible = false;
                 return;
