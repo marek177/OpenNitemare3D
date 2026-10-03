@@ -41,6 +41,7 @@ namespace Nitemare3D
             TestGuardMapClassMapping();
             TestGuardInitialProfiles();
             TestState07Decision();
+            TestState08WallTurn();
             TestPainReturn();
             TestDoorSelector();
             TestWakeCache();
@@ -2183,6 +2184,84 @@ namespace Nitemare3D
                    guard.MoveX == 0 &&
                    guard.MoveY == 8,
                 "strategy-3 state 07 transition mismatch.");
+        }
+
+        static void TestState08WallTurn()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Move08,
+                Strategy = 0,
+                Octant = 0
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 96,
+                WorldY = 96
+            };
+
+            Assert(OriginalGuardDispatcher.ApplyState08WallTurn(
+                       ref guard,
+                       ref obj,
+                       0x41,
+                       2) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.Octant == 2 &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == 0,
+                "state 08 class-41 variant must select facing/movement.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Move08,
+                Strategy = 2,
+                MoveX = 0,
+                MoveY = 0
+            };
+            obj.WorldX = 96;
+            obj.WorldY = 96;
+
+            Assert(OriginalGuardDispatcher.ApplyState08WallTurn(
+                       ref guard,
+                       ref obj,
+                       0x42,
+                       8) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Detection03,
+                "state 08 class-42 variant 8 must enter state 03.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Move08,
+                Strategy = 0,
+                Octant = 1,
+                MoveX = 8,
+                MoveY = 0
+            };
+
+            Assert(OriginalGuardDispatcher.ApplyState08WallTurn(
+                       ref guard,
+                       ref obj,
+                       0x42,
+                       3) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.Detection03 &&
+                   guard.MoveX == 0 &&
+                   guard.MoveY == 0 &&
+                   guard.Octant == 5,
+                "active state-08 class-42 turn must stop, enter 03 and reverse facing.");
+
+            guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Move08,
+                Strategy = 0
+            };
+            obj.WorldX = 97;
+            obj.WorldY = 96;
+
+            Assert(OriginalGuardDispatcher.ApplyState08WallTurn(
+                       ref guard,
+                       ref obj,
+                       0x41,
+                       2) == OriginalGuardDispatchResult.Waiting,
+                "state 08 wall-turn helper must only act at tile center.");
         }
 
         static void TestPainReturn()
