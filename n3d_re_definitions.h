@@ -62,6 +62,19 @@ int N3D_RE_DefinitionVariantIndex(
     uint8_t id,
     uint8_t* variant_index);
 
+/*
+ * Exact FUN_247A-style wall-class variant lookup used by class-0x44 AREA
+ * markers: variant = rawWallId - firstRawIdOfSameMappedClass.
+ */
+int N3D_RE_WallClassVariant(
+    uint8_t raw_wall_id,
+    uint8_t expected_mapped_type,
+    uint8_t* variant_index);
+
+int N3D_RE_AreaIdFromWallId(
+    uint8_t raw_wall_id,
+    uint8_t* area_id);
+
 int N3D_RE_KnownWallMappedTypeForClass(
     const char* class_name,
     uint8_t* mapped_type);
