@@ -3,8 +3,9 @@ using System;
 namespace Nitemare3D
 {
     /// <summary>
-    /// Recovered 64-byte per-level wake gate used by the successful player-fire path.
-    /// It is keyed by the most recently recorded DOOR-family selector.
+    /// Recovered 64-byte per-level AREA wake gate used by the successful
+    /// player-fire/noise path. The selector is the persistent class-0x44 AREA id
+    /// stored in DAT_4C1C for the player and GUARD+0x0E for each guard.
     /// </summary>
     public sealed class OriginalGuardWakeCache
     {
@@ -25,9 +26,9 @@ namespace Nitemare3D
         }
 
         /// <summary>
-        /// Applies the confirmed one-shot wake scan.
-        /// selector 0 is an original no-op. The caller supplies the RNG sample
-        /// for each matching guard so global RNG sequencing can be integrated later.
+        /// Applies the confirmed one-shot AREA wake scan (FUN_1010_7664).
+        /// selector 0 is an original no-op. Matching strategy-0 guards in states
+        /// 7 or 8 receive RNG%8 as timer and enter state 1.
         /// </summary>
         public int Wake(
             byte selector,
