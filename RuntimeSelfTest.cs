@@ -17,6 +17,7 @@ namespace Nitemare3D
             TestObjectDefinitionCatalog();
             TestImgResourceLoader();
             TestOriginalMapTables();
+            TestOriginalWallRuntime();
             TestDamageMatrix();
             TestGuardSounds();
             TestGuardToPlayerDamage();
@@ -296,6 +297,74 @@ namespace Nitemare3D
                    nearestDoorX == 1 &&
                    nearestDoorY == 0,
                 "strategy-1 nearest reachable door selection mismatch.");
+        }
+
+        static void TestOriginalWallRuntime()
+        {
+            byte[] mapBytes = new byte[
+                OriginalMapTables.HeaderBytes +
+                OriginalMapTables.LevelBytes];
+            mapBytes[0] = 1;
+
+            // raw wall 1 -> runtime door class 0x31
+            mapBytes[0x0002 + 1] = 0x31;
+            int level = OriginalMapTables.HeaderBytes;
+            int cell = (1 + 1 * 64) * 2;
+            mapBytes[level + cell] = 1;
+
+            var map = OriginalMapTables.Parse(mapBytes, 0);
+
+            var first = new OriginalRendererCore.Vec
+            {
+                Flags = OriginalMapTables.WallDynamicDoor,
+                RenderClass = 0x31,
+                Orientation = 0,
+                X1 = 64,
+                Y1 = 64,
+                X2 = 128,
+                Y2 = 64
+            };
+            var second = new OriginalRendererCore.Vec
+            {
+                Flags = OriginalMapTables.WallDynamicDoor,
+                RenderClass = 0x31,
+                Orientation = 0,
+                X1 = 64,
+                Y1 = 64,
+                X2 = 128,
+                Y2 = 128
+            };
+
+            var vectors = new System.Collections.Generic.List<OriginalRendererCore.Vec>
+            {
+                first,
+                second
+            };
+            var walls = new OriginalWallRuntime(map, vectors);
+            var door = walls.FindPairedWall(1, 1);
+
+            Assert(door != null &&
+                   door.State == 1 &&
+                   door.Timer == 0 &&
+                   door.TargetX == second.X1 &&
+                   door.TargetY == second.Y1,
+                "FUN_14A8 paired-wall controller initialization mismatch.");
+
+            Assert(walls.TogglePairedWall(1, 1, 2, false) &&
+                   door.State == 2,
+                "FUN_188A state-1 door must enter opening state 2.");
+
+            walls.TickPairedWallMotion();
+            Assert(door.State == 2,
+                "paired-wall motion must remain opening before target is reached.");
+
+            Assert(walls.ForceState(1, 1, 0) &&
+                   door.State == 0,
+                "paired-wall state 0 force mismatch.");
+
+            Assert(walls.SetLatchedPassable(1, 1) &&
+                   door.State == 4,
+                "paired-wall state 4 latched/passable mismatch.");
         }
 
         static void TestDamageMatrix()
