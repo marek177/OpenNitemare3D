@@ -50,22 +50,22 @@ namespace Nitemare3D
                     Game.player.SetRotation(180);
                     break;
                 case ObjectType.Key1red:
-                    ent = new Pickup(PickupType.RedKey);
+                    ent = new Pickup(PickupType.RedKey, (byte)id);
                     break;
                 case ObjectType.Key2green:
-                    ent = new Pickup(PickupType.GreenKey);
+                    ent = new Pickup(PickupType.GreenKey, (byte)id);
                     break;
                 case ObjectType.Key3blue:
-                    ent = new Pickup(PickupType.BlueKey);
+                    ent = new Pickup(PickupType.BlueKey, (byte)id);
                     break;
                 case ObjectType.Key4yellow:
-                    ent = new Pickup(PickupType.YellowKey);
+                    ent = new Pickup(PickupType.YellowKey, (byte)id);
                     break;
                 case ObjectType.Idcard1red:
-                    ent = new Pickup(PickupType.RedIDCard);
+                    ent = new Pickup(PickupType.RedIDCard, (byte)id);
                     break;
                 case ObjectType.Idcard2yellow:
-                    ent = new Pickup(PickupType.YellowIDCard);
+                    ent = new Pickup(PickupType.YellowIDCard, (byte)id);
                     break;
                 case ObjectType.Officedesk:
 
@@ -86,8 +86,10 @@ namespace Nitemare3D
                     ent = new DumbObject(203);
                     break;
                 case ObjectType.Redpotionfullstrength:
+                    ent = new Pickup(PickupType.RedPotion, (byte)id);
                     break;
                 case ObjectType.Bluepotionhalfstrength:
+                    ent = new Pickup(PickupType.BluePotion, (byte)id);
                     break;
                 case ObjectType.Tombstonewithgrass:
                     break;
@@ -98,10 +100,10 @@ namespace Nitemare3D
                 case ObjectType.Tombstonepushable:
                     break;
                 case ObjectType.Magiceye:
-                    ent = new Pickup(PickupType.Eyeball);
+                    ent = new Pickup(PickupType.Eyeball, (byte)id);
                     break;
                 case ObjectType.Crystalball:
-                    ent = new Pickup(PickupType.CrystallBall);
+                    ent = new Pickup(PickupType.CrystallBall, (byte)id);
                     break;
                 case ObjectType.Couch:
                     ent = new DumbObject(227);
@@ -116,30 +118,37 @@ namespace Nitemare3D
                     ent = new DumbObject(230);
                     break;
                 case ObjectType.Pentagramred:
+                    ent = new Pickup(PickupType.PentagramRed, (byte)id);
                     break;
                 case ObjectType.Pentagramgreen:
+                    ent = new Pickup(PickupType.PentagramGreen, (byte)id);
                     break;
                 case ObjectType.Pentagramblue:
+                    ent = new Pickup(PickupType.PentagramBlue, (byte)id);
                     break;
                 case ObjectType.Pentagramyellow:
+                    ent = new Pickup(PickupType.PentagramYellow, (byte)id);
                     break;
                 case ObjectType.Singleboltplasmagun:
-                    ent = new Pickup(PickupType.PlasmaPistol);
+                    ent = new Pickup(PickupType.PlasmaPistol, (byte)id);
                     break;
                 case ObjectType.Magicwand:
-                    ent = new Pickup(PickupType.MagicWand);
+                    ent = new Pickup(PickupType.MagicWand, (byte)id);
                     break;
                 case ObjectType.Pistol:
-                    ent = new Pickup(PickupType.Pistol);
+                    ent = new Pickup(PickupType.Pistol, (byte)id);
                     break;
                 case ObjectType.Multiboltplasmagun:
-                    ent = new Pickup(PickupType.AutoPlasmaPistol);
+                    ent = new Pickup(PickupType.AutoPlasmaPistol, (byte)id);
                     break;
                 case ObjectType.Silverbullets:
+                    ent = new Pickup(PickupType.SilverBullets, (byte)id);
                     break;
                 case ObjectType.Plasmapowercell:
+                    ent = new Pickup(PickupType.PlasmaPowerCell, (byte)id);
                     break;
                 case ObjectType.Spellbookwandpower:
+                    ent = new Pickup(PickupType.SpellbookWandPower, (byte)id);
                     break;
                 case ObjectType.Scroll01532:
                     break;
