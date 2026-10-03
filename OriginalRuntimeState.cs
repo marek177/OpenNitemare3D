@@ -38,6 +38,19 @@ namespace Nitemare3D
         public static int ObjectCount { get; private set; }
         public static int GuardCount { get; private set; }
 
+        // DAT_1048_4C14. FUN_BA16 initializes this to 1 (normal); the
+        // difficulty menu writes 0/1/2. It intentionally survives level Reset().
+        public static byte Difficulty { get; private set; } =
+            OriginalRuntime.DefaultDifficulty;
+
+        public static void SetDifficulty(byte difficulty)
+        {
+            if (difficulty > OriginalRuntime.DifficultyHard)
+                throw new ArgumentOutOfRangeException(nameof(difficulty));
+
+            Difficulty = difficulty;
+        }
+
         public static bool LayoutMatchesRecoveredRuntime =>
             Marshal.SizeOf<OriginalObjectRecord>() == OriginalRuntime.ObjectRuntimeStride &&
             Marshal.SizeOf<OriginalGuardRecord>() == OriginalRuntime.GuardRuntimeStride;
@@ -347,6 +360,12 @@ namespace Nitemare3D
                 default:
                     return OriginalGuardDispatchResult.NotHandled;
             }
+        }
+
+        public static OriginalGuardDispatchResult PlanGuardMovement76FC(
+            Entity entity)
+        {
+            return PlanGuardMovement76FC(entity, Difficulty);
         }
 
         public static OriginalGuardDispatchResult PlanGuardMovement76FC(
