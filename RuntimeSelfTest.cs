@@ -45,6 +45,7 @@ namespace Nitemare3D
             TestState07Decision();
             TestState08WallTurn();
             TestStates0E0F10();
+            TestState14DanceCycle();
             TestPainReturn();
             TestDoorSelector();
             TestWakeCache();
@@ -121,6 +122,7 @@ namespace Nitemare3D
                 OriginalGuardState.RecoverMove11,
                 OriginalGuardState.WaitAnimation12,
                 OriginalGuardState.Transition13,
+                OriginalGuardState.Periodic14,
                 OriginalGuardState.Pain15
             };
 
@@ -131,17 +133,8 @@ namespace Nitemare3D
                     ((byte)state).ToString("X2"));
             }
 
-            OriginalGuardState[] fallback =
-            {
-                OriginalGuardState.Periodic14
-            };
-
-            foreach (var state in fallback)
-            {
-                Assert(!OriginalRuntimeState.IsConfirmedAutonomousState(state),
-                    "partial GUARD state must remain on legacy fallback: 0x" +
-                    ((byte)state).ToString("X2"));
-            }
+            Assert(confirmed.Length == OriginalRuntime.GuardStateCount,
+                "autonomous GUARD coverage must contain all 22 dispatcher states.");
         }
 
         static void TestObjectDefinitionCatalog()
@@ -2486,6 +2479,84 @@ namespace Nitemare3D
                    guard.State == (byte)OriginalGuardState.Conditional0E &&
                    !gatedSound,
                 "state 0x0F must return to 0x0E when 51A5 is clear.");
+        }
+
+        static void TestState14DanceCycle()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.Periodic14,
+                Timer = 0x70,
+                Strategy = 2,
+                NextState = 7
+            };
+            var obj = new OriginalObjectRecord
+            {
+                DefinitionId = 21
+            };
+
+            Assert(OriginalGuardDispatcher.TickState14Countdown(
+                       ref guard,
+                       out bool movement0,
+                       out bool release0) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   guard.Timer == 0x6F &&
+                   !movement0 &&
+                   !release0,
+                "state 14 initial 0x70 tick must wait without movement.");
+
+            guard.Timer = 0x61;
+            Assert(OriginalGuardDispatcher.TickState14Countdown(
+                       ref guard,
+                       out bool movement60,
+                       out bool release60) ==
+                   OriginalGuardDispatchResult.Waiting &&
+                   guard.Timer == 0x60 &&
+                   !movement60 &&
+                   !release60,
+                "state 14 timer 0x60 boundary must still wait.");
+
+            Assert(OriginalGuardDispatcher.TickState14Countdown(
+                       ref guard,
+                       out bool movement5F,
+                       out bool release5F) ==
+                   OriginalGuardDispatchResult.Moved &&
+                   guard.Timer == 0x5F &&
+                   movement5F &&
+                   !release5F,
+                "state 14 timer below 0x60 must run FUN_71DC movement.");
+
+            guard.Timer = 1;
+            Assert(OriginalGuardDispatcher.TickState14Countdown(
+                       ref guard,
+                       out bool movementZero,
+                       out bool releaseZero) ==
+                   OriginalGuardDispatchResult.Moved &&
+                   guard.Timer == 0 &&
+                   movementZero &&
+                   !releaseZero,
+                "state 14 1->0 tick must still perform the final movement.");
+
+            Assert(OriginalGuardDispatcher.TickState14Countdown(
+                       ref guard,
+                       out bool movementRelease,
+                       out bool releaseGroup) ==
+                   OriginalGuardDispatchResult.Transitioned &&
+                   !movementRelease &&
+                   releaseGroup,
+                "state 14 must request global AE56(1) release only on next zero tick.");
+
+            Assert(OriginalGuardDispatcher.ReleaseState14Record(
+                       ref guard,
+                       ref obj,
+                       0x0333) &&
+                   guard.Strategy == 0 &&
+                   guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.Timer == 1 &&
+                   obj.DefinitionId == 7 &&
+                   guard.NextState == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.DefinitionValue == 0x0333,
+                "AE56(1) state-14 record restoration mismatch.");
         }
 
         static void TestPainReturn()
