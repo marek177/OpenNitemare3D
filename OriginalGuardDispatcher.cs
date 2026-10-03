@@ -1495,6 +1495,19 @@ namespace Nitemare3D
             Func<short, short, bool> isBlockedAt,
             ushort randomValue)
         {
+            return TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                isBlockedAt,
+                () => randomValue);
+        }
+
+        public static OriginalGuardMovementResult TickMovementCollisionCore(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            Func<short, short, bool> isBlockedAt,
+            Func<ushort> nextRandom)
+        {
             if (isBlockedAt == null)
                 throw new ArgumentNullException(nameof(isBlockedAt));
 
@@ -1544,7 +1557,8 @@ namespace Nitemare3D
                 // The Win16 assembly negates one byte component and writes only
                 // the low byte into a zeroed 16-bit local before FUN_6E66.
                 // Preserve that compiler-visible behavior here.
-                if ((randomValue & 1) != 0)
+                ushort bounceRandom = nextRandom != null ? nextRandom() : (ushort)0;
+                if ((bounceRandom & 1) != 0)
                 {
                     guard.MoveX = unchecked((sbyte)-guard.MoveX);
                     octantX = unchecked((byte)guard.MoveX);
@@ -1584,6 +1598,27 @@ namespace Nitemare3D
             ushort randomValue,
             out OriginalGuardMovementResult movement)
         {
+            return TickState06Movement(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                isBlockedAt,
+                () => randomValue,
+                out movement);
+        }
+
+        public static OriginalGuardDispatchResult TickState06Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            Func<short, short, bool> isBlockedAt,
+            Func<ushort> nextRandom,
+            out OriginalGuardMovementResult movement)
+        {
             movement = default;
 
             if (guard.State != (byte)OriginalGuardState.MoveThen03)
@@ -1601,7 +1636,7 @@ namespace Nitemare3D
                 ref guard,
                 ref obj,
                 isBlockedAt,
-                randomValue);
+                nextRandom);
 
             guard.Timer--;
 
