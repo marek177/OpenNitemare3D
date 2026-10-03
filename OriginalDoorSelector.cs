@@ -1,9 +1,9 @@
 namespace Nitemare3D
 {
     /// <summary>
-    /// Recovered selector used by the Win16 guard wake cache.
-    /// Only WALLS class-D (DOOR-family) IDs produce a selector.
-    /// The value is wallId - 0x70 and is intentionally sparse.
+    /// Legacy raw WALLS door-family selector helper retained for door-facing
+    /// bridge code/tests. It is NOT GUARD+0x0E / DAT_4C1C; those are class-0x44
+    /// AREA ids recovered through FUN_247A.
     /// </summary>
     public static class OriginalDoorSelector
     {
