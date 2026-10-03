@@ -13,6 +13,9 @@ namespace Nitemare3D
 
         public static Tile[,] tilemap = new Tile[64, 64];
 
+        // Raw MAP ids plus original header translation/property tables.
+        public static OriginalMapTables originalMap;
+
         static void SpawnMapObject(int id, int x, int y)
         {
             if(id == 0){return;}
@@ -1075,49 +1078,36 @@ namespace Nitemare3D
         {
             OriginalRuntimeState.Reset();
 
-            var map = new BinaryReader(File.OpenRead("data/MAP." + episode));
+            // MAP.N and IMG.N are episode-coupled in the original runtime.
+            Img.LoadEpisode(episode);
 
-            map.BaseStream.Position = 514;
-            var data = map.ReadBytes((int)map.BaseStream.Length);
+            string mapPath = "data/MAP." + episode;
+            originalMap = OriginalMapTables.Load(mapPath, id);
+            levelCount = originalMap.LevelCount;
 
-            int x = 0, y = 0;
-            int j = 0;
-
-            for(int tx = 0; tx < 64; tx++)
+            for (int tx = 0; tx < OriginalRuntime.MapWidth; tx++)
             {
-                for(int ty = 0; ty < 64; ty++)
+                for (int ty = 0; ty < OriginalRuntime.MapHeight; ty++)
                 {
-                    tilemap[tx,ty] = new Tile();
+                    tilemap[tx, ty] = new Tile();
                 }
             }
 
-            for (int i = id * 8192; i < (id * 8192) + 8192; i++)
+            // Preserve raw IDs for rendering/orientation/spawn identity. The
+            // translated class/property layers remain available through originalMap.
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
             {
-
-
-                if (i % 2 == 0)
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
                 {
-                    int mx = j % 64;
-                    int my = j / 64;
-                    //tilemap[mx,my] = data[i];
-                    CreateTile(mx, my, data[i]);
-                    j++;
-                }
-                else
-                {
-                    OriginalRuntimeState.RegisterMapObjectDefinition(data[i]);
-                    SpawnMapObject(data[i], x, y);
+                    byte rawWallId = originalMap.WallId[x, y];
+                    byte rawObjectId = originalMap.ObjectId[x, y];
 
-                    x++;
-                    if (x == 64)
-                    {
-                        x = 0;
-                        y++;
-                    }
+                    CreateTile(x, y, rawWallId);
+
+                    OriginalRuntimeState.RegisterMapObjectDefinition(rawObjectId);
+                    SpawnMapObject(rawObjectId, x, y);
                 }
             }
-
-            map.BaseStream.Close();
         }
 
         public static void Update()
