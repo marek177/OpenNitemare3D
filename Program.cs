@@ -38,6 +38,12 @@ namespace Nitemare3D
 
 			Img.LoadEpisode(1);
 
+			// Enable the recovered CC7C/E5D8 sprite/projectile projection only
+			// when the exact 360-degree Q10 table extracted from NITE3W is
+			// available. Missing data deliberately keeps the renderer on the
+			// explicit fallback path instead of silently substituting Math.Sin.
+			OriginalRuntimeState.TryLoadExactTrigQ10();
+
 			Clock dt = new Clock();
 
 			SoundEffect.LoadSounds();
