@@ -1415,6 +1415,18 @@ namespace Nitemare3D
                 "data/IMG." + episode,
                 originalVectors);
 
+            // FUN_22E8(0x2D): the generic exploding-wall sequence cache is
+            // loaded explicitly even when no class-0x2D VEC is present yet.
+            byte explosionWallId =
+                originalMap.FindWallIdByClass(0x2D, 0);
+            if (!originalWallImages.EnsureWallIdCached(
+                    explosionWallId,
+                    out _))
+            {
+                throw new InvalidDataException(
+                    "IMG generic exploding-wall resource is missing.");
+            }
+
             originalWalls = new OriginalWallRuntime(
                 originalMap,
                 originalVectors);
