@@ -23,6 +23,7 @@ namespace Nitemare3D
             TestExactAnimationSchedulers();
             TestHitTransitionRouting();
             TestAttackGate();
+            TestPerceptionPrefilter();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -719,6 +720,76 @@ namespace Nitemare3D
             Assert(!OriginalGuardDispatcher.TryEvaluateAttackGate(
                        ref guard, ref obj, 100, 200, true, out _),
                 "unrecovered attack modes above 2 must stay rejected.");
+        }
+
+        static void TestPerceptionPrefilter()
+        {
+            var guard = new OriginalGuardRecord
+            {
+                Octant = 2 // east
+            };
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 64,
+                WorldY = 64
+            };
+
+            Assert(OriginalGuardDispatcher.GuardPerceptionPrefilter(
+                       ref guard, ref obj, 128, 64, false),
+                "east-facing guard must accept east target.");
+            Assert(!OriginalGuardDispatcher.GuardPerceptionPrefilter(
+                       ref guard, ref obj, 0, 64, false),
+                "east-facing guard must reject west target.");
+            Assert(OriginalGuardDispatcher.GuardPerceptionPrefilter(
+                       ref guard, ref obj, 128, 0, false),
+                "east-facing guard must accept northeast target.");
+            Assert(!OriginalGuardDispatcher.GuardPerceptionPrefilter(
+                       ref guard, ref obj, 64, -512, false),
+                "perception must reject targets beyond 8 tiles on an axis.");
+            Assert(OriginalGuardDispatcher.GuardPerceptionPrefilter(
+                       ref guard, ref obj, 0, 64, true),
+                "ignoreFacing mode must bypass the octant mask.");
+
+            bool traceCalled = false;
+            bool perceived = OriginalGuardDispatcher.EvaluateGuardPerception(
+                ref guard,
+                ref obj,
+                128,
+                64,
+                true,
+                false,
+                (startX, startY, dx, dy, maxSteps, secondary) =>
+                {
+                    traceCalled = true;
+                    Assert(startX == 1 &&
+                           startY == 1 &&
+                           dx == 1 &&
+                           dy == 0 &&
+                           maxSteps == 8 &&
+                           secondary,
+                        "perception line-trace arguments mismatch.");
+                    return true;
+                });
+
+            Assert(perceived && traceCalled,
+                "perception wrapper must return the line-trace result after prefilter.");
+
+            traceCalled = false;
+            perceived = OriginalGuardDispatcher.EvaluateGuardPerception(
+                ref guard,
+                ref obj,
+                0,
+                64,
+                false,
+                false,
+                (a, b, dx, dy, n, secondary) =>
+                {
+                    traceCalled = true;
+                    return true;
+                });
+
+            Assert(!perceived && !traceCalled,
+                "failed FOV prefilter must not call the map trace.");
         }
 
         static void TestProjectileRuntime()
