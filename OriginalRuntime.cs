@@ -169,13 +169,15 @@ namespace Nitemare3D
         public const int ImgDirectoryBytes = ImgDirectoryEntries * 4; // 0x400
         public const int ImgResourceHeadersOffset = 0x0800;
         public const int ImgResourceHeaderBanks = 2;
-        public const int ImgDefinitionTableOffset = 0x0800;
+        public const int ImgDefinitionTableOffset = ImgResourceHeadersOffset;
         public const int ImgWallDefinitionBankOffset = ImgDefinitionTableOffset;
         public const int ImgObjectDefinitionBankOffset =
-            ImgDefinitionTableOffset + ImgDirectoryEntries * ObjectDefinitionBytes; // 0x6200
-        public const int ImgFrameHeaderBytes = 10;
+            ImgDefinitionTableOffset +
+            ImgDirectoryEntries * ObjectResourceHeaderBytes; // 0x6200
+        public const int ImgFrameHeaderBytes = ObjectResourceEntryBytes;
         public const int ImgFirstFrameStreamOffset =
-            ImgDefinitionTableOffset + 2 * ImgDirectoryEntries * ObjectDefinitionBytes; // 0xBC00
+            ImgDefinitionTableOffset +
+            2 * ImgDirectoryEntries * ObjectResourceHeaderBytes; // 0xBC00
         public const byte HudImageObjectId = 0xFF;
         public const int HudImageFrameCount = 29;
         public const int UifDirectorySlots = 32;
