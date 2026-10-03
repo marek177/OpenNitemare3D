@@ -19,6 +19,7 @@ namespace Nitemare3D
             TestFrameCalibration();
             TestGuardLogicClock();
             TestWeaponRuntime();
+            TestPickupRuntime();
             TestAutonomousGuardStateCoverage();
             TestObjectDefinitionCatalog();
             TestImgResourceLoader();
@@ -241,6 +242,96 @@ namespace Nitemare3D
             Assert(!weapon.ConsumeAmmo(OriginalWeaponSelector.MagicWand) &&
                    weapon.WandAmmo == 7,
                 "weapon jam must reject shot acceptance without ammo loss.");
+        }
+
+        static void TestPickupRuntime()
+        {
+            var pickups = new OriginalPickupRuntime();
+            pickups.ResetNewGame();
+
+            var player = new Player();
+            var weapons = OriginalRuntimeState.WeaponRuntime;
+            weapons.ResetNewGame();
+
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x2F, 2, player, weapons) &&
+                   pickups.KeyMask == 0x04,
+                "CF60 key variant must set DAT_4C28 bit.");
+
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x30, 1, player, weapons) &&
+                   pickups.IdCardMask == 0x02,
+                "CF60 ID-card variant must set DAT_4C29 bit.");
+
+            player.health = 95;
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x33, 0, player, weapons) &&
+                   player.health == 100,
+                "full-strength potion must add 20 then clamp HP to 100.");
+            Assert(!pickups.TryCollectDirectMapPickup(
+                       0x33, 1, player, weapons),
+                "health pickup at 100 must be rejected and remain in world.");
+
+            player.health = 80;
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x33, 1, player, weapons) &&
+                   player.health == 90,
+                "half-strength potion must add 10 HP.");
+
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x36, 2, player, weapons) &&
+                   weapons.HasWeapon(OriginalWeaponSelector.SilverPistol) &&
+                   weapons.PistolAmmo == 50,
+                "weapon variant 2 must grant Silver Pistol with 50 ammo.");
+
+            weapons.SetAmmo(OriginalWeaponSelector.SilverPistol, 95);
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x39, 0, player, weapons) &&
+                   weapons.PistolAmmo == 100,
+                "ammo variant 0 must target pistol pool and clamp to 100.");
+            Assert(!pickups.TryCollectDirectMapPickup(
+                       0x39, 0, player, weapons),
+                "full pistol ammo pool must reject pickup.");
+
+            weapons.SetAmmo(OriginalWeaponSelector.SingleShotLaser, 10);
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x39, 1, player, weapons) &&
+                   weapons.PlasmaAmmo == 30,
+                "ammo variant 1 must target shared plasma pool.");
+
+            weapons.SetAmmo(OriginalWeaponSelector.MagicWand, 10);
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x39, 2, player, weapons) &&
+                   weapons.WandAmmo == 30,
+                "ammo variant 2 must target wand pool.");
+
+            for (int i = 0; i < 5; i++)
+                Assert(pickups.TryCollectDirectMapPickup(
+                           0x3A, 0, player, weapons),
+                    "crystal-ball energy pickup should be accepted below 100.");
+            Assert(pickups.EnemyLocatorEnergy == 100 &&
+                   !pickups.TryCollectDirectMapPickup(
+                       0x3A, 0, player, weapons),
+                "enemy-locator energy must cap/reject at 100.");
+
+            for (int i = 0; i < 5; i++)
+                pickups.TryCollectDirectMapPickup(
+                    0x3B, 0, player, weapons);
+            Assert(pickups.MapClarityEnergy == 100,
+                "map-clarity energy must cap at 100.");
+
+            Assert(pickups.TryCollectDirectMapPickup(
+                       0x3C, 3, player, weapons) &&
+                   pickups.PentagramMask == 0x08,
+                "pentagram variant must set DAT_4C45 bit.");
+
+            Assert(OriginalPickupRuntime.PickupSoundEventId(0x2F) == 0x31 &&
+                   OriginalPickupRuntime.PickupSoundEventId(0x33) == 0x2F &&
+                   OriginalPickupRuntime.PickupSoundEventId(0x36) == 0x32 &&
+                   OriginalPickupRuntime.PickupSoundEventId(0x39) == 0x34 &&
+                   OriginalPickupRuntime.PickupSoundEventId(0x3A) == 0x2E &&
+                   OriginalPickupRuntime.PickupSoundEventId(0x3B) == 0x33,
+                "B7FC direct pickup sound-event mapping mismatch.");
         }
 
         static void TestAutonomousGuardStateCoverage()
