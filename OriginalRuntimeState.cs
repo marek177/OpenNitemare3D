@@ -88,8 +88,6 @@ namespace Nitemare3D
         {
             SlowLogicTickDue = false;
             GuardLogicTickDue = false;
-            RefreshPlayerAreaSelectorFromMap();
-
             if (deltaSeconds <= 0)
                 return;
 
@@ -107,6 +105,11 @@ namespace Nitemare3D
             // D70A observes the current 125-ms bin rather than replaying every
             // skipped bin. Preserve phase but drop catch-up iterations.
             guardLogicAccumulator %= GuardLogicTickSeconds;
+        }
+
+        public static void SetPlayerAreaSelector(byte areaId)
+        {
+            PlayerAreaSelector = areaId;
         }
 
         public static void SetDifficulty(byte difficulty)
