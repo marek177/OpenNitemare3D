@@ -2,6 +2,7 @@
 #include "n3d_re_definitions.h"
 #include "n3d_re_collision.h"
 #include "n3d_re_wall_explosion.h"
+#include "n3d_re_door.h"
 
 #include <string.h>
 
@@ -211,19 +212,24 @@ N3D_RE_ClassifyProjectileCollision(int slot)
         return result;
     }
 
-    const n3d_projectile_record* projectile = &n3d_projectiles[slot];
+    const n3d_projectile_record* projectile =
+        &n3d_projectiles[slot];
     if(projectile->state != 1)
         return result;
 
     const int tile_x =
-        (int)N3D_RE_WorldToTile(projectile->object.world_x);
+        (int)N3D_RE_WorldToTile(
+            projectile->object.world_x);
     const int tile_y =
-        (int)N3D_RE_WorldToTile(projectile->object.world_y);
+        (int)N3D_RE_WorldToTile(
+            projectile->object.world_y);
 
     if(tile_x < 0 || tile_y < 0 ||
-       tile_x >= N3D_MAP_WIDTH || tile_y >= N3D_MAP_HEIGHT)
+       tile_x >= N3D_MAP_WIDTH ||
+       tile_y >= N3D_MAP_HEIGHT)
     {
-        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        result.kind =
+            N3D_PROJECTILE_COLLISION_UNRESOLVED;
         return result;
     }
 
@@ -231,10 +237,13 @@ N3D_RE_ClassifyProjectileCollision(int slot)
     result.cell_y = (uint8_t)tile_y;
 
     const n3d_map_cell* cell =
-        N3D_RE_MapCell(result.cell_x, result.cell_y);
+        N3D_RE_MapCell(
+            result.cell_x,
+            result.cell_y);
     if(!cell)
     {
-        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        result.kind =
+            N3D_PROJECTILE_COLLISION_UNRESOLVED;
         return result;
     }
 
@@ -244,7 +253,8 @@ N3D_RE_ClassifyProjectileCollision(int slot)
     if(!N3D_RE_WallPropertyKnown(cell->wall) ||
        !N3D_RE_ObjectPropertyKnown(cell->object))
     {
-        result.kind = N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        result.kind =
+            N3D_PROJECTILE_COLLISION_UNRESOLVED;
         return result;
     }
 
@@ -256,72 +266,142 @@ N3D_RE_ClassifyProjectileCollision(int slot)
             &runtime_wall_class);
 
     if(exploding)
-        result.mapped_wall_type = runtime_wall_class;
+        result.mapped_wall_type =
+            runtime_wall_class;
     else if(N3D_RE_WallMappingKnown(cell->wall))
-        result.mapped_wall_type = n3d_wall_mapped_type[cell->wall];
+        result.mapped_wall_type =
+            n3d_wall_mapped_type[cell->wall];
+
+    const uint8_t wall_flags =
+        exploding
+            ? N3D_RE_WallPropertiesForMappedType(
+                runtime_wall_class)
+            : n3d_wall_property_resolved[
+                cell->wall];
 
     /*
-     * FUN_1010_9B64 first uses the visited cell's object property/class to
-     * select the GUARD path, then applies the +/-9 world-coordinate test.
+     * FUN_1010_9B64 ordering: wall/hard-wall handling precedes actor tests.
+     * Explodable families are hard walls plus property 0x10.
      */
-    if(n3d_object_property_resolved[cell->object] &
-       N3D_OBJECT_CREATES_GUARD)
+    if(wall_flags & 0x04)
+    {
+        if(wall_flags & 0x10)
+        {
+            result.kind =
+                N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL;
+            result.event_id =
+                N3D_EXPLODABLE_WALL_EVENT;
+            result.enter_impact = 1;
+            return result;
+        }
+
+        result.kind =
+            N3D_PROJECTILE_COLLISION_HARD_WALL;
+        result.enter_impact = 1;
+        return result;
+    }
+
+    /*
+     * Dynamic doors only stop the projectile when their 22-byte runtime
+     * state is known and disallows passage. Unknown runtime state remains an
+     * explicit reconstruction boundary rather than being guessed closed/open.
+     */
+    if(wall_flags & 0x08)
+    {
+        if(!N3D_RE_DoorCellStateKnown(
+                result.cell_x,
+                result.cell_y))
+        {
+            result.kind =
+                N3D_PROJECTILE_COLLISION_UNRESOLVED;
+            return result;
+        }
+
+        if(!N3D_RE_DoorCellAllowsPassage(
+                result.cell_x,
+                result.cell_y))
+        {
+            result.kind =
+                N3D_PROJECTILE_COLLISION_CLOSED_DOOR;
+            result.enter_impact = 1;
+            return result;
+        }
+    }
+
+    const uint8_t object_flags =
+        n3d_object_property_resolved[
+            cell->object];
+
+    /*
+     * Property 0x40 reaches an additional original interaction helper.
+     * Keep traversal stopped, but do not invent the helper's final side effect.
+     */
+    if(object_flags & 0x40)
+    {
+        result.kind =
+            N3D_PROJECTILE_COLLISION_OBJECT_SPECIAL_DEFERRED;
+        return result;
+    }
+
+    /*
+     * GUARD cells are special: if the actor is present but the projectile is
+     * outside the +/-9 world-unit hit box, 9B64 returns "continue" directly.
+     * It must NOT fall through into generic object blocking.
+     */
+    if(object_flags & N3D_OBJECT_CREATES_GUARD)
     {
         const int object_slot =
-            N3D_RE_FindObjectSlotByCell(result.cell_x, result.cell_y);
+            N3D_RE_FindObjectSlotByCell(
+                result.cell_x,
+                result.cell_y);
 
         if(object_slot >= 0)
         {
             const n3d_object_record* object =
                 &n3d_objects[object_slot];
 
-            const int guard_slot = object->guard_index;
+            const int guard_slot =
+                object->guard_index;
+
             if(guard_slot >= 0 &&
                guard_slot < (int)n3d_guard_count &&
-               n3d_guards[guard_slot].strength != 0 &&
-               N3D_RE_ProjectileHitsGuard(
-                   projectile->object.world_x,
-                   projectile->object.world_y,
-                   object->world_x,
-                   object->world_y))
+               n3d_guards[guard_slot].strength != 0)
             {
-                result.object_slot = (int16_t)object_slot;
-                result.guard_slot = (int16_t)guard_slot;
-                result.kind = N3D_PROJECTILE_COLLISION_GUARD_HIT;
-                result.enter_impact = 1;
+                if(N3D_RE_ProjectileHitsGuard(
+                       projectile->object.world_x,
+                       projectile->object.world_y,
+                       object->world_x,
+                       object->world_y))
+                {
+                    result.object_slot =
+                        (int16_t)object_slot;
+                    result.guard_slot =
+                        (int16_t)guard_slot;
+                    result.kind =
+                        N3D_PROJECTILE_COLLISION_GUARD_HIT;
+                    result.enter_impact = 1;
+                }
+
                 return result;
             }
         }
-    }
 
-    const uint8_t wall_flags =
-        exploding
-            ? N3D_RE_WallPropertiesForMappedType(runtime_wall_class)
-            : n3d_wall_property_resolved[cell->wall];
-
-    if(wall_flags & 0x10)
-    {
-        /*
-         * Explodable-wall path is verified: event 0x29 and transition toward
-         * runtime wall class 0x2D. Final map/collision cleanup stays deferred.
-         */
-        result.kind = N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL;
-        result.event_id = N3D_EXPLODABLE_WALL_EVENT;
-        result.enter_impact = 1;
         return result;
     }
 
     /*
-     * Other collision-relevant wall classes are intentionally not assigned
-     * cleanup/state effects here until the remaining 9B64 branches are closed.
+     * Generic blocking object bit 0x02 terminates flight unless the original
+     * pass-through exception bit 0x20 is also set.
      */
-    if(wall_flags & (0x01 | 0x02 | 0x04 | 0x08))
+    if((object_flags & 0x02) &&
+       (object_flags & 0x20) == 0)
     {
-        result.kind = N3D_PROJECTILE_COLLISION_WALL_DEFERRED;
+        result.kind =
+            N3D_PROJECTILE_COLLISION_OBJECT_BLOCK;
+        result.enter_impact = 1;
         return result;
     }
 
-    result.kind = N3D_PROJECTILE_COLLISION_NONE;
     return result;
 }
 
@@ -478,19 +558,17 @@ N3D_RE_ResolveProjectileWallCollision(
 {
     n3d_projectile_wall_resolution result = {0};
 
-    if(!collision || slot < 0 || slot >= N3D_MAX_PROJECTILES)
+    if(!collision ||
+       slot < 0 ||
+       slot >= N3D_MAX_PROJECTILES)
         return result;
 
-    if(collision->kind == N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL)
+    if(collision->kind ==
+       N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL)
     {
-        /*
-         * Closed 9B64 evidence:
-         *   wall property 0x10 -> event 0x29 -> runtime class 0x2D.
-         * Final wall/map collision cleanup after animation is deliberately
-         * not performed here because that writer is still unresolved.
-         */
         result.resolved = 1;
-        result.event_id = N3D_EXPLODABLE_WALL_EVENT;
+        result.event_id =
+            N3D_EXPLODABLE_WALL_EVENT;
         result.requested_runtime_wall_class =
             N3D_EXPLODABLE_WALL_RUNTIME_CLASS;
 
@@ -500,7 +578,21 @@ N3D_RE_ResolveProjectileWallCollision(
         return result;
     }
 
-    if(collision->kind == N3D_PROJECTILE_COLLISION_WALL_DEFERRED)
+    if(collision->kind ==
+           N3D_PROJECTILE_COLLISION_HARD_WALL ||
+       collision->kind ==
+           N3D_PROJECTILE_COLLISION_CLOSED_DOOR ||
+       collision->kind ==
+           N3D_PROJECTILE_COLLISION_OBJECT_BLOCK)
+    {
+        result.resolved = 1;
+        if(N3D_RE_EnterProjectileImpactFromFlight(slot))
+            result.entered_impact = 1;
+        return result;
+    }
+
+    if(collision->kind ==
+       N3D_PROJECTILE_COLLISION_OBJECT_SPECIAL_DEFERRED)
     {
         result.deferred = 1;
         return result;

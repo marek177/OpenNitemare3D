@@ -2489,7 +2489,68 @@ int main(void)
 
         projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
         assert(projectile_collision.kind ==
-               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+               N3D_PROJECTILE_COLLISION_HARD_WALL);
+        assert(projectile_collision.enter_impact == 1);
+
+        /*
+         * Dynamic door: unknown runtime state stays unresolved; known state
+         * 1 blocks, while state 0 allows the projectile to continue.
+         */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0x31;
+        n3d_wall_mapping_known[0x31] = 1;
+        n3d_wall_property_known[0x31] = 1;
+        n3d_wall_mapped_type[0x31] = 0x31;
+        n3d_wall_property_resolved[0x31] =
+            N3D_RE_WallPropertiesForMappedType(0x31);
+        assert(N3D_RE_RegisterDoorCell(10, 10) >= 0);
+
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_UNRESOLVED);
+
+        assert(N3D_RE_SetDoorCellState(10, 10, 1));
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_CLOSED_DOOR);
+        assert(projectile_collision.enter_impact == 1);
+
+        assert(N3D_RE_SetDoorCellState(10, 10, 0));
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_NONE);
+
+        /*
+         * Generic object blocker 0x02 terminates flight, unless 0x20
+         * pass-through is also present.
+         */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0;
+        n3d_map[10 * N3D_MAP_WIDTH + 10].object = 0x40;
+        n3d_object_mapping_known[0x40] = 1;
+        n3d_object_property_known[0x40] = 1;
+        n3d_object_mapped_type[0x40] = 0x08;
+        n3d_object_property_resolved[0x40] = 0x02;
+
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_OBJECT_BLOCK);
+        assert(projectile_collision.enter_impact == 1);
+
+        n3d_object_property_resolved[0x40] = 0x22;
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_NONE);
+
+        /* Property 0x40 remains an explicit side-effect boundary. */
+        n3d_object_property_resolved[0x40] = 0x40;
+        projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_OBJECT_SPECIAL_DEFERRED);
         assert(projectile_collision.enter_impact == 0);
     }
 
@@ -2555,7 +2616,7 @@ int main(void)
         advance = N3D_RE_AdvanceProjectileUntilCollision(0, 8);
         assert(advance.advanced_substeps == 1);
         assert(advance.collision.kind ==
-               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+               N3D_PROJECTILE_COLLISION_HARD_WALL);
         assert(n3d_projectiles[0].object.world_x == 11 * 64);
 
         /* Unknown cell mapping also stops traversal immediately. */
@@ -2843,19 +2904,19 @@ int main(void)
         assert(N3D_RE_InitializeProjectile(
             0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
 
-        wall_hit.kind = N3D_PROJECTILE_COLLISION_WALL_DEFERRED;
+        wall_hit.kind = N3D_PROJECTILE_COLLISION_HARD_WALL;
         wall_hit.event_id = 0;
-        wall_hit.enter_impact = 0;
+        wall_hit.enter_impact = 1;
 
         wall_resolution =
             N3D_RE_ResolveProjectileWallCollision(0, &wall_hit);
 
-        assert(wall_resolution.resolved == 0);
-        assert(wall_resolution.deferred == 1);
+        assert(wall_resolution.resolved == 1);
+        assert(wall_resolution.deferred == 0);
         assert(wall_resolution.event_id == 0);
         assert(wall_resolution.requested_runtime_wall_class == 0);
-        assert(wall_resolution.entered_impact == 0);
-        assert(n3d_projectiles[0].state == 1);
+        assert(wall_resolution.entered_impact == 1);
+        assert(n3d_projectiles[0].state == 2);
     }
 
     /* Verified USER.SAV runtime blocks: exact byte transport only. */
@@ -3349,8 +3410,9 @@ int main(void)
             4 * 64 + 32, 5 * 64 + 32, 20));
         collision = N3D_RE_ClassifyProjectileCollision(1);
         assert(collision.kind ==
-               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+               N3D_PROJECTILE_COLLISION_HARD_WALL);
         assert(collision.mapped_wall_type == 0x2D);
+        assert(collision.enter_impact == 1);
 
         N3D_RE_FreeImgArchive(&n3d_img);
         N3D_RE_ResetExplodingWalls();

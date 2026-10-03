@@ -23,7 +23,14 @@ typedef enum n3d_projectile_collision_kind
     N3D_PROJECTILE_COLLISION_UNRESOLVED,
     N3D_PROJECTILE_COLLISION_GUARD_HIT,
     N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL,
-    N3D_PROJECTILE_COLLISION_WALL_DEFERRED
+    N3D_PROJECTILE_COLLISION_HARD_WALL,
+    N3D_PROJECTILE_COLLISION_CLOSED_DOOR,
+    N3D_PROJECTILE_COLLISION_OBJECT_BLOCK,
+    /*
+     * Object-property 0x40 calls an additional original helper. The exact
+     * side effect is not yet closed, so preserve it as an explicit boundary.
+     */
+    N3D_PROJECTILE_COLLISION_OBJECT_SPECIAL_DEFERRED
 } n3d_projectile_collision_kind;
 
 typedef struct n3d_projectile_collision_result
