@@ -33,6 +33,9 @@ namespace Nitemare3D
         public static readonly OriginalProjectilePool ProjectilePool =
             new OriginalProjectilePool();
 
+        public static readonly OriginalWeaponRuntime WeaponRuntime =
+            new OriginalWeaponRuntime();
+
         static readonly Dictionary<Entity, Binding> bindings =
             new Dictionary<Entity, Binding>();
 
@@ -49,6 +52,7 @@ namespace Nitemare3D
         // not replayed as catch-up ticks.
         public const float GuardLogicTickSeconds = 0.125f;
         static float guardLogicAccumulator;
+        public static bool SlowLogicTickDue { get; private set; }
         public static bool GuardLogicTickDue { get; private set; }
 
         // All recovered GUARD states 0x00..0x15 now have production routing.
@@ -82,46 +86,27 @@ namespace Nitemare3D
 
         public static void BeginFrame(float deltaSeconds)
         {
+            SlowLogicTickDue = false;
             GuardLogicTickDue = false;
             RefreshPlayerAreaSelectorFromMap();
 
-            if (!AutonomousGuardRuntimeEnabled || deltaSeconds <= 0)
+            if (deltaSeconds <= 0)
                 return;
 
             guardLogicAccumulator += deltaSeconds;
             if (guardLogicAccumulator < GuardLogicTickSeconds)
                 return;
 
-            GuardLogicTickDue = true;
+            SlowLogicTickDue = true;
+            GuardLogicTickDue = AutonomousGuardRuntimeEnabled;
+
+            // D974 increments the weapon cadence counter on the same recovered
+            // 8-Hz slow update used by GUARD state processing.
+            WeaponRuntime.AdvanceSlowTick();
 
             // D70A observes the current 125-ms bin rather than replaying every
             // skipped bin. Preserve phase but drop catch-up iterations.
             guardLogicAccumulator %= GuardLogicTickSeconds;
-        }
-
-        static void RefreshPlayerAreaSelectorFromMap()
-        {
-            if (Game.player == null || Level.originalMap == null)
-                return;
-
-            int tileX = (int)Game.player.position.X;
-            int tileY = (int)Game.player.position.Y;
-
-            if (tileX < 0 || tileY < 0 ||
-                tileX >= OriginalRuntime.MapWidth ||
-                tileY >= OriginalRuntime.MapHeight)
-            {
-                return;
-            }
-
-            byte rawWallId = Level.originalMap.WallId[tileX, tileY];
-            if (Level.originalMap.TryGetWallClassVariant(
-                    rawWallId,
-                    0x44,
-                    out byte areaId))
-            {
-                PlayerAreaSelector = areaId;
-            }
         }
 
         public static void SetDifficulty(byte difficulty)
@@ -148,6 +133,7 @@ namespace Nitemare3D
             GuardCount = 0;
             GuardAttackClass16FullDamageOverride = false;
             guardLogicAccumulator = 0;
+            SlowLogicTickDue = false;
             GuardLogicTickDue = false;
             GuardProcessingGate = false;
             CurrentRenderGeneration = 0;
