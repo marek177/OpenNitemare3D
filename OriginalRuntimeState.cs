@@ -141,18 +141,40 @@ namespace Nitemare3D
         public static bool TryLoadExactTrigQ10(
             string path = "data/N3D_TRIG_Q10.BIN")
         {
-            if (!System.IO.File.Exists(path))
+            if (System.IO.File.Exists(path))
             {
-                ExactTrigQ10 = null;
-                return false;
+                // OriginalTrigQ10.Load validates both byte length and the known
+                // cardinal/45-degree values. If a file exists but is invalid,
+                // propagate the error rather than silently using wrong projection.
+                ExactTrigQ10 =
+                    OriginalTrigQ10.Load(path);
+                return true;
             }
 
-            // OriginalTrigQ10.Load validates both byte length and the known
-            // cardinal/45-degree values. If a file exists but is invalid,
-            // propagate the error rather than silently using wrong projection.
-            ExactTrigQ10 =
-                OriginalTrigQ10.Load(path);
-            return true;
+            // Convenience path for a clean-room development checkout: when the
+            // extracted BIN is absent, read the exact tables directly from the
+            // audited Win16 1.10 executable. Hash validation is mandatory.
+            string[] exeCandidates =
+            {
+                "data/NITE3W.EXE",
+                "NITE3W.EXE",
+                "data/NITE3W-10.EXE",
+                "NITE3W-10.EXE"
+            };
+
+            foreach (string exePath in exeCandidates)
+            {
+                if (!System.IO.File.Exists(exePath))
+                    continue;
+
+                ExactTrigQ10 =
+                    OriginalTrigQ10.LoadFromNite3w110Exe(
+                        exePath);
+                return true;
+            }
+
+            ExactTrigQ10 = null;
+            return false;
         }
 
         /// <summary>
