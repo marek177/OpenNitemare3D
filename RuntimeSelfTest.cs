@@ -28,6 +28,7 @@ namespace Nitemare3D
             TestAttackGate();
             TestPerceptionPrefilter();
             TestGuardGridTrace();
+            TestGuardLosCellFlags();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -1036,6 +1037,40 @@ namespace Nitemare3D
                        5, 5, -3, -1, 8, false,
                        (x, y, secondary) => false),
                 "negative-delta Bresenham trace mismatch.");
+        }
+
+        static void TestGuardLosCellFlags()
+        {
+            Assert(!OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x00, 0x00, false, false),
+                "ordinary LOS cell must remain transparent.");
+
+            Assert(OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x02 | 0x04, 0x00, false, true),
+                "primary 0x04 must block special LOS cells.");
+
+            Assert(OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x02 | 0x08, 0x00, false, false),
+                "primary 0x08 must block when linked runtime record is not passable.");
+            Assert(!OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x02 | 0x08, 0x00, false, true),
+                "primary 0x08 must pass when linked runtime record is passable.");
+
+            Assert(OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x00, 0x02, true, true),
+                "secondary 0x02 must block when secondary checks are enabled.");
+            Assert(!OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x00, 0x02 | 0x20, true, true),
+                "secondary 0x20 must exempt secondary 0x02 from blocking.");
+            Assert(!OriginalGuardDispatcher.GuardLosCellBlocks(
+                       0x00, 0x02, false, true),
+                "secondary flags must be ignored when secondary checks are disabled.");
+
+            Assert(OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(0) &&
+                   OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(4) &&
+                   !OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(1) &&
+                   !OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(3),
+                "FUN_1476 runtime state predicate mismatch.");
         }
 
         static void TestProjectileRuntime()
