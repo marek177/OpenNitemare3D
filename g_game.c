@@ -6,6 +6,7 @@
 #include "n3d_re_player.h"
 #include "n3d_re_definitions.h"
 #include "n3d_re_img.h"
+#include "n3d_re_map_archive.h"
 
 
 bool G_GameIsDone()
@@ -33,7 +34,18 @@ void G_LoadEpisode(uint8_t episode)
     printf("loading episode %d\n", episode);
     gameinfo.episode = episode;
 
-    if(N3D_RE_LoadEpisodeDefinitions(episode))
+    const int definitions_ok =
+        N3D_RE_LoadEpisodeDefinitions(episode);
+
+    /*
+     * MAP header class tables are the executable-facing source of truth.
+     * Apply them after textual-definition recovery so every raw ID gets its
+     * exact class/property byte, including unnamed classes 0x04/0x05/0x3E.
+     */
+    const int map_header_ok =
+        N3D_RE_LoadMapEpisodeHeader(episode);
+
+    if(definitions_ok)
     {
         const n3d_mapping_coverage wall_coverage =
             N3D_RE_WallMappingCoverage();
@@ -43,7 +55,8 @@ void G_LoadEpisode(uint8_t episode)
         printf("loaded definitions: %u WALLS, %u OBJECTS\n",
                n3d_wall_definitions.count,
                n3d_object_definitions.count);
-        printf("mapped definitions: WALLS %u/%u, OBJECTS %u/%u\n",
+        printf("definition coverage after MAP class bind: "
+               "WALLS %u/%u, OBJECTS %u/%u\n",
                wall_coverage.known,
                wall_coverage.total,
                object_coverage.known,
@@ -56,6 +69,18 @@ void G_LoadEpisode(uint8_t episode)
     {
         printf("definition files WALLS.%u / OBJECTS.%u not fully available\n",
                episode, episode);
+    }
+
+    if(map_header_ok)
+    {
+        printf("loaded exact MAP.%u header: %u levels, "
+               "256 wall classes, 256 object classes\n",
+               episode,
+               n3d_map_archive.level_count);
+    }
+    else
+    {
+        printf("exact MAP.%u header unavailable\n", episode);
     }
 
     if(N3D_RE_LoadImgEpisode(episode))
@@ -146,6 +171,15 @@ void G_LoadLevel(uint8_t level)
 {
     I_ChangeSong(2);
     printf("loading level E%dL%d\n", gameinfo.episode, level + 1);
+
+    if(n3d_map_archive.loaded &&
+       level >= n3d_map_archive.level_count)
+    {
+        printf("level index %u is outside MAP header count %u\n",
+               level,
+               n3d_map_archive.level_count);
+        return;
+    }
 
     byte* data = malloc(N3D_MAP_LEVEL_BYTES);
     char filename[64];

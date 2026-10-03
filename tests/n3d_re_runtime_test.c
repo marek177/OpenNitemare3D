@@ -17,6 +17,7 @@
 #include "../n3d_re_save.h"
 #include "../n3d_re_img.h"
 #include "../n3d_re_wall_explosion.h"
+#include "../n3d_re_map_archive.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -3505,6 +3506,109 @@ int main(void)
                N3D_USE_EXEC_REMOTE_TERMINAL_PASSED);
         assert(special_use.required_inventory_bit == 1);
         assert(special_use.runtime_slot == terminal_object_slot);
+    }
+
+    /* Exact 514-byte MAP archive header class tables. */
+    {
+        uint8_t map_bytes[
+            N3D_MAP_HEADER_BYTES + 2 * N3D_MAP_LEVEL_BYTES];
+        memset(map_bytes, 0, sizeof(map_bytes));
+
+        map_bytes[0] = 2;
+        map_bytes[1] = 0;
+
+        /* Wall classes: class-44 AREA run + exploding wall families. */
+        map_bytes[0x002 + 10] = 0x44;
+        map_bytes[0x002 + 11] = 0x44;
+        map_bytes[0x002 + 15] = 0x44;
+        map_bytes[0x002 + 0x20] = 0x2D;
+        map_bytes[0x002 + 0x21] = 0x2E;
+        map_bytes[0x002 + 0x22] = 0x2F;
+        map_bytes[0x002 + 0x31] = 0x31;
+
+        /* Object classes include the unnamed projectile template class 0x05. */
+        map_bytes[0x102 + 0xFB] = 0x05;
+        map_bytes[0x102 + 0xFC] = 0x05;
+        map_bytes[0x102 + 0xFD] = 0x05;
+        map_bytes[0x102 + 0xFE] = 0x05;
+        map_bytes[0x102 + 0x80] = 0x08;
+        map_bytes[0x102 + 0x81] = 0x08;
+
+        FILE* map_file =
+            fopen("N3D_MAP_HEADER_TEST.BIN", "wb");
+        assert(map_file != NULL);
+        assert(fwrite(
+            map_bytes,
+            1,
+            sizeof(map_bytes),
+            map_file) == sizeof(map_bytes));
+        fclose(map_file);
+
+        n3d_map_archive_header header = {0};
+        assert(N3D_RE_LoadMapArchiveHeader(
+            "N3D_MAP_HEADER_TEST.BIN",
+            &header));
+        assert(header.loaded);
+        assert(header.level_count == 2);
+        assert(header.wall_class[10] == 0x44);
+        assert(header.wall_class[0x21] == 0x2E);
+        assert(header.object_class[0xFB] == 0x05);
+        assert(header.object_class[0x80] == 0x08);
+
+        uint8_t raw_id = 0;
+        assert(N3D_RE_FindFirstWallIdForClass(
+            &header, 0x44, &raw_id));
+        assert(raw_id == 10);
+        assert(N3D_RE_FindFirstWallIdForClass(
+            &header, 0x2D, &raw_id));
+        assert(raw_id == 0x20);
+
+        assert(N3D_RE_FindFirstObjectIdForClass(
+            &header, 0x05, &raw_id));
+        assert(raw_id == 0xFB);
+
+        uint8_t variant = 0xFF;
+        assert(N3D_RE_MapWallClassVariant(
+            &header, 15, 0x44, &variant));
+        assert(variant == 5);
+        assert(!N3D_RE_MapWallClassVariant(
+            &header, 15, 0x43, &variant));
+
+        uint8_t object_class = 0;
+        assert(N3D_RE_MapObjectClassVariant(
+            &header, 0xFE, &object_class, &variant));
+        assert(object_class == 0x05);
+        assert(variant == 3);
+
+        /* Exact class tables supersede text-name/bootstrap guesses. */
+        memset(n3d_wall_mapping_known, 0, sizeof(n3d_wall_mapping_known));
+        memset(n3d_object_mapping_known, 0, sizeof(n3d_object_mapping_known));
+        memset(n3d_wall_property_known, 0, sizeof(n3d_wall_property_known));
+        memset(n3d_object_property_known, 0, sizeof(n3d_object_property_known));
+
+        N3D_RE_ApplyMapArchiveClassTables(&header);
+
+        for(int id = 0; id < 256; ++id)
+        {
+            assert(n3d_wall_mapping_known[id] == 1);
+            assert(n3d_object_mapping_known[id] == 1);
+            assert(n3d_wall_property_known[id] == 1);
+            assert(n3d_object_property_known[id] == 1);
+            assert(n3d_wall_mapped_type[id] == header.wall_class[id]);
+            assert(n3d_object_mapped_type[id] == header.object_class[id]);
+            assert(n3d_wall_property_resolved[id] ==
+                   N3D_RE_WallPropertiesForMappedType(
+                       header.wall_class[id]));
+            assert(n3d_object_property_resolved[id] ==
+                   N3D_RE_ObjectPropertiesForMappedType(
+                       header.object_class[id]));
+        }
+
+        /* AREA lookup now works for anonymous class-table entries too. */
+        assert(N3D_RE_AreaIdFromWallId(15, &variant));
+        assert(variant == 5);
+
+        remove("N3D_MAP_HEADER_TEST.BIN");
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
