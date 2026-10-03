@@ -69,9 +69,9 @@ namespace Nitemare3D
 
             var parsed = OriginalObjectDefinitionCatalog.ParseHeader(header, 0);
             Assert(parsed.FrameCount == 6 &&
-                   parsed.State02Word == 0x0412 &&
-                   parsed.State03Word == 0x0320 &&
-                   parsed.State04Word == 0x0230,
+                   parsed.State02Sequence == 0x0412 &&
+                   parsed.State03Sequence == 0x0320 &&
+                   parsed.State04Sequence == 0x0230,
                 "IMG resource-header field decode mismatch.");
 
             Assert(OriginalObjectDefinitionCatalog.HeaderOffset(0, true) == 0x800 &&
