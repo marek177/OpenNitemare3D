@@ -1,18 +1,48 @@
 using System;
+using System.Runtime.InteropServices;
 
 namespace Nitemare3D
 {
     /// <summary>
-    /// Neutral model of the per-level object resource table produced by
-    /// FUN_1010_4B86. The original first reads a 0x5A-byte header, then allocates
-    /// count*10 bytes and fills 10-byte decoded entries. The returned table pointer,
-    /// not the header buffer, is stored in the per-level metadata rooted at DS:4748.
+    /// Persistent 0x5A-byte IMG resource header copied by FUN_1010_4C8A.
+    /// The per-definition metadata slot at DS:4748 points to this header.
     /// </summary>
+    [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.ObjectResourceHeaderBytes)]
+    public struct OriginalObjectResourceHeader
+    {
+        [FieldOffset(0x02)] public byte FrameCount;
+
+        [FieldOffset(OriginalRuntime.GuardState02ResourceWordOffset)]
+        public ushort State02Word;
+
+        [FieldOffset(OriginalRuntime.GuardState03ResourceWordOffset)]
+        public ushort State03Word;
+
+        [FieldOffset(OriginalRuntime.GuardState04ResourceWordOffset)]
+        public ushort State04Word;
+    }
+
+    /// <summary>
+    /// Runtime form of one 10-byte IMG frame entry produced by FUN_1010_4AB0.
+    /// Only width/height survive from the raw 10-byte disk entry. +02 is replaced
+    /// with the pixel-data file offset and +06 starts as a null cached-pixel pointer.
+    /// </summary>
+    [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.ObjectResourceEntryBytes)]
+    public struct OriginalImageFrameRuntimeRecord
+    {
+        [FieldOffset(0x00)] public byte Width;
+        [FieldOffset(0x01)] public byte Height;
+        [FieldOffset(0x02)] public uint PixelDataFileOffset;
+        [FieldOffset(0x06)] public uint CachedPixelsPointer;
+    }
+
     public sealed class OriginalObjectDefinitionCatalog
     {
         readonly uint[] sourceKeys =
             new uint[OriginalRuntime.MaxObjectDefinitions];
-        readonly byte[][] resourceTables =
+        readonly OriginalObjectResourceHeader[] headers =
+            new OriginalObjectResourceHeader[OriginalRuntime.MaxObjectDefinitions];
+        readonly byte[][] frameTables =
             new byte[OriginalRuntime.MaxObjectDefinitions][];
 
         public int Count { get; private set; }
@@ -20,7 +50,8 @@ namespace Nitemare3D
         public void Clear()
         {
             Array.Clear(sourceKeys, 0, sourceKeys.Length);
-            Array.Clear(resourceTables, 0, resourceTables.Length);
+            Array.Clear(headers, 0, headers.Length);
+            Array.Clear(frameTables, 0, frameTables.Length);
             Count = 0;
         }
 
@@ -39,11 +70,25 @@ namespace Nitemare3D
             return false;
         }
 
-        public bool TryGetTable(byte definitionId, out byte[] table)
+        public bool TryGetHeader(
+            byte definitionId,
+            out OriginalObjectResourceHeader header)
         {
-            if (definitionId < Count && resourceTables[definitionId] != null)
+            if (definitionId < Count)
             {
-                table = resourceTables[definitionId];
+                header = headers[definitionId];
+                return true;
+            }
+
+            header = default;
+            return false;
+        }
+
+        public bool TryGetFrameTable(byte definitionId, out byte[] table)
+        {
+            if (definitionId < Count && frameTables[definitionId] != null)
+            {
+                table = frameTables[definitionId];
                 return true;
             }
 
@@ -57,47 +102,50 @@ namespace Nitemare3D
             out ushort value)
         {
             value = 0;
-            if (!TryGetTable(definitionId, out var table))
+            if (!TryGetHeader(definitionId, out var header))
                 return false;
 
-            int offset;
             switch (state)
             {
                 case OriginalGuardState.Active02:
-                    offset = OriginalRuntime.GuardState02ResourceWordOffset;
-                    break;
+                    value = header.State02Word;
+                    return true;
 
                 case OriginalGuardState.Detection03:
-                    offset = OriginalRuntime.GuardState03ResourceWordOffset;
-                    break;
+                    value = header.State03Word;
+                    return true;
 
                 case OriginalGuardState.DetectionAttack04:
-                    offset = OriginalRuntime.GuardState04ResourceWordOffset;
-                    break;
+                    value = header.State04Word;
+                    return true;
 
                 default:
                     return false;
             }
-
-            if (offset < 0 || offset + 1 >= table.Length)
-                return false;
-
-            value = ReadUInt16LittleEndian(table, offset);
-            return true;
         }
 
         public bool TryGetOrAdd(
             uint sourceKey,
-            byte[] decodedResourceTable,
+            byte[] headerBytes,
+            byte[] decodedFrameTable,
             out byte definitionId)
         {
             if (TryFindBySourceKey(sourceKey, out definitionId))
                 return true;
 
-            if (decodedResourceTable == null ||
-                decodedResourceTable.Length == 0 ||
-                decodedResourceTable.Length % OriginalRuntime.ObjectResourceEntryBytes != 0 ||
+            if (headerBytes == null ||
+                headerBytes.Length < OriginalRuntime.ObjectResourceHeaderBytes ||
+                decodedFrameTable == null ||
+                decodedFrameTable.Length % OriginalRuntime.ObjectResourceEntryBytes != 0 ||
                 Count >= OriginalRuntime.MaxObjectDefinitions)
+            {
+                definitionId = 0;
+                return false;
+            }
+
+            var header = ParseHeader(headerBytes, 0);
+            if (decodedFrameTable.Length !=
+                header.FrameCount * OriginalRuntime.ObjectResourceEntryBytes)
             {
                 definitionId = 0;
                 return false;
@@ -105,23 +153,43 @@ namespace Nitemare3D
 
             definitionId = (byte)Count;
             sourceKeys[Count] = sourceKey;
-            resourceTables[Count] = (byte[])decodedResourceTable.Clone();
+            headers[Count] = header;
+            frameTables[Count] = (byte[])decodedFrameTable.Clone();
             Count++;
             return true;
         }
 
-        public static int DecodeEntryCountFromHeader(byte[] header, int offset)
+        public static OriginalObjectResourceHeader ParseHeader(
+            byte[] headerBytes,
+            int offset)
         {
-            if (header == null)
-                throw new ArgumentNullException(nameof(header));
+            if (headerBytes == null)
+                throw new ArgumentNullException(nameof(headerBytes));
             if (offset < 0 ||
-                offset > header.Length - OriginalRuntime.ObjectResourceHeaderBytes)
+                offset > headerBytes.Length - OriginalRuntime.ObjectResourceHeaderBytes)
             {
                 throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            // FUN_1010_4B86 reads the count from header +2 and allocates count*10.
-            return header[offset + 2];
+            return new OriginalObjectResourceHeader
+            {
+                FrameCount = headerBytes[offset + 0x02],
+                State02Word = ReadUInt16LittleEndian(
+                    headerBytes,
+                    offset + OriginalRuntime.GuardState02ResourceWordOffset),
+                State03Word = ReadUInt16LittleEndian(
+                    headerBytes,
+                    offset + OriginalRuntime.GuardState03ResourceWordOffset),
+                State04Word = ReadUInt16LittleEndian(
+                    headerBytes,
+                    offset + OriginalRuntime.GuardState04ResourceWordOffset)
+            };
+        }
+
+        public static int HeaderOffset(byte imageId, bool tileBank)
+        {
+            int bankedId = tileBank ? imageId : 0x100 + imageId;
+            return 0x800 + bankedId * OriginalRuntime.ObjectResourceHeaderBytes;
         }
 
         static ushort ReadUInt16LittleEndian(byte[] data, int offset)
