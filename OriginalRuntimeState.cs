@@ -110,6 +110,41 @@ namespace Nitemare3D
             set => PlayerInvisible = value;
         }
 
+        // DAT_1048_51A4. FUN_0EF6 initializes it to zero. Win16 menu
+        // items 0x1E/0x1F are literally "Open remote doors" / "Close remote doors".
+        // Each bit records the open/closed selection for one area/group selector.
+        // Like 51A5, this is session/script state rather than a per-level pool field.
+        public static byte RemoteDoorsOpenMask { get; private set; }
+
+        public static bool RemoteDoorsOpenForArea(byte areaSelector)
+        {
+            if (areaSelector >= 8)
+                return false;
+
+            return (RemoteDoorsOpenMask & (1 << areaSelector)) != 0;
+        }
+
+        public static int ApplyRemoteDoorCommand(
+            byte areaSelector,
+            bool open)
+        {
+            int changed = Level.originalWalls != null
+                ? Level.originalWalls.ApplyRemoteDoorCommand(
+                    areaSelector,
+                    open)
+                : 0;
+
+            if (areaSelector < 8)
+            {
+                byte bit = (byte)(1 << areaSelector);
+                RemoteDoorsOpenMask = open
+                    ? (byte)(RemoteDoorsOpenMask | bit)
+                    : (byte)(RemoteDoorsOpenMask & ~bit);
+            }
+
+            return changed;
+        }
+
         // DAT_1048_51A5. FUN_0EF6 initializes it to 1. Win16 menu commands
         // 0x20/0x21 are literally "Enable remote cannons" / "Disable remote cannons"
         // and toggle this byte. Cannon class 0x19 states 0E/0F/10 consume it.
