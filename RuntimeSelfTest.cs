@@ -18,6 +18,7 @@ namespace Nitemare3D
             TestRecordSizes();
             TestFrameCalibration();
             TestExactSpriteProjection();
+            TestProjectedSpriteQueue();
             TestGuardLogicClock();
             TestWeaponRuntime();
             TestPickupRuntime();
@@ -229,6 +230,80 @@ namespace Nitemare3D
             {
                 File.Delete(path);
             }
+        }
+
+        static void TestProjectedSpriteQueue()
+        {
+            Assert(
+                OriginalProjectedSpriteQueue
+                    .WallVisibilityQ4FromPerpendicularDistance(1.0) ==
+                2526,
+                "one-tile wall visibility Q4 mismatch.");
+
+            Assert(
+                OriginalProjectedSpriteQueue
+                    .WallVisibilityQ4FromPerpendicularDistance(2.0) ==
+                1903,
+                "two-tile wall visibility Q4 mismatch.");
+
+            ushort[] visibility =
+                new ushort[OriginalRendererCore.ScreenWidth];
+
+            visibility[120] = 2600;
+            visibility[160] = 2500;
+            visibility[200] = 2700;
+
+            Assert(OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
+                       visibility,
+                       120,
+                       160,
+                       200,
+                       2526),
+                "CC7C three-column gate must pass when any probe wall is behind the sprite.");
+
+            Assert(!OriginalProjectedSpriteQueue.PassesThreeColumnWallGate(
+                       visibility,
+                       120,
+                       160,
+                       200,
+                       2400),
+                "CC7C three-column gate must reject when all probe walls are in front.");
+
+            Assert(OriginalProjectedSpriteQueue.ColumnPassesWall(
+                       visibility,
+                       120,
+                       2400,
+                       true),
+                "OBJECT flag 0x10 wall-bypass path must ignore per-column wall depth.");
+
+            bool[] occupied =
+                new bool[OriginalProjectedSpriteQueue.SlotCount];
+
+            Assert(OriginalProjectedSpriteQueue.FindFreeSlot(
+                       occupied,
+                       100) == 20,
+                "sprite queue must prefer baseline-center slot.");
+
+            occupied[20] = true;
+            occupied[19] = true;
+            Assert(OriginalProjectedSpriteQueue.FindFreeSlot(
+                       occupied,
+                       100) == 18,
+                "sprite queue first pass must walk toward the horizon.");
+
+            for (int i = 0; i <= 74; i++)
+                occupied[i] = true;
+
+            Assert(OriginalProjectedSpriteQueue.FindFreeSlot(
+                       occupied,
+                       155) == 75,
+                "sprite queue second pass must reach the viewport-bottom slot.");
+
+            occupied[75] = true;
+            Assert(OriginalProjectedSpriteQueue.FindFreeSlot(
+                       occupied,
+                       155) == -1,
+                "normal viewport queue must not spill into physical slots 76..99.");
         }
 
         static void TestGuardLogicClock()
