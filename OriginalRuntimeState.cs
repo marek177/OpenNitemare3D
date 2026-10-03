@@ -43,6 +43,11 @@ namespace Nitemare3D
         public static byte Difficulty { get; private set; } =
             OriginalRuntime.DefaultDifficulty;
 
+        // Mirrors the second half of the class-0x16 damage gate:
+        // (episode == 3 || DAT_1048_51A6 != 0). The exact producer of 51A6 is
+        // still separate, so production defaults this override to false.
+        public static bool GuardAttackClass16FullDamageOverride { get; set; }
+
         public static void SetDifficulty(byte difficulty)
         {
             if (difficulty > OriginalRuntime.DifficultyHard)
@@ -65,6 +70,7 @@ namespace Nitemare3D
             bindings.Clear();
             ObjectCount = 0;
             GuardCount = 0;
+            GuardAttackClass16FullDamageOverride = false;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -328,6 +334,189 @@ namespace Nitemare3D
                 out packedSequence);
         }
 
+        static void ConsumeOriginalAlertSoundSelection(byte objectClass)
+        {
+            ushort randomValue = OriginalGuardSounds.AlertUsesRandom(objectClass)
+                ? OriginalRandom.Next()
+                : (ushort)0;
+
+            // Keep RNG parity now; route the selected original SND index through
+            // the corrected audio bridge once the legacy soundOffset path is fixed.
+            OriginalGuardSounds.AlertSoundId(objectClass, randomValue);
+        }
+
+        static void ConsumeOriginalAttackSoundSelection(byte objectClass)
+        {
+            ushort randomValue = OriginalGuardSounds.AttackUsesRandom(objectClass)
+                ? OriginalRandom.Next()
+                : (ushort)0;
+
+            OriginalGuardSounds.AttackSoundId(objectClass, randomValue);
+        }
+
+        static bool TryEvaluateAttackEligibility(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            out bool attackEligible)
+        {
+            attackEligible = false;
+            if (Game.player == null)
+                return false;
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+
+            // FUN_7594 invokes FUN_7494 with both control arguments set to 1:
+            // secondary object-cell checks enabled and facing/FOV bypassed.
+            bool perceptionSucceeded =
+                OriginalGuardDispatcher.EvaluateGuardPerception(
+                    ref guard,
+                    ref obj,
+                    playerWorldX,
+                    playerWorldY,
+                    true,
+                    true,
+                    Level.OriginalPerceptionLineTrace);
+
+            return OriginalGuardDispatcher.TryEvaluateAttackGate(
+                ref guard,
+                ref obj,
+                playerWorldX,
+                playerWorldY,
+                perceptionSucceeded,
+                out attackEligible);
+        }
+
+        static bool ApplyGuardAttackDamageToPlayer(
+            ref OriginalObjectRecord obj)
+        {
+            if (Game.player == null)
+                return false;
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+
+            ushort randomValue =
+                OriginalDamage.GuardAttackUsesRandom(obj.ObjectClass)
+                    ? OriginalRandom.Next()
+                    : (ushort)0;
+
+            bool class16FullDamageGate =
+                Game.episode == 3 ||
+                GuardAttackClass16FullDamageOverride;
+
+            var damage = OriginalDamage.ComputeGuardToPlayerFromWorld(
+                obj.WorldX,
+                obj.WorldY,
+                playerWorldX,
+                playerWorldY,
+                obj.ObjectClass,
+                Difficulty,
+                class16FullDamageGate,
+                randomValue);
+
+            int hp = Game.player.health;
+            int amount = damage.DifficultyTransformed;
+            Game.player.health = amount >= hp ? 0 : hp - amount;
+            return Game.player.health <= 0;
+        }
+
+        static bool EvaluateGuardMovementBlocked(
+            int guardSlot,
+            int objectSlot,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            short candidateWorldX,
+            short candidateWorldY)
+        {
+            int tileX = candidateWorldX >> 6;
+            int tileY = candidateWorldY >> 6;
+
+            if (!Level.TryResolveOriginalMovementCell(
+                    tileX,
+                    tileY,
+                    out byte wallFlags,
+                    out byte objectFlags,
+                    out OriginalDoorCollisionInfo door))
+            {
+                return true;
+            }
+
+            ref var guard = ref Guards[guardSlot];
+            ref var obj = ref Objects[objectSlot];
+
+            var collision =
+                OriginalGuardDispatcher.EvaluateMovementCell700A(
+                    ref guard,
+                    ref obj,
+                    candidateWorldX,
+                    candidateWorldY,
+                    playerWorldX,
+                    playerWorldY,
+                    wallFlags,
+                    objectFlags,
+                    door,
+                    definition);
+
+            if (collision.DoorToggleRequested)
+            {
+                Level.ApplyOriginalGuardDoorInteraction(
+                    tileX,
+                    tileY,
+                    collision.DoorLatchRequested,
+                    guard.Octant);
+            }
+
+            return collision.Blocked;
+        }
+
+        static OriginalGuardDispatchResult TickState06Bridge(
+            Entity entity,
+            Binding binding,
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (Game.player == null ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition))
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+            int guardSlot = binding.GuardSlot;
+            int objectSlot = binding.ObjectSlot;
+
+            var result = OriginalGuardDispatcher.TickState06Movement(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                (candidateX, candidateY) =>
+                    EvaluateGuardMovementBlocked(
+                        guardSlot,
+                        objectSlot,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        candidateX,
+                        candidateY),
+                OriginalRandom.Next,
+                out _);
+
+            entity.position.X =
+                (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
+            entity.position.Y =
+                (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+            SyncGuardPosition(entity);
+
+            return result;
+        }
+
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
@@ -348,6 +537,97 @@ namespace Nitemare3D
 
                 case OriginalGuardState.Delay:
                     return OriginalGuardDispatcher.TickDelay(ref guard);
+
+                case OriginalGuardState.Active02:
+                {
+                    if (!ObjectDefinitions.TryGetGuardStateWord(
+                            obj.DefinitionId,
+                            OriginalGuardState.Active02,
+                            out ushort alertSequence))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    ConsumeOriginalAlertSoundSelection(obj.ObjectClass);
+                    return OriginalGuardDispatcher.BeginState02AlertSequence(
+                        ref guard,
+                        ref obj,
+                        alertSequence);
+                }
+
+                case OriginalGuardState.Detection03:
+                {
+                    if (!TryEvaluateAttackEligibility(
+                            ref guard,
+                            ref obj,
+                            out bool attackEligible))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    if (!attackEligible)
+                        return PlanGuardMovement76FC(entity);
+
+                    if (!ObjectDefinitions.TryGetGuardStateWord(
+                            obj.DefinitionId,
+                            OriginalGuardState.Detection03,
+                            out ushort attackSequence))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    return OriginalGuardDispatcher.BeginState03AttackSequence(
+                        ref guard,
+                        ref obj,
+                        attackSequence);
+                }
+
+                case OriginalGuardState.DetectionAttack04:
+                {
+                    // Once the player death gate is active the original leaves
+                    // state 04 without scheduling the +0x38 recovery sequence.
+                    if (Game.player == null || Game.player.health <= 0)
+                        return OriginalGuardDispatchResult.Waiting;
+
+                    if (!TryEvaluateAttackEligibility(
+                            ref guard,
+                            ref obj,
+                            out bool attackEligible))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    if (attackEligible)
+                    {
+                        ConsumeOriginalAttackSoundSelection(obj.ObjectClass);
+
+                        if (ApplyGuardAttackDamageToPlayer(ref obj))
+                            return OriginalGuardDispatchResult.Waiting;
+                    }
+
+                    if (!ObjectDefinitions.TryGetGuardStateWord(
+                            obj.DefinitionId,
+                            OriginalGuardState.DetectionAttack04,
+                            out ushort recoverySequence))
+                    {
+                        return OriginalGuardDispatchResult.NotHandled;
+                    }
+
+                    return OriginalGuardDispatcher.BeginState04RecoverySequence(
+                        ref guard,
+                        ref obj,
+                        recoverySequence);
+                }
+
+                case OriginalGuardState.Transition05:
+                    return PlanGuardMovement76FC(entity);
+
+                case OriginalGuardState.MoveThen03:
+                    return TickState06Bridge(
+                        entity,
+                        binding,
+                        ref guard,
+                        ref obj);
 
                 case OriginalGuardState.WaitAnimation12:
                     return OriginalGuardDispatcher.TickWaitAnimation12(
