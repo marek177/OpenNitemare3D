@@ -6,7 +6,7 @@ namespace Nitemare3D
         Plasma,
         Magic
     }
-    public class Projectile : Entity, ISprite, IOriginalSpriteFrameSource
+    public class Projectile : Entity, ISprite, IOriginalSpriteProjectionSource
     {
 
 
@@ -243,6 +243,46 @@ namespace Nitemare3D
                 frameIndex,
                 Img.current.rawData,
                 out frame);
+        }
+
+        public bool TryGetOriginalProjectionObject(
+            out OriginalObjectRecord runtimeObject)
+        {
+            runtimeObject = default;
+
+            if (runtimeSlotIndex < 0 ||
+                runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length)
+            {
+                return false;
+            }
+
+            ref var runtime =
+                ref OriginalRuntimeState.ProjectilePool.Slots[runtimeSlotIndex];
+
+            if (runtime.State == (byte)OriginalProjectileState.Free)
+                return false;
+
+            runtimeObject = runtime.RenderObject;
+            return true;
+        }
+
+        public void RecordOriginalProjectedBaseRow(
+            short projectedBaseRow)
+        {
+            if (runtimeSlotIndex < 0 ||
+                runtimeSlotIndex >= OriginalRuntimeState.ProjectilePool.Slots.Length)
+            {
+                return;
+            }
+
+            ref var runtime =
+                ref OriginalRuntimeState.ProjectilePool.Slots[runtimeSlotIndex];
+
+            if (runtime.State != (byte)OriginalProjectileState.Free)
+            {
+                runtime.RenderObject.ProjectedBaseRow =
+                    projectedBaseRow;
+            }
         }
 
         public override void Update()
