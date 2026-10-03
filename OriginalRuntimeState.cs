@@ -420,9 +420,9 @@ namespace Nitemare3D
                 ? OriginalRandom.Next()
                 : (ushort)0;
 
-            // Keep RNG parity now; route the selected original SND index through
-            // the corrected audio bridge once the legacy soundOffset path is fixed.
-            OriginalGuardSounds.AlertSoundId(objectClass, randomValue);
+            int eventId =
+                OriginalGuardSounds.AlertSoundId(objectClass, randomValue);
+            SoundEffect.PlayOriginalEvent(eventId);
         }
 
         static void ConsumeOriginalAttackSoundSelection(byte objectClass)
@@ -431,7 +431,20 @@ namespace Nitemare3D
                 ? OriginalRandom.Next()
                 : (ushort)0;
 
-            OriginalGuardSounds.AttackSoundId(objectClass, randomValue);
+            int eventId =
+                OriginalGuardSounds.AttackSoundId(objectClass, randomValue);
+            SoundEffect.PlayOriginalEvent(eventId);
+        }
+
+        static void PlayOriginalDeathSound(byte objectClass)
+        {
+            ushort randomValue = OriginalGuardSounds.DeathUsesRandom(objectClass)
+                ? OriginalRandom.Next()
+                : (ushort)0;
+
+            int eventId =
+                OriginalGuardSounds.DeathSoundId(objectClass, randomValue);
+            SoundEffect.PlayOriginalEvent(eventId);
         }
 
         static bool TryEvaluateAttackEligibility(
@@ -1062,6 +1075,7 @@ namespace Nitemare3D
 
                 case OriginalGuardState.DeathFinalize09:
                 {
+                    PlayOriginalDeathSound(obj.ObjectClass);
                     var finalized = FinalizeDeath09(entity);
 
                     if (finalized == GuardHitResult.DraculaTransformed)
