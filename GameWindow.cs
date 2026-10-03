@@ -27,6 +27,9 @@ namespace Nitemare3D
             width = uint.Parse(config[0]);
             uint fps = uint.Parse(config[1]);
 
+            if (OriginalRendererStage4.ForceNativeResolution)
+                width = 320;
+
             height = (uint)(width / 1.6f);
 
             //to simulate tall pixels
