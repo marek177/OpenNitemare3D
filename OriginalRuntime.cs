@@ -161,8 +161,14 @@ namespace Nitemare3D
 
         // IMG/UIF reference facts.
         public const int ImgWallDirectoryOffset = 0x0000;
-        public const int ImgObjectDirectoryOffset = 0x0400;
+        // Direct Win16 1.10 evidence: both VEC/tile and OBJECT resource loaders
+        // use the same 256*dword directory at file offset 0. The old 0x0400
+        // "object directory" interpretation was incorrect.
+        public const int ImgObjectDirectoryOffset = 0x0000;
         public const int ImgDirectoryEntries = 256;
+        public const int ImgDirectoryBytes = ImgDirectoryEntries * 4; // 0x400
+        public const int ImgResourceHeadersOffset = 0x0800;
+        public const int ImgResourceHeaderBanks = 2;
         public const int ImgDefinitionTableOffset = 0x0800;
         public const int ImgWallDefinitionBankOffset = ImgDefinitionTableOffset;
         public const int ImgObjectDefinitionBankOffset =
