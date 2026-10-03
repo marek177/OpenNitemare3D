@@ -69,12 +69,18 @@ namespace Nitemare3D
             // Reserve the original eight-slot pool before creating the legacy
             // render/movement shell. Sequence base 0 is temporary until the
             // projectile IMG resource bridge owns presentation as well.
+            int angleDegrees =
+                OriginalProjectileRuntime.AngleFromDirection(
+                    direction.X,
+                    direction.Y);
+
             if (!OriginalProjectileRuntime.TryAllocateAndInitialize(
                     OriginalRuntimeState.ProjectilePool.Slots,
                     (byte)weaponSelector,
                     worldX,
                     worldY,
                     0,
+                    angleDegrees,
                     out int slotIndex))
             {
                 return false;
