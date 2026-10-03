@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace Nitemare3D
@@ -22,6 +24,7 @@ namespace Nitemare3D
             TestImgResourceLoader();
             TestOriginalMapTables();
             TestOriginalWallRuntime();
+            TestExplodingWallRuntime();
             TestOriginalRandom();
             TestDamageMatrix();
             TestScriptProgress51A6();
@@ -625,6 +628,151 @@ namespace Nitemare3D
                    doorRecord.TargetX == door.TargetX &&
                    doorRecord.TargetY == door.TargetY,
                 "door runtime record export mismatch.");
+        }
+
+        static void TestExplodingWallRuntime()
+        {
+            string path = Path.GetTempFileName();
+
+            try
+            {
+                byte[] img = new byte[0xBD00];
+
+                void WriteUInt16(int offset, ushort value)
+                {
+                    img[offset + 0] = (byte)value;
+                    img[offset + 1] = (byte)(value >> 8);
+                }
+
+                void WriteUInt32(int offset, uint value)
+                {
+                    img[offset + 0] = (byte)value;
+                    img[offset + 1] = (byte)(value >> 8);
+                    img[offset + 2] = (byte)(value >> 16);
+                    img[offset + 3] = (byte)(value >> 24);
+                }
+
+                void DefineWall(
+                    byte wallId,
+                    uint stream,
+                    ushort interval,
+                    byte frameCount)
+                {
+                    WriteUInt32(wallId * 4, stream);
+
+                    int seq = 0x0800 + wallId * 0x5A;
+                    WriteUInt16(seq + 0, interval);
+                    img[seq + 2] = frameCount;
+                    img[seq + 3] = 0;
+
+                    int p = checked((int)stream);
+                    for (int i = 0; i < frameCount; i++)
+                    {
+                        img[p + 0] = 1;
+                        img[p + 1] = 1;
+                        img[p + 10] = (byte)(0x20 + i);
+                        p += 11;
+                    }
+                }
+
+                DefineWall(1, 0xBC00, 10, 1); // class 0x2E source
+                DefineWall(2, 0xBC20, 10, 2); // class 0x2D explosion
+                DefineWall(3, 0xBC50, 15, 2); // class 0x2F source
+
+                File.WriteAllBytes(path, img);
+
+                var ex1 = new OriginalRendererCore.Vec
+                {
+                    WallId = 1,
+                    RenderClass = 0x2E
+                };
+                var ex2 = new OriginalRendererCore.Vec
+                {
+                    WallId = 3,
+                    RenderClass = 0x2F
+                };
+
+                var vectors =
+                    new List<OriginalRendererCore.Vec>
+                    {
+                        ex1,
+                        ex2
+                    };
+
+                var runtime =
+                    new OriginalImgWallRuntime(
+                        path,
+                        vectors);
+
+                Assert(runtime.EnsureWallIdCached(
+                           2,
+                           out byte explosionCache),
+                    "class-0x2D wall cache must support explicit preload.");
+
+                byte ex2OriginalCache = ex2.TextureSet;
+
+                runtime.BeginExplodingWall(
+                    ex1,
+                    0x2E,
+                    explosionCache,
+                    100);
+
+                Assert(ex1.RenderClass == 0x2D &&
+                       ex1.AnimationFrame == 0 &&
+                       ex1.TextureSet == explosionCache &&
+                       ex1.RuntimeTimer == 110,
+                    "WALL_EX1 must enter class 0x2D at frame 0 with generic explosion cache.");
+
+                runtime.BeginExplodingWall(
+                    ex2,
+                    0x2F,
+                    explosionCache,
+                    100);
+
+                Assert(ex2.RenderClass == 0x2D &&
+                       ex2.AnimationFrame == 1 &&
+                       ex2.TextureSet == ex2OriginalCache &&
+                       ex2.RuntimeTimer == 115,
+                    "WALL_EX2 must enter class 0x2D at frame 1 and retain its sequence cache.");
+
+                bool completed = false;
+
+                runtime.UpdateAfterVisibleSpan(
+                    ex1,
+                    109,
+                    null,
+                    _ => completed = true);
+
+                Assert(!completed &&
+                       ex1.AnimationFrame == 0,
+                    "exploding wall must not advance before deadline.");
+
+                runtime.UpdateAfterVisibleSpan(
+                    ex1,
+                    110,
+                    null,
+                    _ => completed = true);
+
+                Assert(!completed &&
+                       ex1.AnimationFrame == 1 &&
+                       ex1.RuntimeTimer == 120,
+                    "exploding wall first due frame/deadline mismatch.");
+
+                runtime.UpdateAfterVisibleSpan(
+                    ex1,
+                    120,
+                    null,
+                    _ => completed = true);
+
+                Assert(completed &&
+                       ex1.AnimationFrame == 1 &&
+                       ex1.RuntimeTimer == 130,
+                    "class-0x2D completion must clamp to final frame and reschedule.");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
         }
 
         static void TestOriginalRandom()
