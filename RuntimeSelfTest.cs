@@ -288,6 +288,13 @@ namespace Nitemare3D
             Assert(!tables.IsPerceptionIntermediateBlocked(
                        2, 0, false, (x, y) => true),
                 "secondary-cell disabled mode must ignore object blocker.");
+
+            Assert(tables.TryFindNearestReachableDoor(
+                       3, 0, (x, y) => false,
+                       out int nearestDoorX, out int nearestDoorY) &&
+                   nearestDoorX == 1 &&
+                   nearestDoorY == 0,
+                "strategy-1 nearest reachable door selection mismatch.");
         }
 
         static void TestDamageMatrix()
@@ -1293,6 +1300,117 @@ namespace Nitemare3D
                    guard.State == (byte)OriginalGuardState.MoveThen03 &&
                    guard.Octant == 6,
                 "strategy-2 movement plan mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 1,
+                Strength = 126,
+                MoveX = 0,
+                MoveY = -8,
+                Octant = 0
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 96,
+                WorldY = 96
+            };
+
+            Assert(OriginalGuardDispatcher.PlanStrategy1Movement(
+                       ref guard,
+                       ref obj,
+                       0,
+                       0,
+                       1,
+                       null,
+                       true,
+                       192,
+                       64) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == 0 &&
+                   guard.Timer == 0x10 &&
+                   guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.Octant == 2,
+                "strategy-1 low-HP retreat-door movement mismatch.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 1,
+                Strength = 126,
+                MoveX = -8,
+                MoveY = 8,
+                Octant = 5
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 96,
+                WorldY = 96
+            };
+
+            OriginalGuardDispatcher.PlanStrategy1Movement(
+                ref guard,
+                ref obj,
+                0,
+                0,
+                1,
+                null,
+                false,
+                0,
+                0);
+
+            Assert(guard.MoveX == -8 &&
+                   guard.MoveY == 8 &&
+                   guard.Timer == 0x10 &&
+                   guard.Octant == 5,
+                "strategy-1 with no reachable door must keep prior vector.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 1,
+                Strength = 127,
+                Unknown17 = 1,
+                Unknown18 = 1
+            };
+            obj = new OriginalObjectRecord
+            {
+                WorldX = 128,
+                WorldY = 128
+            };
+            rngIndex = 0;
+            rngValues = new ushort[] { 2 };
+
+            Assert(OriginalGuardDispatcher.PlanStrategy1Movement(
+                       ref guard,
+                       ref obj,
+                       64,
+                       64,
+                       1,
+                       rng,
+                       false,
+                       0,
+                       0) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.MoveX == -8 &&
+                   guard.MoveY == -8 &&
+                   guard.Timer == 8 &&
+                   rngIndex == 1,
+                "strategy-1 strength 127 must use player-pursuit branch.");
+
+            guard = new OriginalGuardRecord
+            {
+                Strategy = 3,
+                State = (byte)OriginalGuardState.Transition05,
+                Timer = 23,
+                MoveX = 8,
+                MoveY = -8
+            };
+
+            Assert(OriginalGuardDispatcher.PlanStrategyCurrentVectorMovement(
+                       ref guard) == OriginalGuardDispatchResult.Transitioned &&
+                   guard.State == (byte)OriginalGuardState.MoveThen03 &&
+                   guard.Timer == 23 &&
+                   guard.MoveX == 8 &&
+                   guard.MoveY == -8 &&
+                   guard.Octant == 1,
+                "strategy 3+ must retain timer/vector through FUN_76FC common tail.");
         }
 
         static void TestMovementCollisionCore()
