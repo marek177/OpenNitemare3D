@@ -173,6 +173,49 @@ namespace Nitemare3D
             return true;
         }
 
+        /// <summary>
+        /// Recovered FUN_1010_9D30-style trajectory loop. A projectile update
+        /// performs a fixed number of one-world-unit DDA substeps and tests
+        /// collision after every visited coordinate. The caller owns the map /
+        /// actor side effects and returns true when the current coordinate hits.
+        ///
+        /// OBJECT+0x1A is the recovered vertical/elevation render anchor: flying
+        /// updates increment it once and clamp at 20. It is not projectile age.
+        /// </summary>
+        public static bool AdvanceTrajectoryAndCollide(
+            ref OriginalProjectileRecord projectile,
+            int substeps,
+            Func<int, int, bool> collidesAt)
+        {
+            if (projectile.State != (byte)OriginalProjectileState.Flying ||
+                substeps <= 0)
+            {
+                return false;
+            }
+
+            bool collided = false;
+
+            for (int i = 0; i < substeps; i++)
+            {
+                if (!AdvanceDdaSubstep(ref projectile))
+                    break;
+
+                if (collidesAt != null &&
+                    collidesAt(
+                        projectile.RenderObject.WorldX,
+                        projectile.RenderObject.WorldY))
+                {
+                    collided = true;
+                    break;
+                }
+            }
+
+            if (projectile.RenderObject.Runtime1A < 20)
+                projectile.RenderObject.Runtime1A++;
+
+            return collided;
+        }
+
         public static int FirstFreeSlot(OriginalProjectileRecord[] pool)
         {
             if (pool == null)
