@@ -22,6 +22,167 @@ int N3D_RE_ScaleEnemyDamageByDifficulty(int damage, uint8_t difficulty)
     }
 }
 
+int N3D_RE_GuardAttackUsesRandom(uint8_t object_class)
+{
+    switch(object_class)
+    {
+        case 0x08:
+        case 0x09:
+        case 0x0A:
+        case 0x11:
+        case 0x12:
+        case 0x13:
+        case 0x14:
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+int N3D_RE_OriginalRoundedSqrt(int squared_distance)
+{
+    if(squared_distance <= 1)
+        return squared_distance < 0 ? 0 : squared_distance;
+
+    /*
+     * Exact semantic port of FUN_1018_324A without depending on libm:
+     * floor(sqrt(n)), then round up when remainder >= root-1.
+     */
+    int root = 0;
+    while((root + 1) <= 46340 &&
+          (root + 1) * (root + 1) <= squared_distance)
+    {
+        ++root;
+    }
+
+    const int remainder =
+        squared_distance - root * root;
+
+    if(remainder >= root - 1)
+        ++root;
+
+    return root;
+}
+
+int N3D_RE_ComputeGuardAttackDistanceMetric(
+    int16_t guard_world_x,
+    int16_t guard_world_y,
+    int16_t player_world_x,
+    int16_t player_world_y)
+{
+    const int guard_tile_x =
+        guard_world_x >> 6;
+    const int guard_tile_y =
+        guard_world_y >> 6;
+    const int player_tile_x =
+        player_world_x >> 6;
+    const int player_tile_y =
+        player_world_y >> 6;
+
+    const int dx =
+        guard_tile_x - player_tile_x;
+    const int dy =
+        guard_tile_y - player_tile_y;
+
+    return N3D_RE_OriginalRoundedSqrt(
+        dx * dx + dy * dy);
+}
+
+int N3D_RE_ApplyGuardAttackClassTransform(
+    int distance_seed,
+    uint8_t object_class,
+    int class16_full_damage_gate,
+    uint16_t rng_value)
+{
+    switch(object_class)
+    {
+        case 0x08:
+            return rng_value & 0x07;
+
+        case 0x09:
+        case 0x0A:
+            return rng_value & 0x0F;
+
+        case 0x0B:
+            return distance_seed / 4;
+
+        case 0x0C:
+        case 0x1D:
+        case 0x1E:
+            return distance_seed;
+
+        case 0x11:
+        case 0x12:
+        case 0x13:
+        case 0x14:
+            return rng_value & 0x1F;
+
+        case 0x16:
+            return class16_full_damage_gate ? 100 : 0x21;
+
+        case 0x19:
+            return 100;
+
+        default:
+            return distance_seed / 2;
+    }
+}
+
+n3d_guard_attack_damage_result N3D_RE_ComputeGuardToPlayerDamage(
+    int distance_metric,
+    uint8_t object_class,
+    uint8_t difficulty,
+    int class16_full_damage_gate,
+    uint16_t rng_value)
+{
+    n3d_guard_attack_damage_result result;
+
+    const int seed =
+        distance_metric > 0
+            ? 100 / distance_metric
+            : 100;
+
+    result.distance_seed = seed;
+    result.class_transformed =
+        N3D_RE_ApplyGuardAttackClassTransform(
+            seed,
+            object_class,
+            class16_full_damage_gate,
+            rng_value);
+    result.difficulty_transformed =
+        N3D_RE_ScaleEnemyDamageByDifficulty(
+            result.class_transformed,
+            difficulty);
+    result.stored_byte =
+        (uint8_t)result.difficulty_transformed;
+
+    return result;
+}
+
+n3d_guard_attack_damage_result
+N3D_RE_ComputeGuardToPlayerDamageFromWorld(
+    int16_t guard_world_x,
+    int16_t guard_world_y,
+    int16_t player_world_x,
+    int16_t player_world_y,
+    uint8_t object_class,
+    uint8_t difficulty,
+    int class16_full_damage_gate,
+    uint16_t rng_value)
+{
+    return N3D_RE_ComputeGuardToPlayerDamage(
+        N3D_RE_ComputeGuardAttackDistanceMetric(
+            guard_world_x,
+            guard_world_y,
+            player_world_x,
+            player_world_y),
+        object_class,
+        difficulty,
+        class16_full_damage_gate,
+        rng_value);
+}
+
 int N3D_RE_ApplyClassWeaponDamageTransform(
     int raw_damage,
     uint8_t object_class,

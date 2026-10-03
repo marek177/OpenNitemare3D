@@ -29,8 +29,47 @@ typedef struct n3d_damage_result
     uint8_t stored_byte;
 } n3d_damage_result;
 
+typedef struct n3d_guard_attack_damage_result
+{
+    int distance_seed;
+    int class_transformed;
+    int difficulty_transformed;
+    uint8_t stored_byte;
+} n3d_guard_attack_damage_result;
+
 int N3D_RE_ScalePlayerDamageByDifficulty(int damage, uint8_t difficulty);
 int N3D_RE_ScaleEnemyDamageByDifficulty(int damage, uint8_t difficulty);
+
+int N3D_RE_GuardAttackUsesRandom(uint8_t object_class);
+int N3D_RE_OriginalRoundedSqrt(int squared_distance);
+int N3D_RE_ComputeGuardAttackDistanceMetric(
+    int16_t guard_world_x,
+    int16_t guard_world_y,
+    int16_t player_world_x,
+    int16_t player_world_y);
+
+int N3D_RE_ApplyGuardAttackClassTransform(
+    int distance_seed,
+    uint8_t object_class,
+    int class16_full_damage_gate,
+    uint16_t rng_value);
+
+n3d_guard_attack_damage_result N3D_RE_ComputeGuardToPlayerDamage(
+    int distance_metric,
+    uint8_t object_class,
+    uint8_t difficulty,
+    int class16_full_damage_gate,
+    uint16_t rng_value);
+
+n3d_guard_attack_damage_result N3D_RE_ComputeGuardToPlayerDamageFromWorld(
+    int16_t guard_world_x,
+    int16_t guard_world_y,
+    int16_t player_world_x,
+    int16_t player_world_y,
+    uint8_t object_class,
+    uint8_t difficulty,
+    int class16_full_damage_gate,
+    uint16_t rng_value);
 
 int N3D_RE_ApplyClassWeaponDamageTransform(
     int raw_damage,

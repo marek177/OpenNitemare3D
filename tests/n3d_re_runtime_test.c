@@ -4363,6 +4363,84 @@ int main(void)
         assert(guard.octant == 1);
     }
 
+    /* Exact GUARD -> player distance/class/difficulty damage producer. */
+    {
+        assert(N3D_RE_OriginalRoundedSqrt(-1) == 0);
+        assert(N3D_RE_OriginalRoundedSqrt(0) == 0);
+        assert(N3D_RE_OriginalRoundedSqrt(1) == 1);
+        assert(N3D_RE_OriginalRoundedSqrt(2) == 2);
+        assert(N3D_RE_OriginalRoundedSqrt(4) == 2);
+        assert(N3D_RE_OriginalRoundedSqrt(5) == 3);
+        assert(N3D_RE_OriginalRoundedSqrt(8) == 3);
+        assert(N3D_RE_OriginalRoundedSqrt(9) == 3);
+
+        assert(N3D_RE_ComputeGuardAttackDistanceMetric(
+            10 * 64 + 32, 10 * 64 + 32,
+            13 * 64 + 32, 14 * 64 + 32) == 5);
+
+        assert(N3D_RE_GuardAttackUsesRandom(0x08));
+        assert(N3D_RE_GuardAttackUsesRandom(0x09));
+        assert(N3D_RE_GuardAttackUsesRandom(0x0A));
+        assert(N3D_RE_GuardAttackUsesRandom(0x11));
+        assert(N3D_RE_GuardAttackUsesRandom(0x12));
+        assert(N3D_RE_GuardAttackUsesRandom(0x13));
+        assert(N3D_RE_GuardAttackUsesRandom(0x14));
+        assert(!N3D_RE_GuardAttackUsesRandom(0x0B));
+        assert(!N3D_RE_GuardAttackUsesRandom(0x16));
+
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x08, 0, 0x1234) == (0x1234 & 0x07));
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x09, 0, 0x1234) == (0x1234 & 0x0F));
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            100, 0x0B, 0, 0) == 25);
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            40, 0x0C, 0, 0) == 40);
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x11, 0, 0x1234) == (0x1234 & 0x1F));
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x16, 0, 0) == 0x21);
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x16, 1, 0) == 100);
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x19, 0, 0) == 100);
+        assert(N3D_RE_ApplyGuardAttackClassTransform(
+            50, 0x18, 0, 0) == 25);
+
+        n3d_guard_attack_damage_result attack_damage =
+            N3D_RE_ComputeGuardToPlayerDamage(
+                5, 0x0C, 1, 0, 0);
+        assert(attack_damage.distance_seed == 20);
+        assert(attack_damage.class_transformed == 20);
+        assert(attack_damage.difficulty_transformed == 20);
+        assert(attack_damage.stored_byte == 20);
+
+        attack_damage =
+            N3D_RE_ComputeGuardToPlayerDamage(
+                5, 0x0C, 0, 0, 0);
+        assert(attack_damage.difficulty_transformed == 10);
+
+        attack_damage =
+            N3D_RE_ComputeGuardToPlayerDamage(
+                5, 0x0C, 2, 0, 0);
+        assert(attack_damage.difficulty_transformed == 40);
+
+        attack_damage =
+            N3D_RE_ComputeGuardToPlayerDamageFromWorld(
+                10 * 64 + 32, 10 * 64 + 32,
+                13 * 64 + 32, 14 * 64 + 32,
+                0x0C, 1, 0, 0);
+        assert(attack_damage.distance_seed == 20);
+        assert(attack_damage.difficulty_transformed == 20);
+
+        attack_damage =
+            N3D_RE_ComputeGuardToPlayerDamage(
+                1, 0x19, 2, 0, 0);
+        assert(attack_damage.class_transformed == 100);
+        assert(attack_damage.difficulty_transformed == 200);
+        assert(attack_damage.stored_byte == 200);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
