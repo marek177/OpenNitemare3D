@@ -313,9 +313,84 @@ namespace Nitemare3D
             }
         }
 
+        void ApplyOriginalRuntimeAnimationBridge(
+            OriginalGuardState runtimeState,
+            OriginalGuardState nextState)
+        {
+            switch (runtimeState)
+            {
+                case OriginalGuardState.MoveThen03:
+                case OriginalGuardState.Move08:
+                case OriginalGuardState.Transition05:
+                case OriginalGuardState.Transition13:
+                case OriginalGuardState.RecoverMove11:
+                    PlayAnim(GuardAnimation.walk);
+                    break;
+
+                case OriginalGuardState.DetectionAttack04:
+                    PlayAnim(GuardAnimation.attack);
+                    break;
+
+                case OriginalGuardState.AnimationTimer:
+                    if (nextState == OriginalGuardState.Detection03)
+                        PlayAnim(GuardAnimation.roar);
+                    else if (nextState == OriginalGuardState.DetectionAttack04)
+                        PlayAnim(GuardAnimation.attack);
+                    else
+                        PlayAnim(GuardAnimation.idle);
+                    break;
+
+                case OriginalGuardState.DeathFinalize09:
+                case OriginalGuardState.WaitAnimation12:
+                    PlayAnim(GuardAnimation.die);
+                    break;
+
+                case OriginalGuardState.Pain15:
+                    PlayAnim(GuardAnimation.roar);
+                    break;
+
+                default:
+                    PlayAnim(GuardAnimation.idle);
+                    break;
+            }
+        }
+
         public override void Update()
         {
-            UpdateState();
+            bool runtimeOwnsGuard = false;
+
+            if (OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
+                OriginalRuntimeState.TryGetGuardRuntimeState(
+                    this,
+                    out OriginalGuardState runtimeState,
+                    out OriginalGuardState nextRuntimeState) &&
+                OriginalRuntimeState.IsConfirmedAutonomousState(runtimeState))
+            {
+                runtimeOwnsGuard = true;
+
+                if (OriginalRuntimeState.GuardLogicTickDue)
+                {
+                    var result =
+                        OriginalRuntimeState.TickConfirmedAutonomousState(this);
+
+                    if (result == OriginalGuardDispatchResult.NotHandled)
+                        runtimeOwnsGuard = false;
+
+                    OriginalRuntimeState.TryGetGuardRuntimeState(
+                        this,
+                        out runtimeState,
+                        out nextRuntimeState);
+                }
+
+                if (runtimeOwnsGuard)
+                    ApplyOriginalRuntimeAnimationBridge(
+                        runtimeState,
+                        nextRuntimeState);
+            }
+
+            if (!runtimeOwnsGuard)
+                UpdateState();
+
             anim.Update();
             spriteIndex = anim.index;
             spritePosition = position;
