@@ -1849,6 +1849,155 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Completed;
         }
 
+        /// <summary>
+        /// Recovered state 0x0E. FUN_7B56 refreshes the normal directional
+        /// sequence, then enters 0x0F with timer 0 only while DAT_1048_51A5 is set.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickState0E(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            bool global51A5)
+        {
+            if (guard.State != (byte)OriginalGuardState.Conditional0E)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            var refresh = RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            if (!global51A5)
+                return refresh == OriginalGuardDispatchResult.Transitioned
+                    ? refresh
+                    : OriginalGuardDispatchResult.Waiting;
+
+            guard.Timer = 0;
+            guard.State = (byte)OriginalGuardState.Timed0F;
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// Recovered state 0x0F. The original uses post-decrement semantics:
+        /// oldTimer is tested after Timer has already been decremented.
+        /// On expiry it selects the state-0x10 directional sequence, then enters
+        /// state 0 animation with nextState=0x10 and Timer=sequence high byte.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickState0F(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            bool global51A5,
+            bool sameArea,
+            out bool attackSoundRequested)
+        {
+            attackSoundRequested = false;
+
+            if (guard.State != (byte)OriginalGuardState.Timed0F)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            if (!global51A5)
+            {
+                guard.State = (byte)OriginalGuardState.Conditional0E;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            short oldTimer = guard.Timer;
+            guard.Timer--;
+
+            if (oldTimer != 0)
+                return OriginalGuardDispatchResult.Waiting;
+
+            attackSoundRequested = sameArea;
+
+            guard.State = (byte)OriginalGuardState.Timed10;
+
+            // FUN_6EE0(force=1) runs while state is already 0x10, selecting
+            // directional bank B.
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                true);
+
+            guard.Timer = (short)((guard.DefinitionValue >> 8) & 0xFF);
+            guard.State = (byte)OriginalGuardState.AnimationTimer;
+            guard.NextState = (byte)OriginalGuardState.Timed10;
+
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// First half of recovered state 0x10. Refreshes directional state and
+        /// performs the original post-decrement timer test. True means the attack
+        /// eligibility/damage call must run this tick.
+        /// </summary>
+        public static bool State10AttackDue(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            if (guard.State != (byte)OriginalGuardState.Timed10)
+                return false;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            short oldTimer = guard.Timer;
+            guard.Timer--;
+            return oldTimer == 0;
+        }
+
+        /// <summary>
+        /// Recovered state-0x10 tail after the optional damage commit.
+        /// Timer becomes 8, state becomes 0x0F, then FUN_6EE0(force=1)
+        /// refreshes the state-0x0F directional bank.
+        /// </summary>
+        public static OriginalGuardDispatchResult CompleteState10AttackCycle(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY)
+        {
+            guard.Timer = 8;
+            guard.State = (byte)OriginalGuardState.Timed0F;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                true);
+
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         // State 0x11: after the confirmed movement/timer sequence, strategy is
         // cleared and normal state-7 processing resumes.
         public static OriginalGuardDispatchResult CompleteState11(
