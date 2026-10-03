@@ -2704,6 +2704,50 @@ int main(void)
         assert(n3d_projectiles[0].state == 2);
     }
 
+    /* Explodable-wall resolution applies only the closed 9B64 effects. */
+    {
+        N3D_RE_ResetRuntime();
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        n3d_projectile_collision_result wall_hit = {0};
+        wall_hit.kind = N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL;
+        wall_hit.event_id = N3D_EXPLODABLE_WALL_EVENT;
+        wall_hit.enter_impact = 1;
+
+        n3d_projectile_wall_resolution wall_resolution =
+            N3D_RE_ResolveProjectileWallCollision(0, &wall_hit);
+
+        assert(wall_resolution.resolved == 1);
+        assert(wall_resolution.deferred == 0);
+        assert(wall_resolution.event_id == N3D_EXPLODABLE_WALL_EVENT);
+        assert(wall_resolution.requested_runtime_wall_class ==
+               N3D_EXPLODABLE_WALL_RUNTIME_CLASS);
+        assert(wall_resolution.entered_impact == 1);
+        assert(n3d_projectiles[0].state == 2);
+        assert(n3d_projectiles[0].object.sequence_id == 21);
+        assert((n3d_projectiles[0].object.flags & 0x10) != 0);
+
+        N3D_RE_ResetRuntime();
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 100, 20));
+
+        wall_hit.kind = N3D_PROJECTILE_COLLISION_WALL_DEFERRED;
+        wall_hit.event_id = 0;
+        wall_hit.enter_impact = 0;
+
+        wall_resolution =
+            N3D_RE_ResolveProjectileWallCollision(0, &wall_hit);
+
+        assert(wall_resolution.resolved == 0);
+        assert(wall_resolution.deferred == 1);
+        assert(wall_resolution.event_id == 0);
+        assert(wall_resolution.requested_runtime_wall_class == 0);
+        assert(wall_resolution.entered_impact == 0);
+        assert(n3d_projectiles[0].state == 1);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
