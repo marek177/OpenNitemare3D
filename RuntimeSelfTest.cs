@@ -784,6 +784,64 @@ namespace Nitemare3D
                    obj.RuntimeValue == 2050,
                 "extended OBJECT sequence must resample empty branches and enter selected start frame.");
 
+            definition = new OriginalObjectDefinitionRecord
+            {
+                Interval = 40,
+                FrameCount = 16
+            };
+
+            obj.ObjectClass = 0x2C;
+            obj.WorldX = 100;
+            obj.WorldY = 100;
+            obj.Component03 = 1;
+            obj.RuntimeValue = 3000;
+
+            // Player due north -> ordinary octant 0.
+            // B17E group = (-(0+4)&7)>>1 = 2, phaseCount=16/4=4.
+            Assert(!OriginalWorldObjectRuntime.AdvanceDirectionalAnimation(
+                       ref obj,
+                       definition,
+                       2999,
+                       100,
+                       36) &&
+                   obj.Component03 == 9 &&
+                   obj.RuntimeValue == 3000,
+                "class 0x2C four-group directional remap mismatch.");
+
+            // Due update first advances one local phase: 9 -> local phase 2,
+            // then re-applies the same group and schedules now+interval.
+            Assert(OriginalWorldObjectRuntime.AdvanceDirectionalAnimation(
+                       ref obj,
+                       definition,
+                       3000,
+                       100,
+                       36) &&
+                   obj.Component03 == 10 &&
+                   obj.RuntimeValue == 3040,
+                "class 0x2C directional due-phase/deadline mismatch.");
+
+            definition = new OriginalObjectDefinitionRecord
+            {
+                Interval = 25,
+                FrameCount = 24
+            };
+
+            obj.ObjectClass = 0x2D;
+            obj.Component03 = 0;
+            obj.RuntimeValue = 4000;
+
+            // Player due east -> wide/control octant 2.
+            // B17E group = (-(2+4)&7) = 2, phaseCount=24/8=3.
+            Assert(OriginalWorldObjectRuntime.AdvanceDirectionalAnimation(
+                       ref obj,
+                       definition,
+                       4000,
+                       164,
+                       100) &&
+                   obj.Component03 == 7 &&
+                   obj.RuntimeValue == 4025,
+                "class 0x2D eight-group directional mapping mismatch.");
+
             obj.ObjectClass = 0x2E;
             Assert(OriginalWorldObjectRuntime.UpdateKnownVerticalAnchor(
                        ref obj,
