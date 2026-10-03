@@ -11,6 +11,7 @@
 #include "../n3d_re_pickup.h"
 #include "../n3d_re_trig.h"
 #include "../n3d_re_movement.h"
+#include "../n3d_re_timing.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -74,6 +75,55 @@ int main(void)
     assert(N3D_RE_RoundedOctant(359) == 0);
 
     remove("N3D_TRIG_Q10_TEST.BIN");
+
+    n3d_timing_parameters timing =
+        N3D_RE_ComputeTimingParameters(10);
+    assert(timing.raw_mean_ms == 10);
+    assert(timing.effective_ms == 40);
+    assert(timing.slow_updates_per_second == 25);
+    assert(timing.movement_substeps == 10);
+    assert(timing.turn_degrees == 5);
+    assert(timing.projectile_substeps == 20);
+
+    timing = N3D_RE_ComputeTimingParameters(40);
+    assert(timing.effective_ms == 40);
+    assert(timing.movement_substeps == 10);
+    assert(timing.turn_degrees == 5);
+    assert(timing.projectile_substeps == 20);
+
+    timing = N3D_RE_ComputeTimingParameters(50);
+    assert(timing.effective_ms == 50);
+    assert(timing.slow_updates_per_second == 20);
+    assert(timing.movement_substeps == 13);
+    assert(timing.turn_degrees == 6);
+    assert(timing.projectile_substeps == 26);
+
+    N3D_RE_SetTimingFromRawMean(40);
+    assert(n3d_timing.movement_substeps == 10);
+    assert(n3d_timing.turn_degrees == 5);
+
+    N3D_RE_ResetPlayer();
+    assert(n3d_player.angle_degrees == 0);
+    assert(n3d_player.coarse_octant == 0);
+    assert(n3d_player.rounded_octant == 0);
+    assert(n3d_player.direction_mask_99 == 0x01);
+
+    N3D_RE_SetPlayerAngle(44);
+    assert(n3d_player.angle_degrees == 44);
+    assert(n3d_player.coarse_octant == 0);
+    assert(n3d_player.rounded_octant == 1);
+    assert(n3d_player.direction_mask_99 == 0x01);
+
+    N3D_RE_SetPlayerAngle(135);
+    assert(n3d_player.coarse_octant == 3);
+    assert(n3d_player.rounded_octant == 3);
+    assert(n3d_player.direction_mask_99 == 0x08);
+
+    N3D_RE_TurnPlayer(-140);
+    assert(n3d_player.angle_degrees == 355);
+    assert(n3d_player.coarse_octant == 7);
+    assert(n3d_player.rounded_octant == 0);
+    assert(n3d_player.direction_mask_99 == 0x80);
 
     uint8_t object_class = 0;
 
