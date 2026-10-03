@@ -22,7 +22,7 @@ int N3D_RE_ScaleEnemyDamageByDifficulty(int damage, uint8_t difficulty)
     }
 }
 
-int N3D_RE_GuardAttackUsesRandom(uint8_t object_class)
+int N3D_RE_GuardAttackDamageUsesRandom(uint8_t object_class)
 {
     switch(object_class)
     {

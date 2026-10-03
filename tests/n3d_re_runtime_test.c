@@ -4008,9 +4008,9 @@ int main(void)
         assert(N3D_RE_GuardAlertSoundId(0x0F, 0) == 0x36);
         assert(N3D_RE_GuardAlertSoundId(0x0F, 1) == 0x37);
 
-        assert(N3D_RE_GuardAttackUsesRandom(0x16));
-        assert(N3D_RE_GuardAttackUsesRandom(0x1B));
-        assert(!N3D_RE_GuardAttackUsesRandom(0x12));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x16));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x1B));
+        assert(!N3D_RE_GuardAttackDamageUsesRandom(0x12));
         assert(N3D_RE_GuardAttackSoundId(0x16, 2) == 0x19);
         assert(N3D_RE_GuardAttackSoundId(0x1B, 3) == 0x4E);
 
@@ -4378,15 +4378,15 @@ int main(void)
             10 * 64 + 32, 10 * 64 + 32,
             13 * 64 + 32, 14 * 64 + 32) == 5);
 
-        assert(N3D_RE_GuardAttackUsesRandom(0x08));
-        assert(N3D_RE_GuardAttackUsesRandom(0x09));
-        assert(N3D_RE_GuardAttackUsesRandom(0x0A));
-        assert(N3D_RE_GuardAttackUsesRandom(0x11));
-        assert(N3D_RE_GuardAttackUsesRandom(0x12));
-        assert(N3D_RE_GuardAttackUsesRandom(0x13));
-        assert(N3D_RE_GuardAttackUsesRandom(0x14));
-        assert(!N3D_RE_GuardAttackUsesRandom(0x0B));
-        assert(!N3D_RE_GuardAttackUsesRandom(0x16));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x08));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x09));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x0A));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x11));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x12));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x13));
+        assert(N3D_RE_GuardAttackDamageUsesRandom(0x14));
+        assert(!N3D_RE_GuardAttackDamageUsesRandom(0x0B));
+        assert(!N3D_RE_GuardAttackDamageUsesRandom(0x16));
 
         assert(N3D_RE_ApplyGuardAttackClassTransform(
             50, 0x08, 0, 0x1234) == (0x1234 & 0x07));

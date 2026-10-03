@@ -40,7 +40,7 @@ typedef struct n3d_guard_attack_damage_result
 int N3D_RE_ScalePlayerDamageByDifficulty(int damage, uint8_t difficulty);
 int N3D_RE_ScaleEnemyDamageByDifficulty(int damage, uint8_t difficulty);
 
-int N3D_RE_GuardAttackUsesRandom(uint8_t object_class);
+int N3D_RE_GuardAttackDamageUsesRandom(uint8_t object_class);
 int N3D_RE_OriginalRoundedSqrt(int squared_distance);
 int N3D_RE_ComputeGuardAttackDistanceMetric(
     int16_t guard_world_x,
