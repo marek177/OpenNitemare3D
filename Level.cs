@@ -450,6 +450,27 @@ namespace Nitemare3D
                 case ObjectType.Missileexplodingspellstars:
                     break;
             }
+            if (ent == null &&
+                originalMap != null)
+            {
+                byte propertyFlags =
+                    originalMap.ObjectProperty[
+                        (byte)id];
+
+                // Render/runtime fallback only for non-GUARD world objects.
+                // GUARD-linked classes must get a real AI implementation rather
+                // than being silently replaced by inert scenery.
+                if ((propertyFlags &
+                        OriginalMapTables.ObjectRuntimePresent) != 0 &&
+                    (propertyFlags &
+                        OriginalMapTables.ObjectCreatesGuard) == 0)
+                {
+                    ent =
+                        new OriginalMapObjectSprite(
+                            (byte)id);
+                }
+            }
+
             if (ent != null)
             {
                 Entity.Add(ent, position);
