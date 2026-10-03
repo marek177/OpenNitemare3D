@@ -14,6 +14,7 @@
 #include "../n3d_re_timing.h"
 #include "../n3d_re_controls.h"
 #include "../n3d_re_weapon.h"
+#include "../n3d_re_save.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -2746,6 +2747,202 @@ int main(void)
         assert(wall_resolution.requested_runtime_wall_class == 0);
         assert(wall_resolution.entered_impact == 0);
         assert(n3d_projectiles[0].state == 1);
+    }
+
+    /* Verified USER.SAV runtime blocks: exact byte transport only. */
+    {
+        static uint8_t save_slot[N3D_USER_SAVE_SLOT_BYTES];
+        static uint8_t rewritten_slot[N3D_USER_SAVE_SLOT_BYTES];
+        static n3d_known_save_blocks save_blocks;
+
+        memset(save_slot, 0xA5, sizeof(save_slot));
+        memset(rewritten_slot, 0x5A, sizeof(rewritten_slot));
+
+        for(size_t i = N3D_SAVE_OBJECT_OFFSET;
+            i < N3D_SAVE_PUSH_OFFSET + N3D_SAVE_PUSH_BYTES;
+            ++i)
+        {
+            save_slot[i] = (uint8_t)((i * 37u + 11u) & 0xFFu);
+        }
+
+        for(size_t i = N3D_SAVE_GUARD_WAKE_OFFSET;
+            i < N3D_SAVE_GUARD_WAKE_OFFSET + N3D_SAVE_GUARD_WAKE_BYTES;
+            ++i)
+        {
+            save_slot[i] = (uint8_t)((i * 13u + 7u) & 0xFFu);
+        }
+
+        /* Independent field fixture for the first OBJECT. */
+        {
+            uint8_t* p = save_slot + N3D_SAVE_OBJECT_OFFSET;
+            p[0x00] = 0xAA;
+            p[0x01] = 0xBB;
+            p[0x02] = 0x80;
+            p[0x03] = 0xFF;
+            p[0x04] = 0xCC;
+            p[0x05] = 0xDD;
+            p[0x06] = 0xEE;
+            p[0x07] = 0x12;
+            p[0x08] = 0x78;
+            p[0x09] = 0x56;
+            p[0x0A] = 0x34;
+            p[0x0B] = 0x12;
+            p[0x0C] = 0x44;
+            p[0x0D] = 0x33;
+            p[0x0E] = 0x22;
+            p[0x0F] = 0x11;
+            p[0x10] = 0x00;
+            p[0x11] = 0x80;
+            p[0x12] = 0xFF;
+            p[0x13] = 0x7F;
+            p[0x18] = 0x34;
+            p[0x19] = 0x12;
+            p[0x1A] = 0x05;
+            p[0x1B] = 0xFE;
+        }
+
+        /* Independent first GUARD fixture. */
+        {
+            uint8_t* p = save_slot + N3D_SAVE_GUARD_OFFSET;
+            p[0x00] = 0x34;
+            p[0x01] = 0x12;
+            p[0x02] = 0x78;
+            p[0x03] = 0x56;
+            p[0x04] = 0x34;
+            p[0x05] = 0x12;
+            p[0x06] = 0xFF;
+            p[0x07] = 0x7F;
+            p[0x08] = 0x02;
+            p[0x09] = 0x01;
+            p[0x0A] = 3;
+            p[0x0B] = N3D_GUARD_STATE_PAIN;
+            p[0x0C] = N3D_GUARD_STATE_07;
+            p[0x10] = 0xF5;
+            p[0x13] = 0xF8;
+            p[0x14] = 0x08;
+        }
+
+        /* Independent first projectile fixture. */
+        {
+            uint8_t* p = save_slot + N3D_SAVE_PROJECTILE_OFFSET;
+            p[0x00] = 0x01;
+            p[0x01] = 0x00;
+            p[0x02] = 0xFE;
+            p[0x03] = 0xFF;
+            p[0x08] = 0x01;
+            p[0x09] = 0x00;
+            p[0x0A] = 0xFF;
+            p[0x0B] = 0xFF;
+            p[0x0C] = 2;
+            p[0x0D] = 0x5A;
+            p[0x0E + 0x10] = 0x34;
+            p[0x0E + 0x11] = 0x12;
+            p[0x0E + 0x12] = 0x78;
+            p[0x0E + 0x13] = 0x56;
+            p[0x0E + 0x1A] = 20;
+        }
+
+        /* Independent first PUSH fixture. */
+        {
+            uint8_t* p = save_slot + N3D_SAVE_PUSH_OFFSET;
+            p[0x00] = 0x34;
+            p[0x01] = 0x12;
+            p[0x02] = 0xF8;
+            p[0x03] = 0x08;
+            p[0x04] = 8;
+            p[0x05] = 0x7A;
+        }
+
+        save_slot[N3D_SAVE_PANEL_ACTIVATION_OFFSET] = 2;
+        save_slot[N3D_SAVE_PANEL_ACTIVATION_OFFSET + 31] = 4;
+        save_slot[N3D_SAVE_GLOBAL_51A4_OFFSET] = 0x91;
+        save_slot[N3D_SAVE_GLOBAL_51A4_OFFSET + 7] = 0xA7;
+        save_slot[N3D_SAVE_GUARD_WAKE_OFFSET] = 0x11;
+        save_slot[N3D_SAVE_GUARD_WAKE_OFFSET + 63] = 0x22;
+
+        assert(!N3D_RE_ReadKnownSaveBlocks(
+            save_slot,
+            N3D_USER_SAVE_SLOT_BYTES - 1,
+            &save_blocks));
+
+        assert(N3D_RE_ReadKnownSaveBlocks(
+            save_slot,
+            sizeof(save_slot),
+            &save_blocks));
+
+        assert(save_blocks.objects[0].map_object_id == 0xAA);
+        assert(save_blocks.objects[0].variant == 0xBB);
+        assert(save_blocks.objects[0].animation_aux == (int8_t)0x80);
+        assert(save_blocks.objects[0].animation_frame == -1);
+        assert(save_blocks.objects[0].sequence_id == 0xCC);
+        assert(save_blocks.objects[0].flags == 0xDD);
+        assert(save_blocks.objects[0].object_class == 0xEE);
+        assert(save_blocks.objects[0].guard_index == 0x12);
+        assert(save_blocks.objects[0].animation_deadline == 0x12345678u);
+        assert(save_blocks.objects[0].map_cell_binding == 0x11223344u);
+        assert(save_blocks.objects[0].world_x == INT16_MIN);
+        assert(save_blocks.objects[0].world_y == INT16_MAX);
+        assert(save_blocks.objects[0].projected_y_base == 0x1234);
+        assert(save_blocks.objects[0].runtime_1a == 5);
+        assert(save_blocks.objects[0].unknown_1b == 0xFE);
+
+        assert(save_blocks.guards[0].definition_value == 0x1234);
+        assert(save_blocks.guards[0].timestamp == 0x12345678u);
+        assert(save_blocks.guards[0].timer == INT16_MAX);
+        assert(save_blocks.guards[0].object_slot == 0x0102);
+        assert(save_blocks.guards[0].strategy == 3);
+        assert(save_blocks.guards[0].state == N3D_GUARD_STATE_PAIN);
+        assert(save_blocks.guards[0].next_state == N3D_GUARD_STATE_07);
+        assert(save_blocks.guards[0].strength == 0xF5);
+        assert(save_blocks.guards[0].move_x == -8);
+        assert(save_blocks.guards[0].move_y == 8);
+
+        assert(save_blocks.projectiles[0].x_is_major_axis == 1);
+        assert(save_blocks.projectiles[0].line_error == -2);
+        assert(save_blocks.projectiles[0].step_x == 1);
+        assert(save_blocks.projectiles[0].step_y == -1);
+        assert(save_blocks.projectiles[0].state == 2);
+        assert(save_blocks.projectiles[0].unknown_0d == 0x5A);
+        assert(save_blocks.projectiles[0].object.world_x == 0x1234);
+        assert(save_blocks.projectiles[0].object.world_y == 0x5678);
+        assert(save_blocks.projectiles[0].object.runtime_1a == 20);
+
+        assert(save_blocks.pushes[0].object_index == 0x1234);
+        assert(save_blocks.pushes[0].delta_x == -8);
+        assert(save_blocks.pushes[0].delta_y == 8);
+        assert(save_blocks.pushes[0].steps_remaining == 8);
+        assert(save_blocks.pushes[0].runtime_05 == 0x7A);
+
+        assert(save_blocks.panel_activation[0] == 2);
+        assert(save_blocks.panel_activation[31] == 4);
+        assert(save_blocks.global_51a4[0] == 0x91);
+        assert(save_blocks.global_51a4[7] == 0xA7);
+        assert(save_blocks.guard_wake_cache[0] == 0x11);
+        assert(save_blocks.guard_wake_cache[63] == 0x22);
+
+        assert(!N3D_RE_WriteKnownSaveBlocks(
+            rewritten_slot,
+            N3D_USER_SAVE_SLOT_BYTES - 1,
+            &save_blocks));
+
+        assert(N3D_RE_WriteKnownSaveBlocks(
+            rewritten_slot,
+            sizeof(rewritten_slot),
+            &save_blocks));
+
+        for(size_t i = 0; i < sizeof(rewritten_slot); ++i)
+        {
+            const int known =
+                (i >= N3D_SAVE_OBJECT_OFFSET &&
+                 i < N3D_SAVE_PUSH_OFFSET + N3D_SAVE_PUSH_BYTES) ||
+                (i >= N3D_SAVE_GUARD_WAKE_OFFSET &&
+                 i < N3D_SAVE_GUARD_WAKE_OFFSET + N3D_SAVE_GUARD_WAKE_BYTES);
+
+            if(known)
+                assert(rewritten_slot[i] == save_slot[i]);
+            else
+                assert(rewritten_slot[i] == 0x5A);
+        }
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
