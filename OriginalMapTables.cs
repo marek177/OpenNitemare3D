@@ -342,6 +342,57 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Primary-wall portion of player collision FUN_1010_84F4.
+        /// Hard walls block immediately. Dynamic doors are passable only in
+        /// controller states 0 or 4 (the shared FUN_1476 predicate).
+        /// </summary>
+        public bool IsPlayerPrimaryWallBlocked84F4(
+            int x,
+            int y,
+            OriginalWallRuntime wallRuntime)
+        {
+            if (x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return true;
+            }
+
+            byte flags = WallPropertyAt(x, y);
+
+            if ((flags & WallHardBlock) != 0)
+                return true;
+
+            if ((flags & WallDynamicDoor) != 0)
+            {
+                return wallRuntime == null ||
+                       !wallRuntime.DoorAllowsSight(x, y);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Final object-blocking test of player collision FUN_1010_84F4.
+        /// Unlike D50A LOS, this path does NOT honor the object 0x20
+        /// pass-through exception: object property bit 0x02 blocks directly.
+        /// </summary>
+        public bool IsPlayerObjectBlocked84F4(
+            int x,
+            int y)
+        {
+            if (x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return true;
+            }
+
+            return (ObjectPropertyAt(x, y) &
+                    ObjectBlocksMovementOrLos) != 0;
+        }
+
+        /// <summary>
         /// Cell-blocking portion of FUN_1010_D50A after Bresenham stepping,
         /// backed directly by the recovered 22-byte DOOR runtime state.
         /// </summary>
