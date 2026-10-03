@@ -264,6 +264,8 @@ namespace Nitemare3D
                 "IMG runtime frame descriptor must be 10 bytes.");
 
             byte[] header = new byte[OriginalRuntime.ObjectResourceHeaderBytes];
+            header[0x00] = 0x34;
+            header[0x01] = 0x12;
             header[0x02] = 6;
             header[0x34] = 0x12;
             header[0x35] = 0x04;
@@ -273,7 +275,8 @@ namespace Nitemare3D
             header[0x39] = 0x02;
 
             var parsed = OriginalObjectDefinitionCatalog.ParseHeader(header, 0);
-            Assert(parsed.FrameCount == 6 &&
+            Assert(parsed.Interval == 0x1234 &&
+                   parsed.FrameCount == 6 &&
                    parsed.State02Sequence == 0x0412 &&
                    parsed.State03Sequence == 0x0320 &&
                    parsed.State04Sequence == 0x0230,
@@ -336,7 +339,7 @@ namespace Nitemare3D
             int streamOffset = OriginalRuntime.ImgFirstFrameStreamOffset;
             byte[] img = new byte[streamOffset + 10 + (32 * 32)];
 
-            int directoryOffset = objectId * 4;
+            int directoryOffset = 0x0400 + objectId * 4;
             img[directoryOffset + 0] = (byte)streamOffset;
             img[directoryOffset + 1] = (byte)(streamOffset >> 8);
             img[directoryOffset + 2] = (byte)(streamOffset >> 16);
@@ -344,6 +347,8 @@ namespace Nitemare3D
 
             int headerOffset =
                 OriginalObjectDefinitionCatalog.HeaderOffset(objectId, false);
+            img[headerOffset + 0x00] = 0x78;
+            img[headerOffset + 0x01] = 0x56;
             img[headerOffset + 0x02] = 1;
             img[headerOffset + 0x34] = 0x12;
             img[headerOffset + 0x35] = 0x04;
@@ -370,7 +375,8 @@ namespace Nitemare3D
 
             var definition =
                 OriginalObjectDefinitionCatalog.Parse(headerBytes, 0);
-            Assert(definition.FrameCount == 1 &&
+            Assert(definition.Interval == 0x5678 &&
+                   definition.FrameCount == 1 &&
                    definition.State02Sequence == 0x0412 &&
                    definition.State03Sequence == 0x0320 &&
                    definition.State04Sequence == 0x0230,
@@ -392,6 +398,7 @@ namespace Nitemare3D
                        out byte definitionId) &&
                    definitionId == 0 &&
                    catalog.TryGetHeader(definitionId, out var registered) &&
+                   registered.Interval == 0x5678 &&
                    registered.State03Sequence == 0x0320,
                 "synthetic IMG definition registration mismatch.");
         }
