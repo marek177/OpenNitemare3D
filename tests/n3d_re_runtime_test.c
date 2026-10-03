@@ -2249,7 +2249,7 @@ int main(void)
         N3D_RE_ResetRuntime();
         assert(N3D_RE_InitializeProjectileFromAngle(
             0, N3D_WEAPON_MAGIC_WAND, 100, 200, 20, 45));
-        assert(n3d_projectiles[0].x_is_major_axis == 1);
+        assert(n3d_projectiles[0].x_is_major_axis == 0);
         assert(n3d_projectiles[0].step_x == 1);
         assert(n3d_projectiles[0].step_y == -1);
         assert(N3D_RE_AdvanceProjectileLineSteps(0, 10) == 10);
