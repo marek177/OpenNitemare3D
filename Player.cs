@@ -36,7 +36,8 @@ namespace Nitemare3D
         float walkSpeed = 3;
         float runSpeed = 5;
         public float rotation = 0;
-        public byte doorWakeSelector = 0;
+        // DAT_1048_4C1C: persistent AREA id from wall class 0x44 markers.
+        public byte areaWakeSelector = 0;
 
         const int weaponCount = 4;
         public int weaponIndex = -1;
@@ -444,24 +445,27 @@ namespace Nitemare3D
             WorldCollision.MovePlayerWithSliding(this, delta);
         }
 
-        void UpdateDoorWakeSelector()
+        void UpdateAreaWakeSelector()
         {
             int tileX = (int)MathF.Floor(position.X);
             int tileY = (int)MathF.Floor(position.Y);
 
-            if (tileX < 0 || tileY < 0 ||
+            if (Level.originalMap == null ||
+                tileX < 0 || tileY < 0 ||
                 tileX >= OriginalRuntime.MapWidth ||
                 tileY >= OriginalRuntime.MapHeight)
             {
                 return;
             }
 
-            var tile = Level.tilemap[tileX, tileY];
-            if (tile != null &&
-                OriginalDoorSelector.TryGet((byte)tile.type, out byte selector))
+            byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+            if (Level.originalMap.TryGetWallClassVariant(
+                    rawWallId,
+                    0x44,
+                    out byte areaId))
             {
-                // Original behavior keeps the previous selector on non-DOOR cells.
-                doorWakeSelector = selector;
+                // FUN_247A/8A20 preserve the previous AREA id off marker cells.
+                areaWakeSelector = areaId;
             }
         }
 
@@ -517,7 +521,7 @@ namespace Nitemare3D
             plane.X = plane.X * (float)Math.Cos(rotation - oldRot) - plane.Y * (float)Math.Sin(rotation - oldRot);
             plane.Y = oldPlaneX * (float)Math.Sin(rotation - oldRot) + plane.Y * (float)Math.Cos(rotation - oldRot);
 
-            UpdateDoorWakeSelector();
+            UpdateAreaWakeSelector();
             UpdateUse();
             RenderRaycaster();
             RenderWeapon();
