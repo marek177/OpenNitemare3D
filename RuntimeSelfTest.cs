@@ -62,6 +62,19 @@ namespace Nitemare3D
                 "OBJECT record must be 28 bytes.");
             Assert(Marshal.SizeOf<OriginalGuardRecord>() == 26,
                 "GUARD record must be 26 bytes.");
+            Assert(Marshal.SizeOf<OriginalDoorRuntimeRecord>() == 22,
+                "DOOR record must be 22 bytes.");
+            Assert(Marshal.OffsetOf<OriginalDoorRuntimeRecord>(
+                       nameof(OriginalDoorRuntimeRecord.State)).ToInt32() == 0x0C &&
+                   Marshal.OffsetOf<OriginalDoorRuntimeRecord>(
+                       nameof(OriginalDoorRuntimeRecord.Timer)).ToInt32() == 0x0E &&
+                   Marshal.OffsetOf<OriginalDoorRuntimeRecord>(
+                       nameof(OriginalDoorRuntimeRecord.TargetX)).ToInt32() == 0x10 &&
+                   Marshal.OffsetOf<OriginalDoorRuntimeRecord>(
+                       nameof(OriginalDoorRuntimeRecord.TargetY)).ToInt32() == 0x12 &&
+                   Marshal.OffsetOf<OriginalDoorRuntimeRecord>(
+                       nameof(OriginalDoorRuntimeRecord.Latch)).ToInt32() == 0x14,
+                "DOOR record field offsets must match Win16 0x16-byte layout.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
         }
@@ -534,8 +547,16 @@ namespace Nitemare3D
                    door.State == 1 &&
                    door.Timer == 0 &&
                    door.TargetX == second.X1 &&
-                   door.TargetY == second.Y1,
+                   door.TargetY == second.Y1 &&
+                   door.Runtime.State == 1 &&
+                   door.Runtime.Timer == 0 &&
+                   door.Runtime.TargetX == second.X1 &&
+                   door.Runtime.TargetY == second.Y1 &&
+                   door.Runtime.Latch == 0,
                 "FUN_14A8 paired-wall controller initialization mismatch.");
+
+            Assert(!walls.DoorAllowsSight(1, 1),
+                "closed state-1 door must block D50A sight.");
 
             Assert(walls.TogglePairedWall(1, 1, 2, false) &&
                    door.State == 2,
@@ -546,12 +567,23 @@ namespace Nitemare3D
                 "paired-wall motion must remain opening before target is reached.");
 
             Assert(walls.ForceState(1, 1, 0) &&
-                   door.State == 0,
-                "paired-wall state 0 force mismatch.");
+                   door.State == 0 &&
+                   door.Runtime.State == 0 &&
+                   walls.DoorAllowsSight(1, 1),
+                "paired-wall state 0 force/passability mismatch.");
 
             Assert(walls.SetLatchedPassable(1, 1) &&
-                   door.State == 4,
+                   door.State == 4 &&
+                   door.Runtime.State == 4 &&
+                   walls.DoorAllowsSight(1, 1),
                 "paired-wall state 4 latched/passable mismatch.");
+
+            Assert(walls.TryGetDoorRuntimeRecord(
+                       1, 1, out var doorRecord) &&
+                   doorRecord.State == 4 &&
+                   doorRecord.TargetX == door.TargetX &&
+                   doorRecord.TargetY == door.TargetY,
+                "door runtime record export mismatch.");
         }
 
         static void TestOriginalRandom()
