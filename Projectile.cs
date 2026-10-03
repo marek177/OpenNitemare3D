@@ -163,10 +163,20 @@ namespace Nitemare3D
             byte objectFlags =
                 Level.originalMap.ObjectPropertyAt(tileX, tileY);
 
-            // GUARDs were resolved above with the exact +/-9 test. Any other
-            // runtime-present blocking object remains an impact surface until
-            // the class-specific projectile-touch side effects are bridged.
-            return (objectFlags & OriginalMapTables.ObjectBlocksMovementOrLos) != 0;
+            // Actor-linked cells use the exact coordinate test above. Being in
+            // the same 64-unit map cell is not itself a projectile hit.
+            if ((objectFlags & OriginalMapTables.ObjectCreatesGuard) != 0)
+                return false;
+
+            // Class 0x2A is the recovered PERMEABLE exception: it carries the
+            // ordinary occupancy bit together with 0x20, and projectile
+            // traversal is allowed to continue through that combination.
+            bool blockingObject =
+                (objectFlags & OriginalMapTables.ObjectBlocksMovementOrLos) != 0;
+            bool permeable =
+                (objectFlags & OriginalMapTables.ObjectLosPassThroughException) != 0;
+
+            return blockingObject && !permeable;
         }
 
         public override void Update()
