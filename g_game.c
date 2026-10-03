@@ -5,6 +5,7 @@
 #include "g_think.h"
 #include "n3d_re_player.h"
 #include "n3d_re_definitions.h"
+#include "n3d_re_img.h"
 
 
 bool G_GameIsDone()
@@ -55,6 +56,17 @@ void G_LoadEpisode(uint8_t episode)
     {
         printf("definition files WALLS.%u / OBJECTS.%u not fully available\n",
                episode, episode);
+    }
+
+    if(N3D_RE_LoadImgEpisode(episode))
+    {
+        printf("loaded exact IMG directories + SEQDEF banks from IMG.%u\n",
+               episode);
+    }
+    else
+    {
+        printf("exact IMG/SEQDEF metadata unavailable for IMG.%u\n",
+               episode);
     }
 }
 

@@ -15,6 +15,7 @@
 #include "../n3d_re_controls.h"
 #include "../n3d_re_weapon.h"
 #include "../n3d_re_save.h"
+#include "../n3d_re_img.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -32,6 +33,14 @@ static void test_touch(uint8_t x, uint8_t y, void* user)
     (void)x;
     (void)y;
     ++*(int*)user;
+}
+
+static void write_u32_le(uint8_t* bytes, size_t offset, uint32_t value)
+{
+    bytes[offset + 0] = (uint8_t)value;
+    bytes[offset + 1] = (uint8_t)(value >> 8);
+    bytes[offset + 2] = (uint8_t)(value >> 16);
+    bytes[offset + 3] = (uint8_t)(value >> 24);
 }
 
 static void write_s16_le(uint8_t* bytes, int offset, int16_t value)
@@ -3034,6 +3043,140 @@ int main(void)
             else
                 assert(rewritten_slot[i] == 0x5A);
         }
+    }
+
+    /* Exact IMG directory + dual 90-byte SEQDEF bank reader. */
+    {
+        const uint8_t wall_id = 0x20;
+        const uint8_t object_id = 0xFB;
+        const size_t wall_stream = N3D_IMG_FRAME_DATA_OFFSET;
+        const size_t wall_frame_bytes = N3D_IMG_FRAME_HEADER_BYTES + 1;
+        const size_t object_stream = wall_stream + 3 * wall_frame_bytes;
+        const size_t total_size = object_stream + 2 * wall_frame_bytes;
+
+        uint8_t* img_bytes = (uint8_t*)calloc(total_size, 1);
+        assert(img_bytes != NULL);
+
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_WALL_DIRECTORY_OFFSET + wall_id * 4u,
+            (uint32_t)wall_stream);
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_OBJECT_DIRECTORY_OFFSET + object_id * 4u,
+            (uint32_t)object_stream);
+
+        const size_t wall_seq =
+            N3D_IMG_LOW_SEQUENCE_BANK_OFFSET +
+            wall_id * N3D_IMG_SEQUENCE_RECORD_BYTES;
+        img_bytes[wall_seq + 0] = 50;
+        img_bytes[wall_seq + 1] = 0;
+        img_bytes[wall_seq + 2] = 3;
+        img_bytes[wall_seq + 3] = 7;
+        img_bytes[wall_seq + 4] = 0xA1;
+
+        const size_t object_seq =
+            N3D_IMG_HIGH_SEQUENCE_BANK_OFFSET +
+            object_id * N3D_IMG_SEQUENCE_RECORD_BYTES;
+        img_bytes[object_seq + 0] = 100;
+        img_bytes[object_seq + 1] = 0;
+        img_bytes[object_seq + 2] = 2;
+        img_bytes[object_seq + 3] = 9;
+        img_bytes[object_seq + 4] = 0xB2;
+
+        for(unsigned frame = 0; frame < 3; ++frame)
+        {
+            const size_t off = wall_stream + frame * wall_frame_bytes;
+            img_bytes[off + 0] = 1;
+            img_bytes[off + 1] = 1;
+            img_bytes[off + 2] = (uint8_t)(0x10 + frame);
+            img_bytes[off + 9] = (uint8_t)(0x20 + frame);
+            img_bytes[off + 10] = (uint8_t)(0x50 + frame);
+        }
+
+        for(unsigned frame = 0; frame < 2; ++frame)
+        {
+            const size_t off = object_stream + frame * wall_frame_bytes;
+            img_bytes[off + 0] = 1;
+            img_bytes[off + 1] = 1;
+            img_bytes[off + 2] = (uint8_t)(0x30 + frame);
+            img_bytes[off + 9] = (uint8_t)(0x40 + frame);
+            img_bytes[off + 10] = (uint8_t)(0x60 + frame);
+        }
+
+        FILE* img_file = fopen("N3D_IMG_SEQDEF_TEST.BIN", "wb");
+        assert(img_file != NULL);
+        assert(fwrite(img_bytes, 1, total_size, img_file) == total_size);
+        fclose(img_file);
+
+        n3d_img_archive archive = {0};
+        assert(N3D_RE_LoadImgArchive(
+            "N3D_IMG_SEQDEF_TEST.BIN", &archive));
+        assert(archive.loaded);
+        assert(archive.size == total_size);
+        assert(archive.wall_offset[wall_id] == wall_stream);
+        assert(archive.object_offset[object_id] == object_stream);
+
+        const n3d_img_sequence_def* wall_sequence =
+            N3D_RE_WallSequence(&archive, wall_id);
+        assert(wall_sequence != NULL);
+        assert(wall_sequence->interval_ms == 50);
+        assert(wall_sequence->frame_count == 3);
+        assert(wall_sequence->extended == 7);
+        assert(wall_sequence->unknown[0] == 0xA1);
+
+        const n3d_img_sequence_def* object_sequence =
+            N3D_RE_ObjectSequence(&archive, object_id);
+        assert(object_sequence != NULL);
+        assert(object_sequence->interval_ms == 100);
+        assert(object_sequence->frame_count == 2);
+        assert(object_sequence->extended == 9);
+        assert(object_sequence->unknown[0] == 0xB2);
+
+        n3d_img_frame_view frame = {0};
+        assert(N3D_RE_WallSequenceFrame(
+            &archive, wall_id, 0, &frame));
+        assert(frame.file_offset == wall_stream);
+        assert(frame.width == 1 && frame.height == 1);
+        assert(frame.metadata[0] == 0x10);
+        assert(frame.metadata[7] == 0x20);
+        assert(frame.pixel_count == 1 && frame.pixels[0] == 0x50);
+
+        assert(N3D_RE_WallSequenceFrame(
+            &archive, wall_id, 2, &frame));
+        assert(frame.file_offset == wall_stream + 2 * wall_frame_bytes);
+        assert(frame.metadata[0] == 0x12);
+        assert(frame.pixels[0] == 0x52);
+        assert(!N3D_RE_WallSequenceFrame(
+            &archive, wall_id, 3, &frame));
+
+        assert(N3D_RE_ObjectSequenceFrame(
+            &archive, object_id, 1, &frame));
+        assert(frame.file_offset == object_stream + wall_frame_bytes);
+        assert(frame.metadata[0] == 0x31);
+        assert(frame.pixels[0] == 0x61);
+        assert(!N3D_RE_ObjectSequenceFrame(
+            &archive, object_id, 2, &frame));
+
+        N3D_RE_FreeImgArchive(&archive);
+        assert(!archive.loaded && archive.bytes == NULL);
+
+        /* Reject a directory entry that points into header/SEQDEF space. */
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_WALL_DIRECTORY_OFFSET + wall_id * 4u,
+            0x100u);
+        img_file = fopen("N3D_IMG_SEQDEF_BAD_TEST.BIN", "wb");
+        assert(img_file != NULL);
+        assert(fwrite(img_bytes, 1, total_size, img_file) == total_size);
+        fclose(img_file);
+
+        assert(!N3D_RE_LoadImgArchive(
+            "N3D_IMG_SEQDEF_BAD_TEST.BIN", &archive));
+
+        free(img_bytes);
+        remove("N3D_IMG_SEQDEF_TEST.BIN");
+        remove("N3D_IMG_SEQDEF_BAD_TEST.BIN");
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");
