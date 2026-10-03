@@ -4169,6 +4169,75 @@ int main(void)
         assert(n3d_guards[0].transition_flag == 1);
     }
 
+    /* Recovered FUN_7594 attack gate and +17/+18 caches. */
+    {
+        n3d_guard_record gate_guard = {0};
+        n3d_object_record gate_object = {0};
+
+        gate_object.world_x = 100;
+        gate_object.world_y = 200;
+
+        int eligible = -1;
+
+        gate_guard.transition_flag = 0;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &gate_guard,
+            &gate_object,
+            164,
+            264,
+            0,
+            &eligible));
+        assert(eligible == 1);
+        assert(gate_guard.unknown_17 == 0);
+        assert(gate_guard.unknown_18 == 1);
+
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &gate_guard,
+            &gate_object,
+            165,
+            264,
+            1,
+            &eligible));
+        assert(eligible == 0);
+        assert(gate_guard.unknown_17 == 1);
+        assert(gate_guard.unknown_18 == 0);
+
+        gate_guard.transition_flag = 1;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &gate_guard,
+            &gate_object,
+            300,
+            400,
+            1,
+            &eligible));
+        assert(eligible == 1);
+        assert(gate_guard.unknown_17 == 1);
+
+        gate_guard.transition_flag = 2;
+        assert(N3D_RE_TryEvaluateGuardAttackGate(
+            &gate_guard,
+            &gate_object,
+            300,
+            400,
+            0,
+            &eligible));
+        assert(eligible == 0);
+        assert(gate_guard.unknown_17 == 0);
+
+        gate_guard.transition_flag = 3;
+        eligible = 1;
+        assert(!N3D_RE_TryEvaluateGuardAttackGate(
+            &gate_guard,
+            &gate_object,
+            100,
+            200,
+            1,
+            &eligible));
+        assert(eligible == 0);
+        assert(gate_guard.unknown_17 == 1);
+        assert(gate_guard.unknown_18 == 1);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }

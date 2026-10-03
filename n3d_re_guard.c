@@ -152,6 +152,50 @@ int N3D_RE_BeginState04RecoverySequence(
         N3D_GUARD_STATE_05);
 }
 
+int N3D_RE_TryEvaluateGuardAttackGate(
+    n3d_guard_record* guard,
+    const n3d_object_record* object,
+    int16_t player_world_x,
+    int16_t player_world_y,
+    int perception_succeeded,
+    int* attack_eligible)
+{
+    if(!guard || !object || !attack_eligible)
+        return 0;
+
+    guard->unknown_17 = perception_succeeded ? 1 : 0;
+
+    const int dx =
+        (int)player_world_x - (int)object->world_x;
+    const int dy =
+        (int)player_world_y - (int)object->world_y;
+
+    const int abs_dx = dx < 0 ? -dx : dx;
+    const int abs_dy = dy < 0 ? -dy : dy;
+
+    const int within_one_tile =
+        abs_dx <= N3D_WORLD_UNITS_PER_TILE &&
+        abs_dy <= N3D_WORLD_UNITS_PER_TILE;
+
+    guard->unknown_18 = within_one_tile ? 1 : 0;
+
+    switch(guard->transition_flag)
+    {
+        case 0:
+            *attack_eligible = within_one_tile;
+            return 1;
+
+        case 1:
+        case 2:
+            *attack_eligible = perception_succeeded ? 1 : 0;
+            return 1;
+
+        default:
+            *attack_eligible = 0;
+            return 0;
+    }
+}
+
 int N3D_RE_TickState01(n3d_guard_record* guard)
 {
     if (!guard || guard->state != N3D_GUARD_STATE_01)

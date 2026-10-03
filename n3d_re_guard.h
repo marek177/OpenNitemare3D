@@ -60,6 +60,19 @@ int N3D_RE_BeginState04RecoverySequence(
     n3d_object_record* object,
     uint16_t class_sequence_38);
 
+/*
+ * Recovered FUN_1010_7594 decision tail.
+ * Writes +0x17 perception cache and +0x18 one-tile proximity cache.
+ * Returns 1 when +0x16 mode is recovered (0..2), 0 for unsupported modes.
+ */
+int N3D_RE_TryEvaluateGuardAttackGate(
+    n3d_guard_record* guard,
+    const n3d_object_record* object,
+    int16_t player_world_x,
+    int16_t player_world_y,
+    int perception_succeeded,
+    int* attack_eligible);
+
 int N3D_RE_TickState01(n3d_guard_record* guard);
 int N3D_RE_CompleteDeferredState(n3d_guard_record* guard);
 int N3D_RE_CompleteState06(n3d_guard_record* guard);
