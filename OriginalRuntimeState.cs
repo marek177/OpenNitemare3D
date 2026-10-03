@@ -94,10 +94,46 @@ namespace Nitemare3D
         // the projected sprite overlaps the aim center; hitscan requires equality.
         public static uint CurrentRenderGeneration { get; private set; }
 
-        // Mirrors the second half of the class-0x16 damage gate:
-        // (episode == 3 || DAT_1048_51A6 != 0). The exact producer of 51A6 is
-        // still separate, so production defaults this override to false.
-        public static bool GuardAttackClass16FullDamageOverride { get; set; }
+        // DAT_1048_51A6. This is a persistent scripted-progression byte,
+        // initialized to 0 by FUN_0EF6 and promoted by FUN_BFD8 event handlers.
+        // Class-0x16 enemy damage tests only whether it is nonzero.
+        public static byte StoryProgress51A6 { get; private set; }
+
+        // Compatibility surface kept for callers written before the 51A6 closure.
+        public static bool GuardAttackClass16FullDamageOverride
+        {
+            get => StoryProgress51A6 != 0;
+            set => StoryProgress51A6 = value ? (byte)1 : (byte)0;
+        }
+
+        public static bool ApplyScriptTouchProgress51A6(
+            int episode,
+            int levelNumber,
+            byte wallClass)
+        {
+            if (wallClass != 0x47 || StoryProgress51A6 != 0)
+                return false;
+
+            bool activates =
+                (episode == 1 && (levelNumber == 7 || levelNumber == 10)) ||
+                (episode == 2 && levelNumber == 10) ||
+                (episode == 3 && (levelNumber == 1 || levelNumber == 10));
+
+            if (!activates)
+                return false;
+
+            StoryProgress51A6 = 1;
+            return true;
+        }
+
+        public static bool AdvanceScriptProgress51A6ToPhase2()
+        {
+            if (StoryProgress51A6 != 1)
+                return false;
+
+            StoryProgress51A6 = 2;
+            return true;
+        }
 
         public static void BeginFrame(float deltaSeconds)
         {
@@ -163,7 +199,6 @@ namespace Nitemare3D
             bindings.Clear();
             ObjectCount = 0;
             GuardCount = 0;
-            GuardAttackClass16FullDamageOverride = false;
             guardLogicAccumulator = 0;
             projectileLogicAccumulator = 0;
             SlowLogicTickDue = false;
