@@ -28,6 +28,7 @@ namespace Nitemare3D
             TestImgResourceLoader();
             TestOriginalMapTables();
             TestOriginalWallRuntime();
+            TestRemoteDoorMenu51A4();
             TestExplodingWallRuntime();
             TestOriginalRandom();
             TestDamageMatrix();
@@ -1156,6 +1157,97 @@ namespace Nitemare3D
                    doorRecord.TargetX == door.TargetX &&
                    doorRecord.TargetY == door.TargetY,
                 "door runtime record export mismatch.");
+        }
+
+        static void TestRemoteDoorMenu51A4()
+        {
+            byte[] mapBytes = new byte[
+                OriginalMapTables.HeaderBytes +
+                OriginalMapTables.LevelBytes];
+            mapBytes[0] = 1;
+
+            // raw wall 1 -> remote vertical door class 0x3B
+            mapBytes[0x0002 + 1] =
+                (byte)OriginalWallSemanticClass.DoorVerticalRemote;
+
+            int level = OriginalMapTables.HeaderBytes;
+            int cell = (2 + 2 * 64) * 2;
+            mapBytes[level + cell] = 1;
+
+            var map = OriginalMapTables.Parse(mapBytes, 0);
+
+            var first = new OriginalRendererCore.Vec
+            {
+                WallId = 1,
+                TextureOffset = 3,
+                Flags = OriginalMapTables.WallDynamicDoor,
+                RenderClass =
+                    (byte)OriginalWallSemanticClass.DoorVerticalRemote,
+                Orientation = 0,
+                X1 = 128,
+                Y1 = 128,
+                X2 = 192,
+                Y2 = 128
+            };
+            var second = new OriginalRendererCore.Vec
+            {
+                WallId = 1,
+                TextureOffset = 3,
+                Flags = OriginalMapTables.WallDynamicDoor,
+                RenderClass =
+                    (byte)OriginalWallSemanticClass.DoorVerticalRemote,
+                Orientation = 0,
+                X1 = 128,
+                Y1 = 128,
+                X2 = 192,
+                Y2 = 192
+            };
+
+            var vectors =
+                new System.Collections.Generic.List<OriginalRendererCore.Vec>
+                {
+                    first,
+                    second
+                };
+
+            var walls = new OriginalWallRuntime(map, vectors);
+            var door = walls.FindPairedWall(2, 2);
+            Assert(door != null && door.State == 1,
+                "remote-door test must start in closed state 1.");
+
+            var savedWalls = Level.originalWalls;
+            Level.originalWalls = walls;
+
+            try
+            {
+                // Ensure the selected test bit starts clear.
+                OriginalRuntimeState.ApplyRemoteDoorCommand(3, false);
+
+                Assert(!OriginalRuntimeState.RemoteDoorsOpenForArea(3),
+                    "remote-door area bit must start clear.");
+
+                Assert(OriginalRuntimeState.ApplyRemoteDoorCommand(3, true) == 1 &&
+                       door.State == 2 &&
+                       door.Latch == 1 &&
+                       OriginalRuntimeState.RemoteDoorsOpenForArea(3),
+                    "Open remote doors must enter opening state 2 and set 51A4 bit.");
+
+                Assert(OriginalRuntimeState.ApplyRemoteDoorCommand(3, false) == 1 &&
+                       door.State == 3 &&
+                       !OriginalRuntimeState.RemoteDoorsOpenForArea(3),
+                    "Close remote doors must enter closing state 3 and clear 51A4 bit.");
+
+                Assert(OriginalRuntimeState.ApplyRemoteDoorCommand(2, true) == 0 &&
+                       !OriginalRuntimeState.RemoteDoorsOpenForArea(2),
+                    "nonmatching remote-door area must not move a controller.");
+            }
+            finally
+            {
+                // Restore global test bridge state.
+                OriginalRuntimeState.ApplyRemoteDoorCommand(2, false);
+                OriginalRuntimeState.ApplyRemoteDoorCommand(3, false);
+                Level.originalWalls = savedWalls;
+            }
         }
 
         static void TestExplodingWallRuntime()
