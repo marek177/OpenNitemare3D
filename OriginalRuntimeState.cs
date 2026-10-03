@@ -565,6 +565,13 @@ namespace Nitemare3D
                 case OriginalGuardState.Transition05:
                 case OriginalGuardState.MoveThen03:
                 case OriginalGuardState.Active07:
+                case OriginalGuardState.Move08:
+                    return TickState08Bridge(
+                        entity,
+                        binding,
+                        ref guard,
+                        ref obj);
+
                 case OriginalGuardState.DeathFinalize09:
                 case OriginalGuardState.NoLocalAction0A:
                 case OriginalGuardState.LethalPlayerContact0B:
@@ -620,6 +627,112 @@ namespace Nitemare3D
                 playerWorldX,
                 playerWorldY,
                 true);
+        }
+
+        static OriginalGuardDispatchResult TickState08Bridge(
+            Entity entity,
+            Binding binding,
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            if (Game.player == null ||
+                Level.originalMap == null ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition))
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+
+            int tileX = obj.WorldX >> 6;
+            int tileY = obj.WorldY >> 6;
+
+            if (tileX >= 0 && tileY >= 0 &&
+                tileX < OriginalRuntime.MapWidth &&
+                tileY < OriginalRuntime.MapHeight)
+            {
+                byte rawWallId = Level.originalMap.WallId[tileX, tileY];
+                byte wallClass = Level.originalMap.WallClass[rawWallId];
+                byte wallVariant = 0;
+
+                if ((wallClass == 0x41 || wallClass == 0x42) &&
+                    Level.originalMap.TryGetWallClassVariant(
+                        rawWallId,
+                        wallClass,
+                        out byte variant))
+                {
+                    wallVariant = variant;
+                }
+
+                OriginalGuardDispatcher.ApplyState08WallTurn(
+                    ref guard,
+                    ref obj,
+                    wallClass,
+                    wallVariant);
+            }
+
+            int guardSlot = binding.GuardSlot;
+            int objectSlot = binding.ObjectSlot;
+
+            var movement =
+                OriginalGuardDispatcher.TickMovementCollisionCore(
+                    ref guard,
+                    ref obj,
+                    (candidateX, candidateY) =>
+                        EvaluateGuardMovementBlocked(
+                            guardSlot,
+                            objectSlot,
+                            definition,
+                            playerWorldX,
+                            playerWorldY,
+                            candidateX,
+                            candidateY),
+                    OriginalRandom.Next);
+
+            OriginalGuardDispatcher.RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            entity.position.X =
+                (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
+            entity.position.Y =
+                (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+
+            if (guard.NextState == (byte)OriginalGuardState.Active02 &&
+                !GuardProcessingGate)
+            {
+                bool perceived =
+                    OriginalGuardDispatcher.EvaluateGuardPerception(
+                        ref guard,
+                        ref obj,
+                        playerWorldX,
+                        playerWorldY,
+                        false,
+                        false,
+                        Level.OriginalPerceptionLineTrace);
+
+                if (perceived)
+                {
+                    guard.State = (byte)OriginalGuardState.Active02;
+                    return OriginalGuardDispatchResult.Transitioned;
+                }
+            }
+
+            if (movement.AppliedX != 0 || movement.AppliedY != 0)
+                return movement.PositionCommitted
+                    ? OriginalGuardDispatchResult.Moved
+                    : OriginalGuardDispatchResult.MovementBlocked;
+
+            return movement.XBlocked || movement.YBlocked
+                ? OriginalGuardDispatchResult.MovementBlocked
+                : OriginalGuardDispatchResult.Waiting;
         }
 
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
@@ -946,6 +1059,7 @@ namespace Nitemare3D
                 case OriginalGuardState.Transition05:
                 case OriginalGuardState.MoveThen03:
                 case OriginalGuardState.Active07:
+                case OriginalGuardState.Move08:
                 case OriginalGuardState.DeathFinalize09:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
