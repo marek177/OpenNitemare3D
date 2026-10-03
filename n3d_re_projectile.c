@@ -459,6 +459,44 @@ N3D_RE_ResolveProjectileGuardHit(
     return result;
 }
 
+n3d_projectile_wall_resolution
+N3D_RE_ResolveProjectileWallCollision(
+    int slot,
+    const n3d_projectile_collision_result* collision)
+{
+    n3d_projectile_wall_resolution result = {0};
+
+    if(!collision || slot < 0 || slot >= N3D_MAX_PROJECTILES)
+        return result;
+
+    if(collision->kind == N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL)
+    {
+        /*
+         * Closed 9B64 evidence:
+         *   wall property 0x10 -> event 0x29 -> runtime class 0x2D.
+         * Final wall/map collision cleanup after animation is deliberately
+         * not performed here because that writer is still unresolved.
+         */
+        result.resolved = 1;
+        result.event_id = N3D_EXPLODABLE_WALL_EVENT;
+        result.requested_runtime_wall_class =
+            N3D_EXPLODABLE_WALL_RUNTIME_CLASS;
+
+        if(N3D_RE_EnterProjectileImpactFromFlight(slot))
+            result.entered_impact = 1;
+
+        return result;
+    }
+
+    if(collision->kind == N3D_PROJECTILE_COLLISION_WALL_DEFERRED)
+    {
+        result.deferred = 1;
+        return result;
+    }
+
+    return result;
+}
+
 void N3D_RE_AdvanceProjectileAnimation(int slot, int frame_count)
 {
     if(slot < 0 || slot >= N3D_MAX_PROJECTILES || frame_count <= 0)
