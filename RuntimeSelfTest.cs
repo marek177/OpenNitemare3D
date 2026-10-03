@@ -18,6 +18,7 @@ namespace Nitemare3D
             TestRecordSizes();
             TestShadeRuntime();
             TestFrameCalibration();
+            TestDeathCameraAngleStep();
             TestExactSpriteProjection();
             TestProjectedSpriteQueue();
             TestGuardLogicClock();
@@ -160,6 +161,36 @@ namespace Nitemare3D
             // Restore the portable/default effective 40-ms profile for all
             // subsequent runtime tests.
             OriginalRuntimeState.ConfigureFrameCalibration(40);
+        }
+
+        static void TestDeathCameraAngleStep()
+        {
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       0, 90, 5) == 5,
+                "death camera must advance positive angle by max step.");
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       90, 0, 5) == 85,
+                "death camera must advance negative angle by max step.");
+
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       358, 2, 5) == 2,
+                "death camera wrap-around short path mismatch.");
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       2, 358, 5) == 358,
+                "death camera reverse wrap-around mismatch.");
+
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       10, 12, 5) == 12,
+                "death camera must snap when remaining delta is below max step.");
+            Assert(OriginalRuntimeState.StepOriginalAngleToward(
+                       45, 45, 5) == 45,
+                "aligned death camera must remain unchanged.");
+
+            Assert(OriginalProjectileRuntime.AngleFromDirection(0, -1) == 0 &&
+                   OriginalProjectileRuntime.AngleFromDirection(1, 0) == 90 &&
+                   OriginalProjectileRuntime.AngleFromDirection(0, 1) == 180 &&
+                   OriginalProjectileRuntime.AngleFromDirection(-1, 0) == 270,
+                "original death-camera cardinal angle convention mismatch.");
         }
 
         static void TestExactSpriteProjection()
