@@ -24,6 +24,7 @@ namespace Nitemare3D
 
         public DirectionalGuard(GuardType type, Direction dir, byte mapObjectId = 0)
         {
+            this.type = type;
             this.mapObjectId = mapObjectId;
             switch (type)
             {
@@ -150,21 +151,48 @@ namespace Nitemare3D
 
         public override void Update()
         {
-            //todo calculate direction from velocity
+            // Keep the historical patrol path only for states that are not yet
+            // owned by the recovered 22-state runtime.
             HandleAnimation();
-            UpdateGuard();
 
+            bool runtimeOwnsGuard = false;
 
+            if (OriginalRuntimeState.AutonomousGuardRuntimeEnabled &&
+                OriginalRuntimeState.TryGetGuardRuntimeState(
+                    this,
+                    out OriginalGuardState runtimeState,
+                    out _) &&
+                OriginalRuntimeState.IsConfirmedAutonomousState(runtimeState))
+            {
+                runtimeOwnsGuard = true;
 
-            position += velocity * speed * Time.dt;
+                if (OriginalRuntimeState.GuardLogicTickDue)
+                {
+                    var result =
+                        OriginalRuntimeState.TickConfirmedAutonomousState(this);
 
+                    if (result == OriginalGuardDispatchResult.NotHandled)
+                        runtimeOwnsGuard = false;
+                }
+
+                if (runtimeOwnsGuard &&
+                    OriginalRuntimeState.TryGetGuardRecord(
+                        this,
+                        out var runtimeGuard))
+                {
+                    direction = (Direction)(runtimeGuard.Octant & 7);
+                }
+            }
+
+            if (!runtimeOwnsGuard)
+            {
+                UpdateGuard();
+                position += velocity * speed * Time.dt;
+            }
 
             spritePosition = position;
-
             spriteIndex = texOffset + (int)direction * 4;
             OriginalRuntimeState.SyncGuardPosition(this);
-
-
         }
     }
 }
