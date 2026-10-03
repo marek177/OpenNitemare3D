@@ -120,18 +120,6 @@ namespace Nitemare3D
 
             WriteWorldPosition(ref obj, entity.position);
 
-            if (mapObjectId != 0 &&
-                Img.current != null &&
-                Img.current.rawData != null &&
-                OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
-                    Img.current.rawData,
-                    mapObjectId,
-                    ObjectDefinitions,
-                    out byte definitionId))
-            {
-                obj.DefinitionId = definitionId;
-            }
-
             ref var guard = ref Guards[guardSlot];
             guard.ObjectSlot = (ushort)objectSlot;
             guard.Strength = OriginalRuntime.GuardInitialStrength;
@@ -163,17 +151,10 @@ namespace Nitemare3D
             if (mapObjectId == 0 || Img.current == null)
                 return false;
 
-            if (!Img.current.TryGetObjectDefinition(
-                    mapObjectId,
-                    out uint sourceKey,
-                    out var definition))
-            {
-                return false;
-            }
-
-            return ObjectDefinitions.TryGetOrAdd(
-                sourceKey,
-                definition,
+            return OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
+                Img.current.rawData,
+                mapObjectId,
+                ObjectDefinitions,
                 out definitionId);
         }
 
