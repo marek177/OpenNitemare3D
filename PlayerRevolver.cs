@@ -11,6 +11,8 @@ namespace Nitemare3D
 
         public override void Fire()
         {
+            OriginalRuntimeState.FireHitscan(
+                OriginalWeaponSelector.SilverPistol);
         }
     }
 }
