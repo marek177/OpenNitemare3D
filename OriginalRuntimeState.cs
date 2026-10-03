@@ -189,6 +189,14 @@ namespace Nitemare3D
         public static bool PlayerDeathLatch46AC { get; private set; }
         public static ushort PlayerDeathSource4C1A { get; private set; }
 
+        // DAT_1048_4BE5. When nonzero FUN_8C0A still computes/marks damage
+        // but suppresses all player-health/death commits. Other original paths
+        // also replenish HP/ammo while this protection flag is active.
+        public static bool PlayerDamageSuppressed4BE5 { get; set; }
+
+        // DAT_1048_53F8: per-frame angular step in degrees, produced by D7D0.
+        public static ushort FrameTurnStepDegrees53F8 { get; private set; } = 5;
+
         // Compatibility surface kept for callers written before the 51A6 closure.
         public static bool GuardAttackClass16FullDamageOverride
         {
@@ -356,6 +364,17 @@ namespace Nitemare3D
             if (deltaSeconds <= 0)
                 return;
 
+            // D7D0 clamps effective frame duration to at least 40 ms and derives
+            // the angular step at DS:53F8 as:
+            //   max(1, (frameMs*360 + 1400) / 2800)
+            // Keep this value available to the recovered player-death camera.
+            int effectiveFrameMs =
+                Math.Max(40, (int)Math.Round(deltaSeconds * 1000.0));
+            FrameTurnStepDegrees53F8 =
+                (ushort)Math.Max(
+                    1,
+                    (effectiveFrameMs * 360 + 1400) / 2800);
+
             // Maintain the 32-bit absolute runtime clock used by OBJECT/projectile
             // animation deadlines. Preserve fractional milliseconds so a fast host
             // does not accumulate per-frame rounding drift.
@@ -441,6 +460,8 @@ namespace Nitemare3D
             GuardDamageMarker4C0E = 0;
             PlayerDeathLatch46AC = false;
             PlayerDeathSource4C1A = 0;
+            PlayerDamageSuppressed4BE5 = false;
+            FrameTurnStepDegrees53F8 = 5;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -1140,6 +1161,9 @@ namespace Nitemare3D
             int amount = damage.DifficultyTransformed;
             if (amount != 0)
                 GuardDamageMarker4C0E = 3;
+
+            if (PlayerDamageSuppressed4BE5)
+                return false;
 
             int hp = Game.player.health;
             if (amount >= hp)
