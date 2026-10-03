@@ -16,7 +16,11 @@ namespace Nitemare3D
     /// </summary>
     public static class OriginalRendererStage4
     {
-        public static bool Enabled { get; private set; } = true;
+        // Keep Stage 4 explicit until every world-object sprite class is
+        // migrated into the recovered 18-byte queue. This avoids silently
+        // hiding legacy-only pickups/scenery merely because renderer tables
+        // happen to be present in data/.
+        public static bool Enabled { get; private set; } = false;
 
         public static bool ForceNativeResolution
         {
@@ -130,10 +134,9 @@ namespace Nitemare3D
             if (!OriginalRuntimeState.TryLoadExactTrigQ10(
                     trigPath))
             {
-                // The recovered renderer is the production default when its
-                // exact extracted tables are available. A checkout without the
-                // original-data-derived trig table may still run the historical
-                // renderer unless Stage 4 was explicitly requested.
+                // Stage 4 is explicit while non-runtime world-object sprites
+                // are still being migrated. Never substitute approximate trig
+                // data when the user requested the recovered renderer.
                 if (explicitlyRequested)
                 {
                     throw new FileNotFoundException(
