@@ -226,7 +226,7 @@ namespace Nitemare3D
             }
 
             ref var obj = ref Objects[binding.ObjectSlot];
-            return ObjectDefinitions.TryGetSequence(
+            return ObjectDefinitions.TryGetGuardStateWord(
                 obj.DefinitionId,
                 state,
                 out packedSequence);
