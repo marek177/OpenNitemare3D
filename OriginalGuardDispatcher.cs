@@ -1036,6 +1036,148 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Transitioned;
         }
 
+        /// <summary>
+        /// Exact state-0x0E Cannon gate from FUN_1010_7B56. The original
+        /// refreshes the directional sequence, then enters 0x0F with timer 0
+        /// only while the global remote-cannon enable byte is non-zero.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickCannonConditional0E(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            bool attackEnabled)
+        {
+            if (guard.State != (byte)OriginalGuardState.Conditional0E)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            if (!attackEnabled)
+                return OriginalGuardDispatchResult.Waiting;
+
+            guard.Timer = 0;
+            guard.State = (byte)OriginalGuardState.Timed0F;
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// Exact state-0x0F Cannon cadence. The dispatcher tests the pre-
+        /// decrement timer value. At zero it emits the attack-sound point,
+        /// selects the state-0x10 directional-B sequence, then wraps that
+        /// sequence in state 0 with next-state 0x10.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickCannonTimed0F(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            bool attackEnabled,
+            out bool attackSoundPoint)
+        {
+            attackSoundPoint = false;
+
+            if (guard.State != (byte)OriginalGuardState.Timed0F)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            if (!attackEnabled)
+            {
+                guard.State = (byte)OriginalGuardState.Conditional0E;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            short oldTimer = guard.Timer;
+            guard.Timer--;
+
+            if (oldTimer != 0)
+                return OriginalGuardDispatchResult.Waiting;
+
+            attackSoundPoint = true;
+
+            // FUN_7B56 changes state to 0x10 before the forced FUN_6CD8,
+            // so GetDirectionalSequence selects bank B.
+            guard.State = (byte)OriginalGuardState.Timed10;
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                true);
+
+            // Cannon differs from BeginPackedSequence: it copies the full high
+            // byte here; state 0 performs the subsequent countdown.
+            guard.Timer = (short)((guard.DefinitionValue >> 8) & 0xFF);
+            guard.NextState = (byte)OriginalGuardState.Timed10;
+            guard.State = (byte)OriginalGuardState.AnimationTimer;
+
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
+        /// <summary>
+        /// Exact state-0x10 Cannon tail. It tests the pre-decrement timer,
+        /// invokes the common perception/damage path once at expiry, then
+        /// schedules an eight-tick 0x0F delay and force-refreshes bank A.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickCannonTimed10(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            Action attackAction)
+        {
+            if (guard.State != (byte)OriginalGuardState.Timed10)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            short oldTimer = guard.Timer;
+            guard.Timer--;
+
+            if (oldTimer != 0)
+                return OriginalGuardDispatchResult.Waiting;
+
+            attackAction?.Invoke();
+
+            guard.Timer = 8;
+            guard.State = (byte)OriginalGuardState.Timed0F;
+
+            // The original falls through the common forced sequence-refresh
+            // tail after changing state back to 0x0F, selecting bank A.
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                true);
+
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         public static void UpdateOctantFromMovement(
             ref OriginalGuardRecord guard,
             int moveX,
