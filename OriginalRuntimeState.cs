@@ -423,6 +423,13 @@ namespace Nitemare3D
 
             WriteWorldPosition(ref obj, entity.position);
 
+            if (hasMapSemantics)
+            {
+                obj.MapCellBinding = OriginalMapTables.CellBindingHandle(
+                    obj.WorldX >> 6,
+                    obj.WorldY >> 6);
+            }
+
             ref var guard = ref Guards[guardSlot];
             guard.ObjectSlot = (ushort)objectSlot;
             guard.Strength = OriginalRuntime.GuardInitialStrength;
@@ -1466,22 +1473,57 @@ namespace Nitemare3D
 
                 case OriginalGuardState.Transition13:
                 {
+                    if (Game.player == null || Level.originalMap == null)
+                        return OriginalGuardDispatchResult.NotHandled;
+
+                    int sourceTileX = obj.WorldX >> 6;
+                    int sourceTileY = obj.WorldY >> 6;
+
+                    short playerWorldX =
+                        ToWorldCoordinate(Game.player.position.X);
+                    short playerWorldY =
+                        ToWorldCoordinate(Game.player.position.Y);
+                    int playerTileX = playerWorldX >> 6;
+                    int playerTileY = playerWorldY >> 6;
+
+                    byte triggerOctant = guard.Octant;
+
                     var result = OriginalGuardDispatcher.TickState13(
                         ref guard,
                         ref obj,
-                        (worldX, worldY) =>
+                        (candidateX, candidateY) =>
                         {
-                            int tileX = worldX >> 6;
-                            int tileY = worldY >> 6;
-                            return Level.IsWalkable(tileX, tileY, entity);
+                            int targetTileX = candidateX >> 6;
+                            int targetTileY = candidateY >> 6;
+
+                            return Level.TryCommitOriginalState13MapMove(
+                                sourceTileX,
+                                sourceTileY,
+                                targetTileX,
+                                targetTileY,
+                                playerTileX,
+                                playerTileY);
+                        },
+                        () =>
+                        {
+                            Level.TriggerOriginalState13OneShot(
+                                sourceTileX,
+                                sourceTileY,
+                                triggerOctant);
                         });
 
                     if (result == OriginalGuardDispatchResult.Moved)
                     {
+                        obj.MapCellBinding = OriginalMapTables.CellBindingHandle(
+                            obj.WorldX >> 6,
+                            obj.WorldY >> 6);
+
                         entity.position.X =
                             (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
                         entity.position.Y =
                             (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+
+                        SyncGuardPosition(entity);
                     }
 
                     return result;
