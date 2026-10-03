@@ -10,6 +10,8 @@ namespace Nitemare3D
     [StructLayout(LayoutKind.Explicit, Pack = 1, Size = OriginalRuntime.ObjectResourceHeaderBytes)]
     public struct OriginalObjectDefinitionRecord
     {
+        // Runtime cache entry +0/+2 are sourced from these first SEQDEF bytes.
+        [FieldOffset(0x00)] public ushort Interval;
         [FieldOffset(0x02)] public byte FrameCount;
 
         [FieldOffset(0x04)] public ushort DirectionalA0;
@@ -309,6 +311,7 @@ namespace Nitemare3D
 
             var d = new OriginalObjectDefinitionRecord
             {
+                Interval = ReadUInt16LittleEndian(headerBytes, offset + 0x00),
                 FrameCount = headerBytes[offset + 0x02],
                 State02Sequence = ReadUInt16LittleEndian(headerBytes, offset + 0x34),
                 State03Sequence = ReadUInt16LittleEndian(headerBytes, offset + 0x36),
