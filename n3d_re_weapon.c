@@ -55,12 +55,13 @@ n3d_fire_result N3D_RE_TryBeginPlayerFire(uint8_t projectile_sequence_base)
          * Pool availability is checked before ammo mutation, matching A97C
          * caller ordering recovered for projectile weapons.
          */
-        if(!N3D_RE_InitializeProjectile(
+        if(!N3D_RE_InitializeProjectileFromAngle(
                 slot,
                 n3d_player.active_weapon,
                 n3d_player.world_x,
                 n3d_player.world_y,
-                projectile_sequence_base))
+                projectile_sequence_base,
+                n3d_player.angle_degrees))
         {
             result.kind = N3D_FIRE_UNRESOLVED;
             return result;
