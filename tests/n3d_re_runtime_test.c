@@ -2281,6 +2281,108 @@ int main(void)
     assert(jam_event.sound_id == N3D_WEAPON_JAM_SOUND_ID);
     assert(n3d_player.weapon_jam == 0);
 
+    /* Projectile collision classification mirrors the closed 9B64 branches. */
+    {
+        N3D_RE_ResetRuntime();
+
+        /* Ensure empty raw cell 0 remains fully resolved and non-colliding. */
+        n3d_wall_mapping_known[0] = 1;
+        n3d_wall_property_known[0] = 1;
+        n3d_wall_mapped_type[0] = 0;
+        n3d_wall_property_resolved[0] = 0;
+        n3d_object_mapping_known[0] = 1;
+        n3d_object_property_known[0] = 1;
+        n3d_object_mapped_type[0] = 0;
+        n3d_object_property_resolved[0] = 0;
+
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER, 10 * 64 + 32, 10 * 64 + 32, 20));
+
+        n3d_projectile_collision_result projectile_collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind == N3D_PROJECTILE_COLLISION_NONE);
+        assert(projectile_collision.enter_impact == 0);
+
+        /* Unknown raw wall mapping must remain explicitly unresolved. */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0x71;
+        projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_UNRESOLVED);
+
+        /*
+         * GUARD cell path: object property bit 0x08 gates the lookup and the
+         * exact +/-9 world tolerance decides the hit.
+         */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0;
+        n3d_map[10 * N3D_MAP_WIDTH + 10].object = 0x80;
+
+        n3d_object_mapping_known[0x80] = 1;
+        n3d_object_property_known[0x80] = 1;
+        n3d_object_mapped_type[0x80] = 0x08;
+        n3d_object_property_resolved[0x80] =
+            N3D_RE_ObjectPropertiesForMappedType(0x08);
+
+        int guard_object_slot = -1;
+        assert(N3D_RE_InstantiateMapObject(
+            0x80, 10, 10, &guard_object_slot));
+        assert(guard_object_slot >= 0);
+        assert(n3d_guard_count == 1);
+
+        n3d_projectiles[0].object.world_x =
+            n3d_objects[guard_object_slot].world_x + 9;
+        n3d_projectiles[0].object.world_y =
+            n3d_objects[guard_object_slot].world_y - 9;
+
+        projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_GUARD_HIT);
+        assert(projectile_collision.object_slot == guard_object_slot);
+        assert(projectile_collision.guard_slot ==
+               n3d_objects[guard_object_slot].guard_index);
+        assert(projectile_collision.enter_impact == 1);
+
+        n3d_projectiles[0].object.world_x =
+            n3d_objects[guard_object_slot].world_x + 10;
+        n3d_projectiles[0].object.world_y =
+            n3d_objects[guard_object_slot].world_y;
+        projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind == N3D_PROJECTILE_COLLISION_NONE);
+
+        /* Explodable wall: property 0x10 requests event 0x29 and impact. */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].object = 0;
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0xFE;
+        n3d_wall_mapping_known[0xFE] = 1;
+        n3d_wall_property_known[0xFE] = 1;
+        n3d_wall_mapped_type[0xFE] = 0x2E;
+        n3d_wall_property_resolved[0xFE] =
+            N3D_RE_WallPropertiesForMappedType(0x2E);
+
+        n3d_projectiles[0].object.world_x = 10 * 64 + 32;
+        n3d_projectiles[0].object.world_y = 10 * 64 + 32;
+        projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL);
+        assert(projectile_collision.mapped_wall_type == 0x2E);
+        assert(projectile_collision.event_id == N3D_EXPLODABLE_WALL_EVENT);
+        assert(projectile_collision.enter_impact == 1);
+
+        /*
+         * Ordinary known blocking wall is classified but its remaining 9B64
+         * state/cleanup effects stay deferred.
+         */
+        n3d_map[10 * N3D_MAP_WIDTH + 10].wall = 0x01;
+        n3d_wall_mapping_known[0x01] = 1;
+        n3d_wall_property_known[0x01] = 1;
+        n3d_wall_mapped_type[0x01] = 0x01;
+        n3d_wall_property_resolved[0x01] =
+            N3D_RE_WallPropertiesForMappedType(0x01);
+
+        projectile_collision = N3D_RE_ClassifyProjectileCollision(0);
+        assert(projectile_collision.kind ==
+               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+        assert(projectile_collision.enter_impact == 0);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
