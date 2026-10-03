@@ -181,6 +181,14 @@ namespace Nitemare3D
         public static byte GameplayState46B4 { get; private set; }
         public static bool EndingRequested51AA { get; private set; }
 
+        // FUN_1010_8C0A player-damage/death globals.
+        // 4C0E is set to 3 whenever computed GUARD damage is nonzero.
+        // 46AC is latched to 1 on lethal player damage.
+        // 4C1A receives the low WORD of the attacking OBJECT +0x08 runtime value.
+        public static ushort GuardDamageMarker4C0E { get; private set; }
+        public static bool PlayerDeathLatch46AC { get; private set; }
+        public static ushort PlayerDeathSource4C1A { get; private set; }
+
         // Compatibility surface kept for callers written before the 51A6 closure.
         public static bool GuardAttackClass16FullDamageOverride
         {
@@ -430,6 +438,9 @@ namespace Nitemare3D
             CurrentRenderGeneration = 0;
             GameplayState46B4 = 0;
             EndingRequested51AA = false;
+            GuardDamageMarker4C0E = 0;
+            PlayerDeathLatch46AC = false;
+            PlayerDeathSource4C1A = 0;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -1093,10 +1104,16 @@ namespace Nitemare3D
         }
 
         static bool ApplyGuardAttackDamageToPlayer(
+            ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj)
         {
             if (Game.player == null)
                 return false;
+
+            // FUN_8C0A does not apply further health changes once the player is
+            // already in gameplay state 2 (death).
+            if (GameplayState46B4 == 2)
+                return true;
 
             short playerWorldX = ToWorldCoordinate(Game.player.position.X);
             short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
@@ -1120,10 +1137,32 @@ namespace Nitemare3D
                 class16FullDamageGate,
                 randomValue);
 
-            int hp = Game.player.health;
             int amount = damage.DifficultyTransformed;
-            Game.player.health = amount >= hp ? 0 : hp - amount;
-            return Game.player.health <= 0;
+            if (amount != 0)
+                GuardDamageMarker4C0E = 3;
+
+            int hp = Game.player.health;
+            if (amount >= hp)
+            {
+                Game.player.health = 0;
+                GameplayState46B4 = 2;
+                PlayerDeathLatch46AC = true;
+                PlayerDeathSource4C1A =
+                    unchecked((ushort)obj.RuntimeValue);
+
+                // FUN_80EA: the attacking GUARD enters the shared no-local-action
+                // state immediately when its hit kills the player.
+                guard.State =
+                    (byte)OriginalGuardState.LethalPlayerContact0B;
+
+                // FUN_8C0A emits original event 10 with the long 0x20000 timing
+                // argument. The current event bridge owns host playback timing.
+                SoundEffect.PlayOriginalEvent(10);
+                return true;
+            }
+
+            Game.player.health = hp - amount;
+            return false;
         }
 
         static bool EvaluateGuardMovementBlocked(
@@ -1604,7 +1643,7 @@ namespace Nitemare3D
                     {
                         ConsumeOriginalAttackSoundSelection(obj.ObjectClass);
 
-                        if (ApplyGuardAttackDamageToPlayer(ref obj))
+                        if (ApplyGuardAttackDamageToPlayer(ref guard, ref obj))
                             return OriginalGuardDispatchResult.Waiting;
                     }
 
@@ -1812,7 +1851,7 @@ namespace Nitemare3D
                     }
 
                     if (attackEligible)
-                        ApplyGuardAttackDamageToPlayer(ref obj);
+                        ApplyGuardAttackDamageToPlayer(ref guard, ref obj);
 
                     return OriginalGuardDispatcher.CompleteState10AttackCycle(
                         ref guard,
