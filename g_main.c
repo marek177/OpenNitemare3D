@@ -44,6 +44,7 @@ void G_Init()
      */
     N3D_RE_SetTimingFromRawMean(40);
     N3D_RE_ResetTimingCalibration();
+    N3D_RE_ResetGuardLogicClock();
     printf(
         "gameplay timing provisional baseline: move=%u turn=%u projectile=%u\n",
         n3d_timing.movement_substeps,
@@ -90,10 +91,15 @@ void G_UpdateGame()
     I_HandleKeyboard();
 
     const int frame_ms = I_FrameTime();
-    if(frame_ms > 0)
     {
         const uint16_t sample_ms =
-            frame_ms > 0xFFFF ? 0xFFFF : (uint16_t)frame_ms;
+            frame_ms <= 0
+                ? 0
+                : frame_ms > 0xFFFF
+                    ? 0xFFFF
+                    : (uint16_t)frame_ms;
+
+        N3D_RE_BeginGuardLogicFrame(sample_ms);
 
         if(N3D_RE_SampleTimingFrame(sample_ms))
         {

@@ -3882,6 +3882,41 @@ int main(void)
         remove("N3D_OBJECT_DEFS_TEST.BIN");
     }
 
+    /* Exact 125-ms GUARD logic clock; no catch-up replay. */
+    {
+        N3D_RE_ResetGuardLogicClock();
+        assert(n3d_guard_clock.accumulator_ms == 0);
+        assert(n3d_guard_clock.tick_due == 0);
+
+        assert(!N3D_RE_BeginGuardLogicFrame(0));
+        assert(!N3D_RE_BeginGuardLogicFrame(40));
+        assert(n3d_guard_clock.accumulator_ms == 40);
+        assert(!N3D_RE_BeginGuardLogicFrame(40));
+        assert(n3d_guard_clock.accumulator_ms == 80);
+        assert(!N3D_RE_BeginGuardLogicFrame(40));
+        assert(n3d_guard_clock.accumulator_ms == 120);
+
+        assert(N3D_RE_BeginGuardLogicFrame(5));
+        assert(n3d_guard_clock.tick_due == 1);
+        assert(n3d_guard_clock.accumulator_ms == 0);
+
+        /* 250 ms is still one dispatch, not two catch-up ticks. */
+        assert(N3D_RE_BeginGuardLogicFrame(250));
+        assert(n3d_guard_clock.tick_due == 1);
+        assert(n3d_guard_clock.accumulator_ms == 0);
+
+        assert(N3D_RE_BeginGuardLogicFrame(130));
+        assert(n3d_guard_clock.accumulator_ms == 5);
+        assert(!N3D_RE_BeginGuardLogicFrame(119));
+        assert(n3d_guard_clock.accumulator_ms == 124);
+        assert(N3D_RE_BeginGuardLogicFrame(1));
+        assert(n3d_guard_clock.accumulator_ms == 0);
+
+        N3D_RE_ResetGuardLogicClock();
+        assert(!n3d_guard_clock.tick_due);
+        assert(n3d_guard_clock.accumulator_ms == 0);
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }

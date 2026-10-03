@@ -7,6 +7,7 @@
 #include "n3d_re_definitions.h"
 #include "n3d_re_img.h"
 #include "n3d_re_map_archive.h"
+#include "n3d_re_timing.h"
 
 
 bool G_GameIsDone()
@@ -23,7 +24,10 @@ void G_StartMainGame()
 void G_UpdateMainGame()
 {
     G_HandleThinking();
-    G_HandleRecoveredGuardThinking();
+
+    if(n3d_guard_clock.tick_due)
+        G_HandleRecoveredGuardThinking();
+
     G_ShowWalls();
 
     R_DrawRaycaster();

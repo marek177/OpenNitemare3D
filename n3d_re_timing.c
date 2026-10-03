@@ -2,6 +2,7 @@
 
 n3d_timing_parameters n3d_timing;
 n3d_timing_calibration n3d_timing_calibration_state;
+n3d_guard_logic_clock n3d_guard_clock;
 
 static uint16_t max_u16(uint16_t a, uint16_t b)
 {
@@ -76,5 +77,39 @@ int N3D_RE_SampleTimingFrame(uint16_t frame_ms)
         raw_mean > 0xFFFFu ? 0xFFFFu : (uint16_t)raw_mean);
 
     n3d_timing_calibration_state.complete = 1;
+    return 1;
+}
+
+
+void N3D_RE_ResetGuardLogicClock(void)
+{
+    n3d_guard_clock.accumulator_ms = 0;
+    n3d_guard_clock.tick_due = 0;
+}
+
+int N3D_RE_BeginGuardLogicFrame(uint16_t frame_ms)
+{
+    n3d_guard_clock.tick_due = 0;
+
+    if(frame_ms == 0)
+        return 0;
+
+    n3d_guard_clock.accumulator_ms += frame_ms;
+
+    if(n3d_guard_clock.accumulator_ms <
+       N3D_GUARD_LOGIC_TICK_MS)
+    {
+        return 0;
+    }
+
+    n3d_guard_clock.tick_due = 1;
+
+    /*
+     * D70A observes the current 125-ms bin rather than replaying every skipped
+     * bin. Preserve phase, but intentionally drop catch-up iterations.
+     */
+    n3d_guard_clock.accumulator_ms %=
+        N3D_GUARD_LOGIC_TICK_MS;
+
     return 1;
 }
