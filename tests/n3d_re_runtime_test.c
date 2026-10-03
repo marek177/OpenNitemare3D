@@ -4008,9 +4008,9 @@ int main(void)
         assert(N3D_RE_GuardAlertSoundId(0x0F, 0) == 0x36);
         assert(N3D_RE_GuardAlertSoundId(0x0F, 1) == 0x37);
 
-        assert(N3D_RE_GuardAttackDamageUsesRandom(0x16));
-        assert(N3D_RE_GuardAttackDamageUsesRandom(0x1B));
-        assert(!N3D_RE_GuardAttackDamageUsesRandom(0x12));
+        assert(N3D_RE_GuardAttackUsesRandom(0x16));
+        assert(N3D_RE_GuardAttackUsesRandom(0x1B));
+        assert(!N3D_RE_GuardAttackUsesRandom(0x12));
         assert(N3D_RE_GuardAttackSoundId(0x16, 2) == 0x19);
         assert(N3D_RE_GuardAttackSoundId(0x1B, 3) == 0x4E);
 
