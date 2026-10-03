@@ -2187,6 +2187,78 @@ int main(void)
     assert(fire_result.ammo_consumed == 0);
     assert(n3d_player.laser_ammo == 0);
 
+    /* Projectile line state shares exact E516/9D30 integer stepping. */
+    {
+        uint8_t projectile_trig_fixture[N3D_TRIG_FILE_BYTES] = {0};
+        write_s16_le(projectile_trig_fixture, 45 * 2, 724);
+        write_s16_le(projectile_trig_fixture, 90 * 2, 1024);
+        write_s16_le(projectile_trig_fixture, 180 * 2, 0);
+        write_s16_le(projectile_trig_fixture, 270 * 2, -1024);
+        write_s16_le(
+            projectile_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 0 * 2,
+            1024);
+        write_s16_le(
+            projectile_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 45 * 2,
+            724);
+        write_s16_le(
+            projectile_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 90 * 2,
+            0);
+        write_s16_le(
+            projectile_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 180 * 2,
+            -1024);
+        write_s16_le(
+            projectile_trig_fixture,
+            N3D_TRIG_ANGLE_COUNT * 2 + 270 * 2,
+            0);
+
+        FILE* projectile_trig_file =
+            fopen("N3D_TRIG_Q10_PROJECTILE_TEST.BIN", "wb");
+        assert(projectile_trig_file != NULL);
+        assert(fwrite(
+            projectile_trig_fixture,
+            1,
+            sizeof(projectile_trig_fixture),
+            projectile_trig_file) == sizeof(projectile_trig_fixture));
+        fclose(projectile_trig_file);
+
+        assert(N3D_RE_LoadTrigQ10(
+            "N3D_TRIG_Q10_PROJECTILE_TEST.BIN"));
+
+        N3D_RE_ResetRuntime();
+        assert(N3D_RE_InitializeProjectileFromAngle(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 200, 20, 0));
+        assert(n3d_projectiles[0].x_is_major_axis == 0);
+        assert(n3d_projectiles[0].step_y == -1);
+        assert(N3D_RE_AdvanceProjectileLineSteps(0, 10) == 10);
+        assert(n3d_projectiles[0].object.world_x == 100);
+        assert(n3d_projectiles[0].object.world_y == 190);
+
+        N3D_RE_ResetRuntime();
+        assert(N3D_RE_InitializeProjectileFromAngle(
+            0, N3D_WEAPON_SINGLE_LASER, 100, 200, 20, 90));
+        assert(n3d_projectiles[0].x_is_major_axis == 1);
+        assert(n3d_projectiles[0].step_x == 1);
+        assert(N3D_RE_AdvanceProjectileLineSteps(0, 10) == 10);
+        assert(n3d_projectiles[0].object.world_x == 110);
+        assert(n3d_projectiles[0].object.world_y == 200);
+
+        N3D_RE_ResetRuntime();
+        assert(N3D_RE_InitializeProjectileFromAngle(
+            0, N3D_WEAPON_MAGIC_WAND, 100, 200, 20, 45));
+        assert(n3d_projectiles[0].x_is_major_axis == 1);
+        assert(n3d_projectiles[0].step_x == 1);
+        assert(n3d_projectiles[0].step_y == -1);
+        assert(N3D_RE_AdvanceProjectileLineSteps(0, 10) == 10);
+        assert(n3d_projectiles[0].object.world_x == 110);
+        assert(n3d_projectiles[0].object.world_y == 190);
+
+        remove("N3D_TRIG_Q10_PROJECTILE_TEST.BIN");
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }
