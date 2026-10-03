@@ -51,8 +51,20 @@ namespace Nitemare3D
         // i.e. one global logic step every 125 ms. Extra missed intervals are
         // not replayed as catch-up ticks.
         public const float GuardLogicTickSeconds = 0.125f;
-        public const float ProjectileLogicTickSeconds = 0.040f;
-        public const int ProjectileSubstepsPerTick = 20;
+
+        // FUN_D7D0 calibration outputs. The portable default corresponds to the
+        // original minimum effective render duration D=40 ms; a startup timing
+        // bridge can replace RawFrameMeanMs later without changing projectile code.
+        public static ushort RawFrameMeanMs { get; private set; } = 40;
+        public static ushort FrameRateParameter53F4 { get; private set; } = 25;
+        public static ushort MovementStep53F6 { get; private set; } = 10;
+        public static ushort TurnStep53F8 { get; private set; } = 5;
+        public static int ProjectileSubstepsPerTick { get; private set; } = 20;
+
+        public static float ProjectileLogicTickSeconds =>
+            FrameRateParameter53F4 == 0
+                ? 0.040f
+                : 1.0f / FrameRateParameter53F4;
 
         static float guardLogicAccumulator;
         static float projectileLogicAccumulator;
@@ -121,6 +133,43 @@ namespace Nitemare3D
         /// and class 0x48 clears the jam. The original emits event 0x44 only
         /// when the latch actually changes.
         /// </summary>
+        /// <summary>
+        /// Ordinary-positive-duration model of Win16 FUN_1010_D7D0:
+        /// raw mean is stored before the local 40-ms minimum is applied.
+        /// D=max(raw,40); 53F4=(1000+D/2)/D; 53F6=max(1,(D+2)/4);
+        /// 53F8=max(1,(360*D+1400)/2800); 53FA=2*53F6.
+        /// </summary>
+        public static void ConfigureFrameCalibration(uint rawMeanMs)
+        {
+            RawFrameMeanMs = unchecked((ushort)rawMeanMs);
+
+            uint effective = rawMeanMs < 40 ? 40u : rawMeanMs;
+
+            uint frameRate =
+                (1000u + effective / 2u) / effective;
+            FrameRateParameter53F4 =
+                (ushort)Math.Min(frameRate, ushort.MaxValue);
+
+            uint movement =
+                (effective + 2u) / 4u;
+            if (movement < 1)
+                movement = 1;
+            MovementStep53F6 =
+                (ushort)Math.Min(movement, ushort.MaxValue);
+
+            uint turn =
+                (360u * effective + 1400u) / 2800u;
+            if (turn < 1)
+                turn = 1;
+            TurnStep53F8 =
+                (ushort)Math.Min(turn, ushort.MaxValue);
+
+            ProjectileSubstepsPerTick =
+                Math.Min(
+                    ushort.MaxValue,
+                    MovementStep53F6 * 2);
+        }
+
         public static bool ApplyWeaponJamScriptTouchBFD8(
             int episode,
             int levelNumber,
