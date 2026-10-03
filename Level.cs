@@ -1272,28 +1272,11 @@ namespace Nitemare3D
                     continue;
                 }
 
-                // FUN_9B64:
-                // class 0x2E ('.') -> frame 0, class 0x2D, generic
-                // exploding-wall sequence selector.
-                // class 0x2F ('/') -> frame 1, class 0x2D, retain the
-                // existing sequence selector.
-                if (sourceClass == 0x2E)
-                {
-                    vec.AnimationFrame = 0;
-                    vec.TextureSet = explosionCache;
-                }
-                else
-                {
-                    vec.AnimationFrame = 1;
-                }
-
-                vec.RenderClass = 0x2D;
-
-                var cache =
-                    originalWallImages.CacheFor(vec);
-
-                vec.RuntimeTimer =
-                    unchecked(nowMs + cache.IntervalMs);
+                originalWallImages.BeginExplodingWall(
+                    vec,
+                    sourceClass,
+                    explosionCache,
+                    nowMs);
 
                 found = true;
             }
