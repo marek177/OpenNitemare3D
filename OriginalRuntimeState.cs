@@ -516,6 +516,194 @@ namespace Nitemare3D
             return true;
         }
 
+        public static bool RegisterWorldObject(
+            Entity entity,
+            byte mapObjectId)
+        {
+            if (entity == null ||
+                mapObjectId == 0 ||
+                Level.originalMap == null)
+            {
+                return false;
+            }
+
+            if (bindings.TryGetValue(
+                    entity,
+                    out var existing))
+            {
+                return existing.ObjectSlot >= 0;
+            }
+
+            if (!Level.originalMap.TryGetObjectClassAndVariant(
+                    mapObjectId,
+                    out byte objectClass,
+                    out byte variant))
+            {
+                return false;
+            }
+
+            byte propertyFlags =
+                Level.originalMap.ObjectProperty[
+                    mapObjectId];
+
+            if ((propertyFlags &
+                    OriginalMapTables.ObjectRuntimePresent) == 0)
+            {
+                return false;
+            }
+
+            if (!RegisterMapObjectDefinition(
+                    mapObjectId,
+                    out byte definitionId))
+            {
+                return false;
+            }
+
+            if (ObjectCount >= Objects.Length)
+            {
+                throw new InvalidOperationException(
+                    "Original OBJECT pool capacity exceeded.");
+            }
+
+            int objectSlot =
+                ObjectCount++;
+
+            ref var obj =
+                ref Objects[objectSlot];
+
+            short worldX =
+                ToWorldCoordinate(
+                    entity.position.X);
+            short worldY =
+                ToWorldCoordinate(
+                    entity.position.Y);
+
+            OriginalWorldObjectRuntime.InitializeMapObject(
+                ref obj,
+                mapObjectId,
+                variant,
+                propertyFlags,
+                objectClass,
+                definitionId,
+                worldX,
+                worldY);
+
+            RefreshKnownWorldObjectVerticalAnchor(
+                ref obj);
+
+            bindings[entity] =
+                new Binding
+                {
+                    ObjectSlot = objectSlot,
+                    GuardSlot = -1
+                };
+
+            return true;
+        }
+
+        static void RefreshKnownWorldObjectVerticalAnchor(
+            ref OriginalObjectRecord obj)
+        {
+            if (Img.current == null)
+                return;
+
+            int frameIndex =
+                unchecked((byte)obj.Component03);
+
+            if (!ObjectDefinitions.TryGetBitmapFrame(
+                    obj.DefinitionId,
+                    frameIndex,
+                    Img.current.rawData,
+                    out BitmapImage frame))
+            {
+                return;
+            }
+
+            OriginalWorldObjectRuntime.UpdateKnownVerticalAnchor(
+                ref obj,
+                frame.height);
+        }
+
+        public static bool TickBoundWorldObjectPresentation(
+            Entity entity)
+        {
+            if (!bindings.TryGetValue(
+                    entity,
+                    out var binding) ||
+                binding.ObjectSlot < 0 ||
+                binding.GuardSlot >= 0)
+            {
+                return false;
+            }
+
+            ref var obj =
+                ref Objects[binding.ObjectSlot];
+
+            if ((obj.Flags &
+                    OriginalMapTables.ObjectRuntimePresent) == 0 ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition) ||
+                definition.ExtensionFlag != 0)
+            {
+                return false;
+            }
+
+            bool advanced =
+                OriginalWorldObjectRuntime
+                    .AdvanceSimpleAnimationIfDue(
+                        ref obj,
+                        definition,
+                        RuntimeClockMs);
+
+            if (advanced)
+            {
+                RefreshKnownWorldObjectVerticalAnchor(
+                    ref obj);
+            }
+
+            return advanced;
+        }
+
+        public static bool DeactivateCollectedWorldObject(
+            Entity entity)
+        {
+            if (!bindings.TryGetValue(
+                    entity,
+                    out var binding) ||
+                binding.ObjectSlot < 0 ||
+                binding.GuardSlot >= 0)
+            {
+                return false;
+            }
+
+            ref var obj =
+                ref Objects[binding.ObjectSlot];
+
+            if (Level.originalMap != null)
+            {
+                int tileX =
+                    obj.WorldX >> 6;
+                int tileY =
+                    obj.WorldY >> 6;
+
+                if (tileX >= 0 &&
+                    tileY >= 0 &&
+                    tileX < OriginalRuntime.MapWidth &&
+                    tileY < OriginalRuntime.MapHeight)
+                {
+                    Level.originalMap.ObjectId[
+                        tileX,
+                        tileY] = 0;
+                }
+            }
+
+            OriginalWorldObjectRuntime.DeactivateCollected(
+                ref obj);
+
+            return true;
+        }
+
         public static bool RegisterMapObjectDefinition(
             byte mapObjectId,
             out byte definitionId)
@@ -1797,6 +1985,27 @@ namespace Nitemare3D
                 CurrentRenderGeneration = 1;
         }
 
+        public static bool RecordObjectProjection(
+            Entity entity,
+            short projectedBaseRow)
+        {
+            if (!bindings.TryGetValue(
+                    entity,
+                    out var binding) ||
+                binding.ObjectSlot < 0)
+            {
+                return false;
+            }
+
+            // OBJECT+0x18 is persistent: projection overwrites it only after a
+            // successful visible sprite projection; failed/off-screen frames do
+            // not clear the previous cached row.
+            Objects[binding.ObjectSlot].ProjectedBaseRow =
+                projectedBaseRow;
+
+            return true;
+        }
+
         public static bool RecordGuardProjection(
             Entity entity,
             short projectedBaseRow,
@@ -1809,13 +2018,12 @@ namespace Nitemare3D
                 return false;
             }
 
-            ref var obj = ref Objects[binding.ObjectSlot];
-            ref var guard = ref Guards[binding.GuardSlot];
+            RecordObjectProjection(
+                entity,
+                projectedBaseRow);
 
-            // OBJECT+0x18 is persistent: projection overwrites it only after a
-            // successful visible sprite projection; failed/off-screen frames do
-            // not clear the previous cached row.
-            obj.ProjectedBaseRow = projectedBaseRow;
+            ref var guard =
+                ref Guards[binding.GuardSlot];
 
             if (overlapsAimCenter)
                 guard.Timestamp = CurrentRenderGeneration;
