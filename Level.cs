@@ -1091,6 +1091,53 @@ namespace Nitemare3D
             return true;
         }
 
+        public static bool TryResolveOriginalMovementCell(
+            int x,
+            int y,
+            out byte wallFlags,
+            out byte objectFlags,
+            out OriginalDoorCollisionInfo door)
+        {
+            wallFlags = 0;
+            objectFlags = 0;
+            door = default;
+
+            if (originalMap == null ||
+                x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            wallFlags = originalMap.WallPropertyAt(x, y);
+            objectFlags = originalMap.ObjectPropertyAt(x, y);
+            TryGetOriginalDoorCollisionInfo(x, y, out door);
+            return true;
+        }
+
+        public static void ApplyOriginalGuardDoorInteraction(
+            int x,
+            int y,
+            bool setLatch,
+            byte guardOctant)
+        {
+            var door = originalWalls?.FindPairedWall(x, y);
+            if (door == null)
+                return;
+
+            if (setLatch)
+                door.Latch = 1;
+
+            // FUN_700A already handled its own latch decision. FUN_188A receives
+            // the guard octant but must not unconditionally set the latch again.
+            originalWalls.TogglePairedWall(
+                x,
+                y,
+                guardOctant,
+                false);
+        }
+
         public static bool OriginalDoorAllowsSight(int x, int y)
         {
             var door = originalWalls?.FindPairedWall(x, y);
