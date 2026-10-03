@@ -1215,17 +1215,58 @@ namespace Nitemare3D
             return false;
         }
 
+        /// <summary>
+        /// Exact health/death commit tail of FUN_1010_8C0A after A1EA produced
+        /// the byte-sized GUARD damage amount. Returns whether gameplay state is
+        /// the original death state 2 after the commit.
+        /// </summary>
+        public static bool CommitGuardAttackDamageToPlayer(
+            Player player,
+            ref OriginalGuardRecord guard,
+            int amount)
+        {
+            if (player == null)
+                return false;
+
+            // Original order: the damage marker is updated before either 4BE5
+            // protection or the already-dead 46B4==2 gate is tested.
+            if (amount != 0)
+                GuardDamageMarker4C0E = 3;
+
+            if (PlayerDamageSuppressed4BE5 ||
+                GameplayState46B4 == 2)
+            {
+                return GameplayState46B4 == 2;
+            }
+
+            int hp = player.health;
+            if (amount >= hp)
+            {
+                player.health = 0;
+                GameplayState46B4 = 2;
+                PlayerDeathLatch46AC = true;
+                PlayerDeathSource4C1A =
+                    guard.ObjectSlot;
+
+                // FUN_80EA.
+                guard.State =
+                    (byte)OriginalGuardState.LethalPlayerContact0B;
+
+                // FUN_8C0A event 0x0A.
+                SoundEffect.PlayOriginalEvent(10);
+                return true;
+            }
+
+            player.health = hp - amount;
+            return false;
+        }
+
         static bool ApplyGuardAttackDamageToPlayer(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj)
         {
             if (Game.player == null)
                 return false;
-
-            // FUN_8C0A does not apply further health changes once the player is
-            // already in gameplay state 2 (death).
-            if (GameplayState46B4 == 2)
-                return true;
 
             short playerWorldX = ToWorldCoordinate(Game.player.position.X);
             short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
@@ -1249,35 +1290,10 @@ namespace Nitemare3D
                 class16FullDamageGate,
                 randomValue);
 
-            int amount = damage.DifficultyTransformed;
-            if (amount != 0)
-                GuardDamageMarker4C0E = 3;
-
-            if (PlayerDamageSuppressed4BE5)
-                return false;
-
-            int hp = Game.player.health;
-            if (amount >= hp)
-            {
-                Game.player.health = 0;
-                GameplayState46B4 = 2;
-                PlayerDeathLatch46AC = true;
-                PlayerDeathSource4C1A =
-                    guard.ObjectSlot;
-
-                // FUN_80EA: the attacking GUARD enters the shared no-local-action
-                // state immediately when its hit kills the player.
-                guard.State =
-                    (byte)OriginalGuardState.LethalPlayerContact0B;
-
-                // FUN_8C0A emits original event 10 with the long 0x20000 timing
-                // argument. The current event bridge owns host playback timing.
-                SoundEffect.PlayOriginalEvent(10);
-                return true;
-            }
-
-            Game.player.health = hp - amount;
-            return false;
+            return CommitGuardAttackDamageToPlayer(
+                Game.player,
+                ref guard,
+                damage.DifficultyTransformed);
         }
 
         static bool EvaluateGuardMovementBlocked(
