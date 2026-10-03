@@ -32,6 +32,7 @@ namespace Nitemare3D
             TestOriginalRandom();
             TestDamageMatrix();
             TestGuardKillScoreTable();
+            TestRemoteCannonToggle51A5();
             TestScriptProgress51A6();
             TestWeaponJamScriptBFD8();
             TestGuardSounds();
@@ -1334,6 +1335,21 @@ namespace Nitemare3D
             Assert(OriginalRuntime.GuardScore(0x07) == 0 &&
                    OriginalRuntime.GuardScore(0x21) == 0,
                 "out-of-range kill scores must be zero.");
+        }
+
+        static void TestRemoteCannonToggle51A5()
+        {
+            bool original = OriginalRuntimeState.RemoteCannonsEnabled;
+
+            OriginalRuntimeState.RemoteCannonsEnabled = true;
+            Assert(OriginalRuntimeState.GuardState0E10Gate51A5,
+                "51A5 compatibility alias must reflect enabled remote cannons.");
+
+            OriginalRuntimeState.GuardState0E10Gate51A5 = false;
+            Assert(!OriginalRuntimeState.RemoteCannonsEnabled,
+                "51A5 compatibility alias must write the remote-cannon flag.");
+
+            OriginalRuntimeState.RemoteCannonsEnabled = original;
         }
 
         static void TestScriptProgress51A6()
@@ -3570,14 +3586,14 @@ namespace Nitemare3D
                        ref guard, ref obj, definition, 64, 0, false) !=
                    OriginalGuardDispatchResult.NotHandled &&
                    guard.State == (byte)OriginalGuardState.Conditional0E,
-                "state 0E must remain 0E while 51A5 gate is clear.");
+                "Cannon state 0E must remain idle while remote cannons are disabled.");
 
             Assert(OriginalGuardDispatcher.TickState0E(
                        ref guard, ref obj, definition, 64, 0, true) ==
                    OriginalGuardDispatchResult.Transitioned &&
                    guard.State == (byte)OriginalGuardState.Timed0F &&
                    guard.Timer == 0,
-                "state 0E must enter 0F with timer zero when 51A5 is set.");
+                "Cannon state 0E must enter cadence state 0F when remote cannons are enabled.");
 
             guard.Timer = 2;
             Assert(OriginalGuardDispatcher.TickState0F(
@@ -3634,7 +3650,7 @@ namespace Nitemare3D
                    OriginalGuardDispatchResult.Transitioned &&
                    guard.State == (byte)OriginalGuardState.Conditional0E &&
                    !gatedSound,
-                "state 0x0F must return to 0x0E when 51A5 is clear.");
+                "Cannon state 0F must return to idle state 0E when remote cannons are disabled.");
         }
 
         static void TestState14DanceCycle()
