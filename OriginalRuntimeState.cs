@@ -349,6 +349,49 @@ namespace Nitemare3D
             }
         }
 
+        public static OriginalGuardDispatchResult PlanGuardMovement76FC(
+            Entity entity,
+            byte difficulty)
+        {
+            if (Game.player == null ||
+                !bindings.TryGetValue(entity, out var binding) ||
+                binding.GuardSlot < 0 ||
+                binding.ObjectSlot < 0)
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            ref var guard = ref Guards[binding.GuardSlot];
+            ref var obj = ref Objects[binding.ObjectSlot];
+
+            short playerWorldX = ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY = ToWorldCoordinate(Game.player.position.Y);
+
+            bool doorFound = false;
+            short doorTargetX = 0;
+            short doorTargetY = 0;
+
+            if (guard.Strategy == 1 && guard.Strength < 0x7F)
+            {
+                doorFound = Level.TryGetNearestRetreatDoorTarget(
+                    obj.WorldX >> 6,
+                    obj.WorldY >> 6,
+                    out doorTargetX,
+                    out doorTargetY);
+            }
+
+            return OriginalGuardDispatcher.PlanMovement76FC(
+                ref guard,
+                ref obj,
+                playerWorldX,
+                playerWorldY,
+                difficulty,
+                OriginalRandom.Next,
+                doorFound,
+                doorTargetX,
+                doorTargetY);
+        }
+
         public static bool EnterStrategy3TimedMove(Entity entity, ushort randomValue)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
