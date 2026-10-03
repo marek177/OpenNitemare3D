@@ -400,6 +400,32 @@ namespace Nitemare3D
             return controller;
         }
 
+        public bool TryGetDoorRuntimeRecord(
+            int x,
+            int y,
+            out OriginalDoorRuntimeRecord record)
+        {
+            PairedWall controller = FindPairedWall(x, y);
+            if (controller == null)
+            {
+                record = default;
+                return false;
+            }
+
+            record = controller.Runtime;
+            return true;
+        }
+
+        public bool DoorAllowsSight(
+            int x,
+            int y)
+        {
+            PairedWall controller = FindPairedWall(x, y);
+            return controller != null &&
+                   OriginalGuardDispatcher.GuardLosRuntimeRecordPassable(
+                       unchecked((ushort)controller.Runtime.State));
+        }
+
         public Class3Group FindClass3Group(
             int x,
             int y)
