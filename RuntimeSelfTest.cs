@@ -35,6 +35,7 @@ namespace Nitemare3D
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
+            TestState11Movement();
             TestMovementPlanning();
             TestMovementCell700A();
             TestMovementCollisionCore();
@@ -1385,6 +1386,73 @@ namespace Nitemare3D
             Assert(guard.Strategy == 0 &&
                    guard.State == (byte)OriginalGuardState.Active02,
                 "blocked state 13 must still terminate normally.");
+        }
+
+        static void TestState11Movement()
+        {
+            var definition = new OriginalObjectDefinitionRecord
+            {
+                DirectionalB4 = 0x0204
+            };
+
+            var guard = new OriginalGuardRecord
+            {
+                State = (byte)OriginalGuardState.RecoverMove11,
+                Strategy = 1,
+                Timer = 2,
+                MoveX = 8,
+                MoveY = 0,
+                Octant = 2,
+                Control = 1,
+                ResultOctant = 0xFF
+            };
+
+            var obj = new OriginalObjectRecord
+            {
+                WorldX = 100,
+                WorldY = 100,
+                Component03 = 4
+            };
+
+            Assert(OriginalGuardDispatcher.TickState11Movement(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       200,
+                       100,
+                       (x, y) => false,
+                       () => 0,
+                       out var firstMove) ==
+                   OriginalGuardDispatchResult.Moved,
+                "state 11 first movement tick must remain active.");
+
+            Assert(firstMove.PositionCommitted &&
+                   obj.WorldX == 108 &&
+                   obj.WorldY == 100 &&
+                   guard.Timer == 1 &&
+                   guard.State == (byte)OriginalGuardState.RecoverMove11 &&
+                   guard.Strategy == 1,
+                "state 11 first tick movement/countdown mismatch.");
+
+            Assert(OriginalGuardDispatcher.TickState11Movement(
+                       ref guard,
+                       ref obj,
+                       definition,
+                       200,
+                       100,
+                       (x, y) => false,
+                       () => 0,
+                       out _) ==
+                   OriginalGuardDispatchResult.Transitioned,
+                "state 11 timer expiry must transition.");
+
+            Assert(obj.WorldX == 116 &&
+                   guard.Timer == 0 &&
+                   guard.MoveX == 0 &&
+                   guard.MoveY == 0 &&
+                   guard.Strategy == 0 &&
+                   guard.State == (byte)OriginalGuardState.Active07,
+                "state 11 completion must clear temporary door movement and return to state 07.");
         }
 
         static void TestMovementPlanning()
