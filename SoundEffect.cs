@@ -14,11 +14,31 @@ namespace Nitemare3D
 
         static List<SoundEffect> effects = new List<SoundEffect>();
 
+        public static int OriginalEventToPhysicalSlot(int eventId)
+        {
+            // Win16 FUN_5132 skips the first 32 physical SND.DAT entries,
+            // then FUN_E3B0 indexes the loaded 79-entry event table.
+            return eventId + 32;
+        }
+
+        public static void PlayOriginalEvent(int eventId)
+        {
+            if (eventId < 0)
+                return;
+
+            PlaySound(OriginalEventToPhysicalSlot(eventId));
+        }
+
         public static void PlaySound(int id)
         {
-            if(effects[id - soundOffset].sound == null){return;}
-            if(effects[id - soundOffset].sound.Status == SoundStatus.Playing){return;}
-            effects[id - soundOffset].Play();
+            int effectIndex = id - soundOffset;
+            if (effectIndex < 0 || effectIndex >= effects.Count)
+                return;
+            if (effects[effectIndex].sound == null)
+                return;
+            if (effects[effectIndex].sound.Status == SoundStatus.Playing)
+                return;
+            effects[effectIndex].Play();
         }
 
         public static void LoadSounds()
