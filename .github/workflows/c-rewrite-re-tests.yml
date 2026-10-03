@@ -44,3 +44,12 @@ jobs:
             g_think.c \
             m_obj.c \
             $(pkg-config --cflags sdl2 SDL2_mixer SDL2_image SDL2_ttf fluidsynth)
+
+      - name: Link complete C rewrite
+        run: |
+          mkdir -p build
+          gcc -std=c11 -Wall -Wextra \
+            *.c \
+            -o build/N3D-ci \
+            $(pkg-config --cflags --libs sdl2 SDL2_mixer SDL2_image SDL2_ttf fluidsynth) \
+            -lm
