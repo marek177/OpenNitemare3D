@@ -66,8 +66,15 @@ namespace Nitemare3D
             if (second < 0)
                 second = 0;
 
+            int maxNormalViewportSlot =
+                OriginalRendererCore.ViewBottom -
+                OriginalRendererCore.CenterY;
+
+            if (maxNormalViewportSlot >= SlotCount)
+                maxNormalViewportSlot = SlotCount - 1;
+
             for (int slot = second;
-                slot < SlotCount;
+                slot <= maxNormalViewportSlot;
                 slot++)
             {
                 if (!occupied[slot])
@@ -75,6 +82,39 @@ namespace Nitemare3D
             }
 
             return -1;
+        }
+
+        public static ushort WallVisibilityQ4FromPerpendicularDistance(
+            double distanceTiles)
+        {
+            if (distanceTiles <= 0)
+                return ushort.MaxValue;
+
+            long depthQ10 =
+                (long)System.Math.Round(
+                    distanceTiles *
+                    OriginalRuntime.WorldUnitsPerTile *
+                    1024.0);
+
+            if (depthQ10 < OriginalRendererCore.NearDepthQ10)
+                depthQ10 = OriginalRendererCore.NearDepthQ10;
+
+            var constants =
+                OriginalRendererCore.BuildProjectionConstants(
+                    OriginalRendererCore.ViewportWidth,
+                    OriginalRendererCore.ViewportHeight);
+
+            long value =
+                constants.VerticalNumerator /
+                depthQ10 +
+                OriginalRendererCore.CenterYQ4;
+
+            if (value < 0)
+                return 0;
+            if (value > ushort.MaxValue)
+                return ushort.MaxValue;
+
+            return (ushort)value;
         }
 
         public static bool PassesThreeColumnWallGate(
