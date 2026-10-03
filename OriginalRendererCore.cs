@@ -59,6 +59,8 @@ namespace Nitemare3D
             // OpenNitemare3D bridge metadata, not fields from the original
             // packed 28-byte record.
             public int TextureIndex;
+            public int SourceTileX;
+            public int SourceTileY;
             public long CameraDepth1;
             public long CameraDepth2;
             public long CameraLateral1;
