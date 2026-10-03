@@ -23,6 +23,7 @@ namespace Nitemare3D
             TestOriginalWallRuntime();
             TestOriginalRandom();
             TestDamageMatrix();
+            TestScriptProgress51A6();
             TestGuardSounds();
             TestGuardToPlayerDamage();
             TestPackedGuardSequences();
@@ -618,6 +619,41 @@ namespace Nitemare3D
             Assert(OriginalDamage.ApplyClassWeaponTransform(
                        80, 0x16, (byte)OriginalWeaponSelector.MagicWand, 3) == 3,
                 "Hamerstein gate value 3 must yield literal damage 3.");
+        }
+
+        static void TestScriptProgress51A6()
+        {
+            OriginalRuntimeState.GuardAttackClass16FullDamageOverride = false;
+            Assert(OriginalRuntimeState.StoryProgress51A6 == 0,
+                "51A6 test must start at phase 0.");
+
+            Assert(!OriginalRuntimeState.ApplyScriptTouchProgress51A6(
+                       1, 6, 0x47) &&
+                   OriginalRuntimeState.StoryProgress51A6 == 0,
+                "episode 1 level 6 must not activate 51A6.");
+
+            Assert(!OriginalRuntimeState.ApplyScriptTouchProgress51A6(
+                       1, 7, 0x48),
+                "class 0x48 must not activate the 51A6 damage gate.");
+
+            Assert(OriginalRuntimeState.ApplyScriptTouchProgress51A6(
+                       1, 7, 0x47) &&
+                   OriginalRuntimeState.StoryProgress51A6 == 1,
+                "episode 1 level 7 class 0x47 must activate 51A6.");
+
+            Assert(!OriginalRuntimeState.ApplyScriptTouchProgress51A6(
+                       3, 10, 0x47),
+                "already-active 51A6 must not retrigger phase 1.");
+
+            Assert(OriginalRuntimeState.AdvanceScriptProgress51A6ToPhase2() &&
+                   OriginalRuntimeState.StoryProgress51A6 == 2,
+                "51A6 phase 1 -> 2 transition mismatch.");
+
+            Assert(!OriginalRuntimeState.AdvanceScriptProgress51A6ToPhase2(),
+                "51A6 phase 2 must not advance again.");
+
+            // Restore neutral startup state for later tests.
+            OriginalRuntimeState.GuardAttackClass16FullDamageOverride = false;
         }
 
         static void TestGuardSounds()
