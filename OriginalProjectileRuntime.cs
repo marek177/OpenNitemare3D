@@ -309,6 +309,42 @@ namespace Nitemare3D
             return true;
         }
 
+        public static void InitializeSpawnWithDefinition(
+            ref OriginalProjectileRecord projectile,
+            byte definitionId,
+            short worldX,
+            short worldY,
+            uint now,
+            ushort interval)
+        {
+            projectile = default;
+            projectile.State = (byte)OriginalProjectileState.Flying;
+            projectile.RenderObject.Component03 = 0;
+            projectile.RenderObject.DefinitionId = definitionId;
+            projectile.RenderObject.Flags = 0x01;
+            projectile.RenderObject.ObjectClass = 5;
+            projectile.RenderObject.RuntimeValue =
+                unchecked(now + interval);
+            projectile.RenderObject.WorldX = worldX;
+            projectile.RenderObject.WorldY = worldY;
+            projectile.RenderObject.Runtime1A = 5;
+        }
+
+        public static void EnterImpactWithDefinition(
+            ref OriginalProjectileRecord projectile,
+            byte definitionId,
+            uint now,
+            ushort interval)
+        {
+            projectile.State = (byte)OriginalProjectileState.Impact;
+            projectile.RenderObject.Component03 = 0;
+            projectile.RenderObject.DefinitionId = definitionId;
+            projectile.RenderObject.Flags =
+                (byte)(projectile.RenderObject.Flags | 0x10);
+            projectile.RenderObject.RuntimeValue =
+                unchecked(now + interval);
+        }
+
         public static bool InitializeSpawn(
             ref OriginalProjectileRecord projectile,
             byte weaponSelector,
@@ -346,6 +382,37 @@ namespace Nitemare3D
                 (byte)(sequenceBase + offsets.Impact);
             projectile.RenderObject.Flags =
                 (byte)(projectile.RenderObject.Flags | 0x10);
+            return true;
+        }
+
+        /// <summary>
+        /// Exact one-step deadline behavior of the projectile updater: when the
+        /// absolute deadline is due, advance at most one frame and schedule the
+        /// next deadline from the current time. Missed intervals are not replayed.
+        /// </summary>
+        public static bool AdvanceAnimationIfDue(
+            ref OriginalProjectileRecord projectile,
+            uint now,
+            int frameCount,
+            ushort interval)
+        {
+            if (projectile.State == (byte)OriginalProjectileState.Free ||
+                frameCount <= 0 ||
+                now < projectile.RenderObject.RuntimeValue)
+            {
+                return false;
+            }
+
+            AdvanceAnimationFrame(
+                ref projectile,
+                frameCount);
+
+            if (projectile.State != (byte)OriginalProjectileState.Free)
+            {
+                projectile.RenderObject.RuntimeValue =
+                    unchecked(now + interval);
+            }
+
             return true;
         }
 
