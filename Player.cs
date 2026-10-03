@@ -133,6 +133,8 @@ namespace Nitemare3D
         }
         public void RenderRaycaster()
         {
+            OriginalRuntimeState.BeginRenderGeneration();
+
             //var direction = new Vec2(MathF.Cos(rotation), MathF.Sin(rotation)).Normalize();
 
 
@@ -352,26 +354,32 @@ namespace Nitemare3D
 
                 int spriteHeight = (int)(MathF.Abs(RayHeight / transformY) / vDiv);
 
-                int drawStartY = -spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int rawDrawStartY = -spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int rawDrawEndY = spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int drawStartY = rawDrawStartY;
                 if(drawStartY < 0) drawStartY = 0;
-                int drawEndY = spriteHeight / 2 + RayHeight / 2 + vMoveScreen;
+                int drawEndY = rawDrawEndY;
                 if(drawEndY >= RayHeight) drawEndY = RayHeight - 1;
 
 
                 int spriteWidth = (int)(MathF.Abs(RayHeight / transformY) / uDiv);
-                int drawStartX = -spriteWidth / 2 + spriteScreenX;
+                int rawDrawStartX = -spriteWidth / 2 + spriteScreenX;
+                int rawDrawEndX = spriteWidth / 2 + spriteScreenX;
+                int drawStartX = rawDrawStartX;
                 if(drawStartX < 0) drawStartX = 0;
-                int drawEndX = spriteWidth / 2 + spriteScreenX;
+                int drawEndX = rawDrawEndX;
                 if(drawEndX >= RayWidth) drawEndX = RayWidth - 1; 
 
 
-                
+                bool projectedVisible = false;
                 for(int stripe = drawStartX; stripe < drawEndX; stripe++)
                 {
                     int texX = (int)(256 * (stripe - (-spriteWidth / 2 + spriteScreenX)) * spriteW / spriteWidth) / 256;
 
 
                     if(transformY > 0 && stripe > 0 && stripe < RayWidth && transformY < zBuffer[stripe])
+                    {
+                    projectedVisible = true;
                     for(int y = drawStartY; y < drawEndY; y++) //for every pixel of the current stripe
                     {
                         int d = (y-vMoveScreen) * 256 - RayHeight * 128 + spriteHeight * 128;
@@ -386,6 +394,36 @@ namespace Nitemare3D
                         
 
                     }
+                    }
+                }
+
+                if (projectedVisible && sprite is Entity runtimeEntity)
+                {
+                    float scale = GameWindow.scale > 0 ? GameWindow.scale : 1f;
+
+                    // The renderer works in a scaled viewport-local coordinate
+                    // system; OBJECT+0x18 stores the original absolute screen row.
+                    int projectedBaseRow =
+                        OriginalRuntime.ViewportY +
+                        (int)MathF.Round(rawDrawEndY / scale);
+
+                    if (projectedBaseRow < short.MinValue)
+                        projectedBaseRow = short.MinValue;
+                    else if (projectedBaseRow > short.MaxValue)
+                        projectedBaseRow = short.MaxValue;
+
+                    int aimCenterLocal = RayWidth / 2;
+                    int aimSlack = Math.Max(
+                        1,
+                        (int)MathF.Round(4f * scale));
+                    bool overlapsAimCenter =
+                        rawDrawStartX - aimSlack < aimCenterLocal &&
+                        rawDrawEndX + aimSlack > aimCenterLocal;
+
+                    OriginalRuntimeState.RecordGuardProjection(
+                        runtimeEntity,
+                        (short)projectedBaseRow,
+                        overlapsAimCenter);
                 }
                 
 
