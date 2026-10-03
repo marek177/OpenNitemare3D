@@ -545,6 +545,7 @@ namespace Nitemare3D
             {
                 // FUN_247A/8A20 preserve the previous AREA id off marker cells.
                 areaWakeSelector = areaId;
+                OriginalRuntimeState.SetPlayerAreaSelector(areaId);
             }
         }
 
