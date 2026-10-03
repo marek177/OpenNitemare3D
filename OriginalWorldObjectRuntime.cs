@@ -51,18 +51,33 @@ namespace Nitemare3D
             obj.Runtime1A = 0;
         }
 
+        static ushort Alternative(
+            OriginalObjectDefinitionRecord definition,
+            int selector)
+        {
+            return definition.GetDirectionalSequenceA(
+                selector & 7);
+        }
+
         /// <summary>
-        /// General non-extended OBJECT animation path: advance at most one
-        /// frame when the absolute deadline is due, loop at frameCount and
-        /// schedule now+interval. This is the safe path for SEQDEFs whose
-        /// extension/alternative selector is zero.
+        /// General timestamped world-OBJECT animation path from B22C:
+        /// one due frame per call, simple loop when no alternatives exist,
+        /// otherwise use OBJECT+0x02 as the 0..7 branch selector. Each branch
+        /// word is low=start frame, high=length. On branch completion sample
+        /// original RNG until a non-empty branch is selected.
+        ///
+        /// Classes 0x2C/0x2D use the separate directional-animation path and
+        /// are deliberately not handled here.
         /// </summary>
-        public static bool AdvanceSimpleAnimationIfDue(
+        public static bool AdvancePresentationAnimationIfDue(
             ref OriginalObjectRecord obj,
             OriginalObjectDefinitionRecord definition,
-            uint now)
+            uint now,
+            Func<ushort> nextRandom)
         {
-            if (definition.Interval == 0 ||
+            if (obj.ObjectClass == 0x2C ||
+                obj.ObjectClass == 0x2D ||
+                definition.Interval == 0 ||
                 definition.FrameCount == 0 ||
                 now < obj.RuntimeValue)
             {
@@ -72,11 +87,65 @@ namespace Nitemare3D
             int next =
                 unchecked((byte)obj.Component03) + 1;
 
-            if (next >= definition.FrameCount)
-                next = 0;
+            if (definition.ExtensionFlag == 0)
+            {
+                if (next >= definition.FrameCount)
+                    next = 0;
 
-            obj.Component03 =
-                unchecked((sbyte)next);
+                obj.Component03 =
+                    unchecked((sbyte)next);
+            }
+            else
+            {
+                ushort branch =
+                    Alternative(
+                        definition,
+                        unchecked((byte)obj.Component02));
+
+                int start =
+                    branch & 0xFF;
+
+                int length =
+                    branch >> 8;
+
+                if (length == 0 ||
+                    next >= start + length)
+                {
+                    if (nextRandom == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Extended OBJECT SEQDEF requires original-compatible RNG.");
+                    }
+
+                    int selector;
+                    do
+                    {
+                        selector =
+                            nextRandom() & 7;
+
+                        branch =
+                            Alternative(
+                                definition,
+                                selector);
+
+                        start =
+                            branch & 0xFF;
+
+                        length =
+                            branch >> 8;
+                    }
+                    while (length == 0);
+
+                    obj.Component02 =
+                        unchecked((sbyte)selector);
+
+                    next =
+                        start;
+                }
+
+                obj.Component03 =
+                    unchecked((sbyte)next);
+            }
 
             obj.RuntimeValue =
                 unchecked(
@@ -84,6 +153,19 @@ namespace Nitemare3D
                     definition.Interval);
 
             return true;
+        }
+
+        // Compatibility name retained for existing direct tests/callers.
+        public static bool AdvanceSimpleAnimationIfDue(
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            uint now)
+        {
+            return AdvancePresentationAnimationIfDue(
+                ref obj,
+                definition,
+                now,
+                () => 0);
         }
 
         /// <summary>
