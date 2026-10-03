@@ -64,6 +64,8 @@ namespace Nitemare3D
 
         public static void UpdateEntites()
         {
+            OriginalRuntimeState.BeginFrame(Time.dt);
+
             foreach (var entity in entities)
             {
                 entity.Update();
