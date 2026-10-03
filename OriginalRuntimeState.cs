@@ -666,6 +666,9 @@ namespace Nitemare3D
 
                 case OriginalGuardState.Active07:
                 {
+                    if (Game.player == null)
+                        return OriginalGuardDispatchResult.NotHandled;
+
                     if (!ObjectDefinitions.TryGetHeader(
                             obj.DefinitionId,
                             out var definition))
@@ -711,6 +714,25 @@ namespace Nitemare3D
                         GuardProcessingGate,
                         perceived,
                         randomValue);
+                }
+
+                case OriginalGuardState.DeathFinalize09:
+                {
+                    var finalized = FinalizeDeath09(entity);
+
+                    if (finalized == GuardHitResult.DraculaTransformed)
+                        return OriginalGuardDispatchResult.Transitioned;
+
+                    if (finalized == GuardHitResult.Killed)
+                    {
+                        if (entity is Guard legacyGuard)
+                            legacyGuard.visible = false;
+
+                        Entity.Remove(entity);
+                        return OriginalGuardDispatchResult.Completed;
+                    }
+
+                    return OriginalGuardDispatchResult.NotHandled;
                 }
 
                 case OriginalGuardState.WaitAnimation12:
@@ -830,6 +852,7 @@ namespace Nitemare3D
                 case OriginalGuardState.Transition05:
                 case OriginalGuardState.MoveThen03:
                 case OriginalGuardState.Active07:
+                case OriginalGuardState.DeathFinalize09:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
                 case OriginalGuardState.Pain15:
