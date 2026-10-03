@@ -3135,6 +3135,8 @@ int main(void)
             img_bytes,
             N3D_IMG_OBJECT_DIRECTORY_OFFSET + object_id * 4u,
             (uint32_t)object_stream);
+        assert(N3D_IMG_WALL_DIRECTORY_OFFSET == 0x0000u);
+        assert(N3D_IMG_OBJECT_DIRECTORY_OFFSET == 0x0000u);
 
         const size_t wall_seq =
             N3D_IMG_LOW_SEQUENCE_BANK_OFFSET +
@@ -3186,6 +3188,8 @@ int main(void)
         assert(archive.size == total_size);
         assert(archive.wall_offset[wall_id] == wall_stream);
         assert(archive.object_offset[object_id] == object_stream);
+        assert(archive.wall_offset[object_id] == object_stream);
+        assert(archive.object_offset[wall_id] == wall_stream);
 
         const n3d_img_sequence_def* wall_sequence =
             N3D_RE_WallSequence(&archive, wall_id);

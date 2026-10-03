@@ -103,15 +103,20 @@ int N3D_RE_LoadImgArchive(
 
     for(size_t i = 0; i < N3D_IMG_INDEX_ENTRIES; ++i)
     {
-        const size_t wall_dir =
-            N3D_IMG_WALL_DIRECTORY_OFFSET + i * 4u;
-        const size_t object_dir =
-            N3D_IMG_OBJECT_DIRECTORY_OFFSET + i * 4u;
+        const size_t resource_dir =
+            N3D_IMG_RESOURCE_DIRECTORY_OFFSET + i * 4u;
 
-        loaded.wall_offset[i] =
-            N3D_RE_ImgReadU32(loaded.bytes + wall_dir);
-        loaded.object_offset[i] =
-            N3D_RE_ImgReadU32(loaded.bytes + object_dir);
+        /*
+         * Win16 1.10 FUN_4C8A/4B86 and the wall/VEC loader both index the
+         * same 256-entry DWORD resource directory at file offset 0.
+         * The former 0x0400 "object directory" interpretation was incorrect.
+         */
+        const uint32_t resource_offset =
+            N3D_RE_ImgReadU32(
+                loaded.bytes + resource_dir);
+
+        loaded.wall_offset[i] = resource_offset;
+        loaded.object_offset[i] = resource_offset;
 
         if(loaded.wall_offset[i] != 0 &&
            (loaded.wall_offset[i] < N3D_IMG_FRAME_DATA_OFFSET ||
