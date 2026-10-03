@@ -853,6 +853,13 @@ namespace Nitemare3D
                         randomValue);
                 }
 
+                case OriginalGuardState.Move08:
+                    return TickState08Bridge(
+                        entity,
+                        binding,
+                        ref guard,
+                        ref obj);
+
                 case OriginalGuardState.DeathFinalize09:
                 {
                     var finalized = FinalizeDeath09(entity);
