@@ -1657,6 +1657,64 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Recovered state-0x11 strategy-1 door maneuver. Entry is produced by
+        /// FUN_700A with a 0x20 timer and door-facing movement vector. While the
+        /// countdown is active it uses the normal movement/collision core and
+        /// directional bank B; completion clears the temporary strategy/vector
+        /// and resumes stationary acquisition in state 0x07.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickState11Movement(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            OriginalObjectDefinitionRecord definition,
+            short playerWorldX,
+            short playerWorldY,
+            Func<short, short, bool> isBlockedAt,
+            Func<ushort> nextRandom,
+            out OriginalGuardMovementResult movement)
+        {
+            movement = default;
+
+            if (guard.State != (byte)OriginalGuardState.RecoverMove11)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            RefreshDirectionalSequence(
+                ref guard,
+                ref obj,
+                definition,
+                playerWorldX,
+                playerWorldY,
+                false);
+
+            movement = TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                isBlockedAt,
+                nextRandom);
+
+            if (guard.Timer > 0)
+                guard.Timer--;
+
+            if (guard.Timer == 0)
+            {
+                guard.MoveX = 0;
+                guard.MoveY = 0;
+                guard.Strategy = 0;
+                guard.State = (byte)OriginalGuardState.Active07;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            if (movement.AppliedX != 0 || movement.AppliedY != 0)
+                return movement.PositionCommitted
+                    ? OriginalGuardDispatchResult.Moved
+                    : OriginalGuardDispatchResult.MovementBlocked;
+
+            return movement.XBlocked || movement.YBlocked
+                ? OriginalGuardDispatchResult.MovementBlocked
+                : OriginalGuardDispatchResult.Waiting;
+        }
+
+        /// <summary>
         /// Recovered normal directional movement step. Eight facings collapse
         /// into four cardinal vectors. Strategy 2 doubles 8 world units to 16.
         /// </summary>
@@ -1799,6 +1857,9 @@ namespace Nitemare3D
             if (guard.State != (byte)OriginalGuardState.RecoverMove11)
                 return OriginalGuardDispatchResult.NotHandled;
 
+            guard.Timer = 0;
+            guard.MoveX = 0;
+            guard.MoveY = 0;
             guard.Strategy = 0;
             guard.State = (byte)OriginalGuardState.Active07;
             return OriginalGuardDispatchResult.Completed;
