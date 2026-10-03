@@ -313,6 +313,47 @@ N3D_RE_ClassifyProjectileCollision(int slot)
     return result;
 }
 
+n3d_projectile_advance_result
+N3D_RE_AdvanceProjectileUntilCollision(
+    int slot,
+    uint16_t substeps)
+{
+    n3d_projectile_advance_result result = {0};
+    result.requested_substeps = substeps;
+    result.collision.object_slot = -1;
+    result.collision.guard_slot = -1;
+
+    if(slot < 0 || slot >= N3D_MAX_PROJECTILES)
+    {
+        result.collision.kind =
+            N3D_PROJECTILE_COLLISION_UNRESOLVED;
+        return result;
+    }
+
+    for(uint16_t i = 0; i < substeps; ++i)
+    {
+        if(!N3D_RE_AdvanceProjectileLineSubstep(slot))
+            break;
+
+        ++result.advanced_substeps;
+        result.collision =
+            N3D_RE_ClassifyProjectileCollision(slot);
+
+        if(result.collision.kind !=
+           N3D_PROJECTILE_COLLISION_NONE)
+        {
+            /*
+             * Match the recovered 9D30 -> 9B64 ordering: collision is checked
+             * after every small movement step and traversal stops immediately.
+             * Damage/impact/wall cleanup remain caller-owned.
+             */
+            break;
+        }
+    }
+
+    return result;
+}
+
 int N3D_RE_EnterProjectileImpact(
     int slot,
     uint8_t weapon_selector,
