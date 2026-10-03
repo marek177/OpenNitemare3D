@@ -82,7 +82,7 @@ typedef struct n3d_guard_record
     uint8_t result_octant;     /* +12 */
     int8_t move_x;             /* +13 */
     int8_t move_y;             /* +14 */
-    uint8_t unknown_15;        /* +15 */
+    uint8_t unknown_15;        /* +15 signed vertical-bob step */
     uint8_t transition_flag;   /* +16 transition/perception control: 0 proximity, 1/2 LOS */
     uint8_t unknown_17;        /* +17 cached perception result */
     uint8_t unknown_18;        /* +18 cached <=1-tile proximity */
