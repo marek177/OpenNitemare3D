@@ -15,6 +15,7 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestGuardLogicClock();
+            TestWeaponRuntime();
             TestAutonomousGuardStateCoverage();
             TestObjectDefinitionCatalog();
             TestImgResourceLoader();
@@ -97,6 +98,107 @@ namespace Nitemare3D
 
             OriginalRuntimeState.AutonomousGuardRuntimeEnabled = previous;
             OriginalRuntimeState.Reset();
+        }
+
+        static void TestWeaponRuntime()
+        {
+            var weapon = new OriginalWeaponRuntime();
+            weapon.ResetNewGame();
+
+            Assert(weapon.ActiveSelector == OriginalWeaponSelector.None &&
+                   weapon.OwnedWeaponsMask == 0 &&
+                   weapon.PistolAmmo == 0 &&
+                   weapon.PlasmaAmmo == 0 &&
+                   weapon.WandAmmo == 0,
+                "new-game weapon block must start empty.");
+
+            Assert(OriginalWeaponRuntime.FireThreshold(
+                       OriginalWeaponSelector.SingleShotLaser) == 2 &&
+                   OriginalWeaponRuntime.FireThreshold(
+                       OriginalWeaponSelector.MagicWand) == 1 &&
+                   OriginalWeaponRuntime.FireThreshold(
+                       OriginalWeaponSelector.SilverPistol) == 3 &&
+                   OriginalWeaponRuntime.FireThreshold(
+                       OriginalWeaponSelector.ContinuousLaser) == 1,
+                "weapon cadence threshold table mismatch.");
+
+            weapon.AdvanceSlowTick();
+            Assert(!weapon.TryAcceptFireAttempt(
+                       OriginalWeaponSelector.SingleShotLaser,
+                       true,
+                       true),
+                "weapon 0 must not fire before two slow ticks.");
+
+            weapon.AdvanceSlowTick();
+            Assert(weapon.TryAcceptFireAttempt(
+                       OriginalWeaponSelector.SingleShotLaser,
+                       true,
+                       true) &&
+                   weapon.CadenceCounter == 0,
+                "weapon 0 cadence acceptance/reset mismatch.");
+
+            weapon.AdvanceSlowTick();
+            Assert(!weapon.TryAcceptFireAttempt(
+                       OriginalWeaponSelector.SingleShotLaser,
+                       false,
+                       true),
+                "weapons 0-2 must require FIRE edge.");
+
+            Assert(weapon.TryAcceptFireAttempt(
+                       OriginalWeaponSelector.ContinuousLaser,
+                       false,
+                       true),
+                "weapon 3 must accept held FIRE after its threshold.");
+
+            weapon.GrantWeapon(OriginalWeaponSelector.SingleShotLaser);
+            Assert(weapon.HasWeapon(
+                       OriginalWeaponSelector.SingleShotLaser) &&
+                   weapon.ActiveSelector ==
+                       OriginalWeaponSelector.SingleShotLaser &&
+                   weapon.PlasmaAmmo == 50,
+                "weapon pickup must own/select weapon and initialize ammo to 50.");
+
+            Assert(weapon.ConsumeAmmo(
+                       OriginalWeaponSelector.SingleShotLaser) &&
+                   weapon.PlasmaAmmo == 49,
+                "weapon 0 plasma ammo decrement mismatch.");
+
+            weapon.GrantWeapon(OriginalWeaponSelector.ContinuousLaser);
+            Assert(weapon.PlasmaAmmo == 50,
+                "weapon 3 pickup must share/reset the plasma pool to 50.");
+            Assert(weapon.ConsumeAmmo(
+                       OriginalWeaponSelector.ContinuousLaser) &&
+                   weapon.PlasmaAmmo == 49,
+                "weapon 3 must consume the shared plasma pool.");
+
+            weapon.GrantWeapon(OriginalWeaponSelector.MagicWand);
+            weapon.GrantWeapon(OriginalWeaponSelector.SilverPistol);
+            Assert(weapon.WandAmmo == 50 &&
+                   weapon.PistolAmmo == 50,
+                "wand/pistol weapon-start ammo mismatch.");
+
+            weapon.SetAmmo(OriginalWeaponSelector.SilverPistol, 99);
+            Assert(weapon.AddAmmoPickup(
+                       OriginalWeaponSelector.SilverPistol) &&
+                   weapon.PistolAmmo == 119,
+                "ammo pickup must preserve transient 99+20 before clamp.");
+            weapon.NormalizeAmmoCaps();
+            Assert(weapon.PistolAmmo == 100 &&
+                   !weapon.AddAmmoPickup(
+                       OriginalWeaponSelector.SilverPistol),
+                "ammo normalization/cap rejection mismatch.");
+
+            weapon.SetAmmo(OriginalWeaponSelector.MagicWand, 7);
+            weapon.Omnipotent = true;
+            Assert(weapon.ConsumeAmmo(OriginalWeaponSelector.MagicWand) &&
+                   weapon.WandAmmo == 7,
+                "Omnipotent must bypass ammo decrement.");
+
+            weapon.Omnipotent = false;
+            weapon.Jammed = true;
+            Assert(!weapon.ConsumeAmmo(OriginalWeaponSelector.MagicWand) &&
+                   weapon.WandAmmo == 7,
+                "weapon jam must reject shot acceptance without ammo loss.");
         }
 
         static void TestAutonomousGuardStateCoverage()
