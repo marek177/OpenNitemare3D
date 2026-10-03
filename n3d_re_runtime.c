@@ -4,6 +4,7 @@
 #include "n3d_re_special_runtime.h"
 #include "n3d_re_use.h"
 #include "n3d_re_definitions.h"
+#include "n3d_re_wall_explosion.h"
 #include <string.h>
 
 n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
@@ -25,6 +26,7 @@ void N3D_RE_ResetRuntime(void)
     N3D_RE_ResetDoors();
     N3D_RE_ResetPanelsAndPushes();
     N3D_RE_ResetUseLatch();
+    N3D_RE_ResetExplodingWalls();
     n3d_object_count = 0;
     n3d_guard_count = 0;
 }

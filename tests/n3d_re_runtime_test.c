@@ -16,6 +16,7 @@
 #include "../n3d_re_weapon.h"
 #include "../n3d_re_save.h"
 #include "../n3d_re_img.h"
+#include "../n3d_re_wall_explosion.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -3178,6 +3179,175 @@ int main(void)
         free(img_bytes);
         remove("N3D_IMG_SEQDEF_TEST.BIN");
         remove("N3D_IMG_SEQDEF_BAD_TEST.BIN");
+    }
+
+    /* SEQDEF-driven WALL_EX1/WALL_EX2 explosion lifecycle. */
+    {
+        const size_t frame_bytes = N3D_IMG_FRAME_HEADER_BYTES + 1;
+        const size_t class2d_stream = N3D_IMG_FRAME_DATA_OFFSET;
+        const size_t class2f_stream = class2d_stream + 3 * frame_bytes;
+        const size_t total_size = class2f_stream + 3 * frame_bytes;
+        uint8_t* img_bytes = (uint8_t*)calloc(total_size, 1);
+        assert(img_bytes != NULL);
+
+        const uint8_t class2d_id = 0x20;
+        const uint8_t wall_ex1_id = 0x21;
+        const uint8_t wall_ex2_id = 0x22;
+
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_WALL_DIRECTORY_OFFSET + class2d_id * 4u,
+            (uint32_t)class2d_stream);
+        write_u32_le(
+            img_bytes,
+            N3D_IMG_WALL_DIRECTORY_OFFSET + wall_ex2_id * 4u,
+            (uint32_t)class2f_stream);
+
+        const size_t class2d_seq =
+            N3D_IMG_LOW_SEQUENCE_BANK_OFFSET +
+            class2d_id * N3D_IMG_SEQUENCE_RECORD_BYTES;
+        img_bytes[class2d_seq + 0] = 50;
+        img_bytes[class2d_seq + 1] = 0;
+        img_bytes[class2d_seq + 2] = 3;
+
+        const size_t class2f_seq =
+            N3D_IMG_LOW_SEQUENCE_BANK_OFFSET +
+            wall_ex2_id * N3D_IMG_SEQUENCE_RECORD_BYTES;
+        img_bytes[class2f_seq + 0] = 50;
+        img_bytes[class2f_seq + 1] = 0;
+        img_bytes[class2f_seq + 2] = 3;
+
+        for(unsigned frame = 0; frame < 3; ++frame)
+        {
+            size_t off = class2d_stream + frame * frame_bytes;
+            img_bytes[off] = 1;
+            img_bytes[off + 1] = 1;
+            img_bytes[off + 10] = (uint8_t)(0x70 + frame);
+
+            off = class2f_stream + frame * frame_bytes;
+            img_bytes[off] = 1;
+            img_bytes[off + 1] = 1;
+            img_bytes[off + 10] = (uint8_t)(0x80 + frame);
+        }
+
+        FILE* f = fopen("N3D_IMG_WALL_EXPLOSION_TEST.BIN", "wb");
+        assert(f != NULL);
+        assert(fwrite(img_bytes, 1, total_size, f) == total_size);
+        fclose(f);
+        free(img_bytes);
+
+        assert(N3D_RE_LoadImgArchive(
+            "N3D_IMG_WALL_EXPLOSION_TEST.BIN",
+            &n3d_img));
+
+        n3d_wall_mapping_known[class2d_id] = 1;
+        n3d_wall_property_known[class2d_id] = 1;
+        n3d_wall_mapped_type[class2d_id] = 0x2D;
+        n3d_wall_property_resolved[class2d_id] =
+            N3D_RE_WallPropertiesForMappedType(0x2D);
+
+        n3d_wall_mapping_known[wall_ex1_id] = 1;
+        n3d_wall_property_known[wall_ex1_id] = 1;
+        n3d_wall_mapped_type[wall_ex1_id] = 0x2E;
+        n3d_wall_property_resolved[wall_ex1_id] =
+            N3D_RE_WallPropertiesForMappedType(0x2E);
+
+        n3d_wall_mapping_known[wall_ex2_id] = 1;
+        n3d_wall_property_known[wall_ex2_id] = 1;
+        n3d_wall_mapped_type[wall_ex2_id] = 0x2F;
+        n3d_wall_property_resolved[wall_ex2_id] =
+            N3D_RE_WallPropertiesForMappedType(0x2F);
+
+        N3D_RE_ResetExplodingWalls();
+        n3d_map[5 * N3D_MAP_WIDTH + 4].wall = wall_ex1_id;
+
+        assert(N3D_RE_StartExplodingWall(4, 5, 100));
+        const n3d_exploding_wall_record* wall =
+            N3D_RE_ExplodingWallAt(4, 5);
+        assert(wall != NULL);
+        assert(wall->source_wall_id == wall_ex1_id);
+        assert(wall->source_wall_class == 0x2E);
+        assert(wall->sequence_wall_id == class2d_id);
+        assert(wall->frame == 0);
+        assert(wall->animation_deadline_ms == 150);
+
+        uint8_t visual_id = 0, visual_frame = 0;
+        assert(N3D_RE_ExplodingWallVisual(
+            4, 5, &visual_id, &visual_frame));
+        assert(visual_id == class2d_id && visual_frame == 0);
+
+        uint8_t runtime_class = 0;
+        assert(N3D_RE_ExplodingWallRuntimeClass(
+            4, 5, &runtime_class));
+        assert(runtime_class == 0x2D);
+
+        assert(N3D_RE_UpdateExplodingWalls(149) == 0);
+        assert(N3D_RE_ExplodingWallAt(4, 5)->frame == 0);
+
+        assert(N3D_RE_UpdateExplodingWalls(150) == 0);
+        assert(N3D_RE_ExplodingWallAt(4, 5)->frame == 1);
+        assert(N3D_RE_ExplodingWallAt(4, 5)->animation_deadline_ms == 200);
+
+        assert(N3D_RE_UpdateExplodingWalls(200) == 0);
+        assert(N3D_RE_ExplodingWallAt(4, 5)->frame == 2);
+
+        assert(N3D_RE_UpdateExplodingWalls(250) == 1);
+        assert(N3D_RE_ExplodingWallAt(4, 5) == NULL);
+        assert(n3d_map[5 * N3D_MAP_WIDTH + 4].wall == 0);
+
+        /* WALL_EX2 keeps its own sequence and starts at frame one. */
+        N3D_RE_ResetExplodingWalls();
+        n3d_map[5 * N3D_MAP_WIDTH + 4].wall = wall_ex2_id;
+        assert(N3D_RE_StartExplodingWall(4, 5, 100));
+        wall = N3D_RE_ExplodingWallAt(4, 5);
+        assert(wall != NULL);
+        assert(wall->sequence_wall_id == wall_ex2_id);
+        assert(wall->frame == 1);
+        assert(wall->animation_deadline_ms == 150);
+
+        assert(N3D_RE_UpdateExplodingWalls(150) == 0);
+        assert(N3D_RE_ExplodingWallAt(4, 5)->frame == 2);
+        assert(N3D_RE_UpdateExplodingWalls(200) == 1);
+        assert(N3D_RE_ExplodingWallAt(4, 5) == NULL);
+        assert(n3d_map[5 * N3D_MAP_WIDTH + 4].wall == 0);
+
+        /*
+         * Projectile resolver starts the wall lifecycle and enters impact.
+         * While active, projectile collision sees runtime class 0x2D, so a
+         * second hit does not retrigger the explodable-property branch.
+         */
+        N3D_RE_ResetExplodingWalls();
+        n3d_map[5 * N3D_MAP_WIDTH + 4].wall = wall_ex1_id;
+        assert(N3D_RE_InitializeProjectile(
+            0, N3D_WEAPON_SINGLE_LASER,
+            4 * 64 + 32, 5 * 64 + 32, 20));
+
+        n3d_projectile_collision_result collision =
+            N3D_RE_ClassifyProjectileCollision(0);
+        assert(collision.kind ==
+               N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL);
+
+        n3d_projectile_wall_resolution wall_resolution =
+            N3D_RE_ResolveProjectileWallCollisionAtTime(
+                0, &collision, 100);
+        assert(wall_resolution.resolved == 1);
+        assert(wall_resolution.explosion_started == 1);
+        assert(wall_resolution.event_id == 0x29);
+        assert(wall_resolution.entered_impact == 1);
+        assert(n3d_projectiles[0].state == 2);
+        assert(N3D_RE_ExplodingWallAt(4, 5) != NULL);
+
+        assert(N3D_RE_InitializeProjectile(
+            1, N3D_WEAPON_SINGLE_LASER,
+            4 * 64 + 32, 5 * 64 + 32, 20));
+        collision = N3D_RE_ClassifyProjectileCollision(1);
+        assert(collision.kind ==
+               N3D_PROJECTILE_COLLISION_WALL_DEFERRED);
+        assert(collision.mapped_wall_type == 0x2D);
+
+        N3D_RE_FreeImgArchive(&n3d_img);
+        N3D_RE_ResetExplodingWalls();
+        remove("N3D_IMG_WALL_EXPLOSION_TEST.BIN");
     }
 
     puts("C-rewrite recovered runtime self-test: PASS");

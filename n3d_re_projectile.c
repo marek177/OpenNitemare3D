@@ -1,6 +1,7 @@
 #include "n3d_re_projectile.h"
 #include "n3d_re_definitions.h"
 #include "n3d_re_collision.h"
+#include "n3d_re_wall_explosion.h"
 
 #include <string.h>
 
@@ -247,7 +248,16 @@ N3D_RE_ClassifyProjectileCollision(int slot)
         return result;
     }
 
-    if(N3D_RE_WallMappingKnown(cell->wall))
+    uint8_t runtime_wall_class = 0;
+    const int exploding =
+        N3D_RE_ExplodingWallRuntimeClass(
+            result.cell_x,
+            result.cell_y,
+            &runtime_wall_class);
+
+    if(exploding)
+        result.mapped_wall_type = runtime_wall_class;
+    else if(N3D_RE_WallMappingKnown(cell->wall))
         result.mapped_wall_type = n3d_wall_mapped_type[cell->wall];
 
     /*
@@ -285,7 +295,9 @@ N3D_RE_ClassifyProjectileCollision(int slot)
     }
 
     const uint8_t wall_flags =
-        n3d_wall_property_resolved[cell->wall];
+        exploding
+            ? N3D_RE_WallPropertiesForMappedType(runtime_wall_class)
+            : n3d_wall_property_resolved[cell->wall];
 
     if(wall_flags & 0x10)
     {
@@ -492,6 +504,31 @@ N3D_RE_ResolveProjectileWallCollision(
     {
         result.deferred = 1;
         return result;
+    }
+
+    return result;
+}
+
+n3d_projectile_wall_resolution
+N3D_RE_ResolveProjectileWallCollisionAtTime(
+    int slot,
+    const n3d_projectile_collision_result* collision,
+    uint32_t now_ms)
+{
+    n3d_projectile_wall_resolution result =
+        N3D_RE_ResolveProjectileWallCollision(
+            slot,
+            collision);
+
+    if(collision &&
+       collision->kind == N3D_PROJECTILE_COLLISION_EXPLODABLE_WALL &&
+       result.resolved)
+    {
+        result.explosion_started =
+            (uint8_t)N3D_RE_StartExplodingWall(
+                collision->cell_x,
+                collision->cell_y,
+                now_ms);
     }
 
     return result;
