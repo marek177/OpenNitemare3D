@@ -3,10 +3,9 @@ using System;
 namespace Nitemare3D
 {
     /// <summary>
-    /// Clean-room parser for the two IMG definition banks recovered from
-    /// FUN_1010_4B86. The object bank begins at 0x6200 and contains one 0x5A
-    /// definition for each object id. The object directory at 0x0400 supplies
-    /// the shared source/frame-stream key used by FUN_1010_4C8A deduplication.
+    /// Byte-array equivalent of the recovered IMG resource path. This keeps the
+    /// original per-level deduplication semantics while avoiding file I/O when the
+    /// current Img instance already owns rawData.
     /// </summary>
     public static class OriginalImgDefinitionLoader
     {
@@ -14,10 +13,29 @@ namespace Nitemare3D
             byte[] imgData,
             byte objectId,
             out uint sourceKey,
-            out OriginalObjectDefinitionRecord definition)
+            out byte[] headerBytes,
+            out byte[] runtimeFrameTable)
+        {
+            return TryReadResource(
+                imgData,
+                objectId,
+                false,
+                out sourceKey,
+                out headerBytes,
+                out runtimeFrameTable);
+        }
+
+        public static bool TryReadResource(
+            byte[] imgData,
+            byte imageId,
+            bool tileBank,
+            out uint sourceKey,
+            out byte[] headerBytes,
+            out byte[] runtimeFrameTable)
         {
             sourceKey = 0;
-            definition = default;
+            headerBytes = null;
+            runtimeFrameTable = null;
 
             if (imgData == null ||
                 imgData.Length < OriginalRuntime.ImgFirstFrameStreamOffset)
@@ -25,11 +43,14 @@ namespace Nitemare3D
                 return false;
             }
 
-            int directoryOffset =
-                OriginalRuntime.ImgObjectDirectoryOffset + objectId * 4;
-            sourceKey = ReadUInt32LittleEndian(imgData, directoryOffset);
+            int directoryOffset = imageId * 4;
+            if (directoryOffset >
+                imgData.Length - sizeof(uint))
+            {
+                return false;
+            }
 
-            // A zero directory pointer is the original "no resource" case.
+            sourceKey = ReadUInt32LittleEndian(imgData, directoryOffset);
             if (sourceKey == 0 ||
                 sourceKey < OriginalRuntime.ImgFirstFrameStreamOffset ||
                 sourceKey >= imgData.Length)
@@ -37,19 +58,76 @@ namespace Nitemare3D
                 return false;
             }
 
-            int definitionOffset =
-                OriginalRuntime.ImgObjectDefinitionBankOffset +
-                objectId * OriginalRuntime.ObjectDefinitionBytes;
-
-            if (definitionOffset < 0 ||
-                definitionOffset >
-                    imgData.Length - OriginalRuntime.ObjectDefinitionBytes)
+            int headerOffset =
+                OriginalObjectDefinitionCatalog.HeaderOffset(imageId, tileBank);
+            if (headerOffset < 0 ||
+                headerOffset >
+                    imgData.Length - OriginalRuntime.ObjectResourceHeaderBytes)
             {
                 return false;
             }
 
-            definition =
-                OriginalObjectDefinitionCatalog.Parse(imgData, definitionOffset);
+            headerBytes = new byte[OriginalRuntime.ObjectResourceHeaderBytes];
+            Array.Copy(
+                imgData,
+                headerOffset,
+                headerBytes,
+                0,
+                headerBytes.Length);
+
+            var header =
+                OriginalObjectDefinitionCatalog.ParseHeader(headerBytes, 0);
+
+            runtimeFrameTable =
+                new byte[header.FrameCount * OriginalRuntime.ObjectResourceEntryBytes];
+
+            long cursor = sourceKey;
+            for (int i = 0; i < header.FrameCount; i++)
+            {
+                if (cursor >
+                    imgData.Length - OriginalRuntime.ObjectResourceEntryBytes)
+                {
+                    return false;
+                }
+
+                byte width = imgData[cursor + 0];
+                byte height = imgData[cursor + 1];
+
+                if (tileBank)
+                {
+                    if (height != 0x40 ||
+                        (width != 0x40 && width != 0x80))
+                    {
+                        return false;
+                    }
+                }
+                else if (width * height > 0x0C00)
+                {
+                    return false;
+                }
+
+                uint pixelDataOffset =
+                    checked((uint)(cursor + OriginalRuntime.ObjectResourceEntryBytes));
+                long pixelBytes = (long)width * height;
+                if (pixelDataOffset + pixelBytes > imgData.Length)
+                    return false;
+
+                int entryOffset =
+                    i * OriginalRuntime.ObjectResourceEntryBytes;
+                runtimeFrameTable[entryOffset + 0] = width;
+                runtimeFrameTable[entryOffset + 1] = height;
+                WriteUInt32LittleEndian(
+                    runtimeFrameTable,
+                    entryOffset + 2,
+                    pixelDataOffset);
+                WriteUInt32LittleEndian(
+                    runtimeFrameTable,
+                    entryOffset + 6,
+                    0);
+
+                cursor = pixelDataOffset + pixelBytes;
+            }
+
             return true;
         }
 
@@ -66,14 +144,16 @@ namespace Nitemare3D
                     imgData,
                     objectId,
                     out uint sourceKey,
-                    out var definition))
+                    out byte[] headerBytes,
+                    out byte[] runtimeFrameTable))
             {
                 return false;
             }
 
             return catalog.TryGetOrAdd(
                 sourceKey,
-                definition,
+                headerBytes,
+                runtimeFrameTable,
                 out definitionId);
         }
 
@@ -84,6 +164,17 @@ namespace Nitemare3D
                 (data[offset + 1] << 8) |
                 (data[offset + 2] << 16) |
                 (data[offset + 3] << 24));
+        }
+
+        static void WriteUInt32LittleEndian(
+            byte[] data,
+            int offset,
+            uint value)
+        {
+            data[offset + 0] = (byte)value;
+            data[offset + 1] = (byte)(value >> 8);
+            data[offset + 2] = (byte)(value >> 16);
+            data[offset + 3] = (byte)(value >> 24);
         }
     }
 }
