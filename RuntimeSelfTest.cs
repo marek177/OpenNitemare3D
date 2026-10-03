@@ -16,6 +16,7 @@ namespace Nitemare3D
         public static void Run()
         {
             TestRecordSizes();
+            TestShadeRuntime();
             TestFrameCalibration();
             TestExactSpriteProjection();
             TestProjectedSpriteQueue();
@@ -91,6 +92,51 @@ namespace Nitemare3D
                 "DOOR record field offsets must match Win16 0x16-byte layout.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
+        }
+
+        static void TestShadeRuntime()
+        {
+            byte[] palette =
+                new byte[256 * 3];
+
+            for (int i = 0; i < 256; i++)
+            {
+                palette[i * 3 + 0] = (byte)i;
+                palette[i * 3 + 1] = (byte)i;
+                palette[i * 3 + 2] = (byte)i;
+            }
+
+            var shade =
+                new OriginalShadeRuntime();
+
+            shade.Rebuild(
+                palette,
+                2);
+
+            Assert(shade.ShadeIndex == 2 &&
+                   OriginalShadeRuntime.ShadeLevel(2) == 8 &&
+                   shade.Remap[100] == 68 &&
+                   shade.Remap[20] == 10 &&
+                   shade.Remap[9] == 9 &&
+                   shade.Remap[246] == 246,
+                "Win16 shade-2 236-color remap mismatch.");
+
+            shade.Rebuild(
+                palette,
+                6);
+
+            Assert(OriginalShadeRuntime.ShadeLevel(6) == 30 &&
+                   shade.Remap[200] == 80,
+                "Win16 shade-6 dark-event remap mismatch.");
+
+            shade.Rebuild(
+                palette,
+                0);
+
+            Assert(shade.Remap[100] == 100 &&
+                   shade.Remap[10] == 10 &&
+                   shade.Remap[245] == 245,
+                "shade 0 must preserve identity mapping.");
         }
 
         static void TestFrameCalibration()
