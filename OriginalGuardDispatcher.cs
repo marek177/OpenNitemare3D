@@ -2140,6 +2140,62 @@ namespace Nitemare3D
             return OriginalGuardDispatchResult.Transitioned;
         }
 
+        /// <summary>
+        /// Recovered state 0x14 timer front-end. AE56(0) initializes Timer=0x70.
+        /// The first 16 ticks count 0x70 -> 0x60 without movement; values below
+        /// 0x60 run FUN_71DC once per tick through zero. A subsequent tick with
+        /// Timer already <=0 requests the global AE56(1) release.
+        /// </summary>
+        public static OriginalGuardDispatchResult TickState14Countdown(
+            ref OriginalGuardRecord guard,
+            out bool movementDue,
+            out bool releaseGroup)
+        {
+            movementDue = false;
+            releaseGroup = false;
+
+            if (guard.State != (byte)OriginalGuardState.Periodic14)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            if (guard.Timer <= 0)
+            {
+                releaseGroup = true;
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            guard.Timer--;
+
+            if (guard.Timer >= 0x60)
+                return OriginalGuardDispatchResult.Waiting;
+
+            movementDue = true;
+            return OriginalGuardDispatchResult.Moved;
+        }
+
+        /// <summary>
+        /// Exact per-record AE56(1) release transformation for a state-0x14 guard.
+        /// savedDefinitionId is GUARD +0x0C, temporarily repurposed by AE56(0).
+        /// restoredDirectionalC0 is header +0x24 of that saved definition.
+        /// </summary>
+        public static bool ReleaseState14Record(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            ushort restoredDirectionalC0)
+        {
+            if (guard.State != (byte)OriginalGuardState.Periodic14)
+                return false;
+
+            byte savedDefinitionId = guard.NextState;
+
+            guard.Strategy = 0;
+            guard.State = (byte)OriginalGuardState.MoveThen03;
+            guard.Timer = 1;
+            obj.DefinitionId = savedDefinitionId;
+            guard.NextState = (byte)OriginalGuardState.MoveThen03;
+            guard.DefinitionValue = restoredDirectionalC0;
+            return true;
+        }
+
         // State 0x11: after the confirmed movement/timer sequence, strategy is
         // cleared and normal state-7 processing resumes.
         public static OriginalGuardDispatchResult CompleteState11(
