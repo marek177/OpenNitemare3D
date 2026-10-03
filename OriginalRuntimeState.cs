@@ -1124,6 +1124,90 @@ namespace Nitemare3D
                 out attackEligible);
         }
 
+        static int NormalizeOriginalAngle(int angle)
+        {
+            angle %= 360;
+            if (angle < 0)
+                angle += 360;
+            return angle;
+        }
+
+        static int ShortestOriginalAngleDelta(int target, int current)
+        {
+            int delta = target - current;
+            if (delta > 180)
+                delta -= 360;
+            else if (current - target > 180)
+                delta += 360;
+            return delta;
+        }
+
+        /// <summary>
+        /// Recovered FUN_1010_D8FC player-death camera phase.
+        /// State 2 rotates the view toward the OBJECT slot saved by FUN_8C0A.
+        /// Once already aligned at the beginning of a tick, gameplay state advances
+        /// to 3. The original does not advance to 3 on the same tick that reaches
+        /// the target angle.
+        /// </summary>
+        public static bool TickPlayerDeathCamera(Player player)
+        {
+            if (player == null ||
+                GameplayState46B4 != 2 ||
+                PlayerDeathSource4C1A >= ObjectCount)
+            {
+                return false;
+            }
+
+            ref var killer =
+                ref Objects[PlayerDeathSource4C1A];
+
+            short playerWorldX =
+                ToWorldCoordinate(player.position.X);
+            short playerWorldY =
+                ToWorldCoordinate(player.position.Y);
+
+            int dx = killer.WorldX - playerWorldX;
+            int dy = killer.WorldY - playerWorldY;
+
+            int targetAngle =
+                OriginalProjectileRuntime.AngleFromDirection(dx, dy);
+
+            int currentAngle =
+                OriginalProjectileRuntime.AngleFromDirection(
+                    player.direction.X,
+                    player.direction.Y);
+
+            int delta =
+                ShortestOriginalAngleDelta(
+                    targetAngle,
+                    currentAngle);
+
+            if (delta == 0)
+            {
+                GameplayState46B4 = 3;
+                return true;
+            }
+
+            int step = FrameTurnStepDegrees53F8;
+            int applied =
+                Math.Abs(delta) < step
+                    ? delta
+                    : (delta < 0 ? -step : step);
+
+            int nextAngle =
+                NormalizeOriginalAngle(
+                    currentAngle + applied);
+
+            // Port rotation convention: 0=east, original: 0=north.
+            player.SetRotation(nextAngle - 90);
+            player.direction =
+                new Vec2(
+                    MathF.Cos(player.rotation),
+                    MathF.Sin(player.rotation)).Normalize();
+
+            return false;
+        }
+
         static bool ApplyGuardAttackDamageToPlayer(
             ref OriginalGuardRecord guard,
             ref OriginalObjectRecord obj)
