@@ -655,13 +655,33 @@ namespace Nitemare3D
                 return false;
             }
 
-            bool advanced =
-                OriginalWorldObjectRuntime
-                    .AdvancePresentationAnimationIfDue(
-                        ref obj,
-                        definition,
-                        RuntimeClockMs,
-                        OriginalRandom.Next);
+            bool advanced;
+
+            if ((obj.ObjectClass == 0x2C ||
+                 obj.ObjectClass == 0x2D) &&
+                Game.player != null)
+            {
+                advanced =
+                    OriginalWorldObjectRuntime
+                        .AdvanceDirectionalAnimation(
+                            ref obj,
+                            definition,
+                            RuntimeClockMs,
+                            ToWorldCoordinate(
+                                Game.player.position.X),
+                            ToWorldCoordinate(
+                                Game.player.position.Y));
+            }
+            else
+            {
+                advanced =
+                    OriginalWorldObjectRuntime
+                        .AdvancePresentationAnimationIfDue(
+                            ref obj,
+                            definition,
+                            RuntimeClockMs,
+                            OriginalRandom.Next);
+            }
 
             if (advanced)
             {
