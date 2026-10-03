@@ -12,6 +12,7 @@
 #include "../n3d_re_trig.h"
 #include "../n3d_re_movement.h"
 #include "../n3d_re_timing.h"
+#include "../n3d_re_controls.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -150,6 +151,40 @@ int main(void)
     N3D_RE_SetTimingFromRawMean(40);
     assert(n3d_timing.movement_substeps == 10);
     assert(n3d_timing.turn_degrees == 5);
+
+    n3d_control_steps control_steps =
+        N3D_RE_ControlStepsForInput(0);
+    assert(control_steps.movement_substeps == 10);
+    assert(control_steps.turn_degrees == 5);
+
+    control_steps =
+        N3D_RE_ControlStepsForInput(N3D_INPUT_FAST);
+    assert(control_steps.movement_substeps == 20);
+    assert(control_steps.turn_degrees == 10);
+
+    control_steps =
+        N3D_RE_ControlStepsForInput(N3D_INPUT_FINE);
+    assert(control_steps.movement_substeps == 1);
+    assert(control_steps.turn_degrees == 1);
+
+    control_steps =
+        N3D_RE_ControlStepsForInput(
+            N3D_INPUT_FAST | N3D_INPUT_FINE);
+    assert(control_steps.movement_substeps == 1);
+    assert(control_steps.turn_degrees == 1);
+
+    assert(N3D_RE_ForwardAngle(350) == 350);
+    assert(N3D_RE_BackwardAngle(350) == 170);
+    assert(N3D_RE_StrafeLeftAngle(10) == 280);
+    assert(N3D_RE_StrafeRightAngle(350) == 80);
+    assert(N3D_RE_LeftTurnDelta(0) == -5);
+    assert(N3D_RE_RightTurnDelta(0) == 5);
+    assert(N3D_RE_LeftTurnDelta(N3D_INPUT_FAST) == -10);
+    assert(N3D_RE_RightTurnDelta(N3D_INPUT_FAST) == 10);
+    assert(N3D_RE_LeftTurnDelta(N3D_INPUT_FINE) == -1);
+    assert(N3D_RE_RightTurnDelta(N3D_INPUT_FINE) == 1);
+    assert(N3D_RE_LeftTurnDelta(N3D_INPUT_STRAFE) == 0);
+    assert(N3D_RE_RightTurnDelta(N3D_INPUT_STRAFE) == 0);
 
     N3D_RE_ResetPlayer();
     assert(n3d_player.angle_degrees == 0);
