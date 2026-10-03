@@ -7,6 +7,7 @@
 #include "n3d_re_use.h"
 #include "n3d_re_movement.h"
 #include "n3d_re_timing.h"
+#include "n3d_re_controls.h"
 #include "n3d_re_door.h"
 #include "n3d_re_pickup.h"
 
