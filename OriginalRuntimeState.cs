@@ -51,9 +51,15 @@ namespace Nitemare3D
         // i.e. one global logic step every 125 ms. Extra missed intervals are
         // not replayed as catch-up ticks.
         public const float GuardLogicTickSeconds = 0.125f;
+        public const float ProjectileLogicTickSeconds = 0.040f;
+        public const int ProjectileSubstepsPerTick = 20;
+
         static float guardLogicAccumulator;
+        static float projectileLogicAccumulator;
+
         public static bool SlowLogicTickDue { get; private set; }
         public static bool GuardLogicTickDue { get; private set; }
+        public static bool ProjectileLogicTickDue { get; private set; }
 
         // All recovered GUARD states 0x00..0x15 now have production routing.
         // Keep the original-runtime path enabled by default; callers may still
@@ -88,8 +94,22 @@ namespace Nitemare3D
         {
             SlowLogicTickDue = false;
             GuardLogicTickDue = false;
+            ProjectileLogicTickDue = false;
+
             if (deltaSeconds <= 0)
                 return;
+
+            // The calibrated Win16 frame path clamps its effective duration to
+            // at least 40 ms. On a modern host this yields the 25-Hz baseline
+            // projectile update with 53FA=20 one-world-unit DDA substeps.
+            projectileLogicAccumulator += deltaSeconds;
+            if (projectileLogicAccumulator >= ProjectileLogicTickSeconds)
+            {
+                ProjectileLogicTickDue = true;
+                // Like the original bucket schedulers, do not replay every
+                // missed tick in one frame; preserve only phase.
+                projectileLogicAccumulator %= ProjectileLogicTickSeconds;
+            }
 
             guardLogicAccumulator += deltaSeconds;
             if (guardLogicAccumulator < GuardLogicTickSeconds)
@@ -136,8 +156,10 @@ namespace Nitemare3D
             GuardCount = 0;
             GuardAttackClass16FullDamageOverride = false;
             guardLogicAccumulator = 0;
+            projectileLogicAccumulator = 0;
             SlowLogicTickDue = false;
             GuardLogicTickDue = false;
+            ProjectileLogicTickDue = false;
             GuardProcessingGate = false;
             CurrentRenderGeneration = 0;
         }
