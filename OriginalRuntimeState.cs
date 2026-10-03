@@ -771,6 +771,116 @@ namespace Nitemare3D
                 : OriginalGuardDispatchResult.Waiting;
         }
 
+        static int ReleaseState14Group()
+        {
+            int released = 0;
+
+            for (int i = 0; i < GuardCount; i++)
+            {
+                ref var member = ref Guards[i];
+                if (member.State != (byte)OriginalGuardState.Periodic14)
+                    continue;
+
+                int objectSlot = member.ObjectSlot;
+                if (objectSlot < 0 || objectSlot >= ObjectCount)
+                    continue;
+
+                ref var memberObject = ref Objects[objectSlot];
+                byte savedDefinitionId = member.NextState;
+
+                ushort directionalC0 = 0;
+                if (ObjectDefinitions.TryGetHeader(
+                        savedDefinitionId,
+                        out var restoredDefinition))
+                {
+                    directionalC0 = restoredDefinition.DirectionalC0;
+                }
+
+                if (OriginalGuardDispatcher.ReleaseState14Record(
+                        ref member,
+                        ref memberObject,
+                        directionalC0))
+                {
+                    released++;
+                }
+            }
+
+            // Original AE56(1) also emits SND 0x45 and restores normal level
+            // music through C63E. The current port already owns background music,
+            // while the legacy SND bridge is not safe for original IDs <34.
+            return released;
+        }
+
+        static OriginalGuardDispatchResult TickState14Bridge(
+            Entity entity,
+            Binding binding,
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj)
+        {
+            var countdown = OriginalGuardDispatcher.TickState14Countdown(
+                ref guard,
+                out bool movementDue,
+                out bool releaseGroup);
+
+            if (countdown == OriginalGuardDispatchResult.NotHandled)
+                return countdown;
+
+            if (releaseGroup)
+            {
+                return ReleaseState14Group() > 0
+                    ? OriginalGuardDispatchResult.Transitioned
+                    : OriginalGuardDispatchResult.Waiting;
+            }
+
+            if (!movementDue)
+                return countdown;
+
+            if (Game.player == null ||
+                !ObjectDefinitions.TryGetHeader(
+                    obj.DefinitionId,
+                    out var definition))
+            {
+                return OriginalGuardDispatchResult.NotHandled;
+            }
+
+            short playerWorldX =
+                ToWorldCoordinate(Game.player.position.X);
+            short playerWorldY =
+                ToWorldCoordinate(Game.player.position.Y);
+
+            int guardSlot = binding.GuardSlot;
+            int objectSlot = binding.ObjectSlot;
+
+            var movement = OriginalGuardDispatcher.TickMovementCollisionCore(
+                ref guard,
+                ref obj,
+                (candidateX, candidateY) =>
+                    EvaluateGuardMovementBlocked(
+                        guardSlot,
+                        objectSlot,
+                        definition,
+                        playerWorldX,
+                        playerWorldY,
+                        candidateX,
+                        candidateY),
+                OriginalRandom.Next);
+
+            entity.position.X =
+                (float)obj.WorldX / OriginalRuntime.WorldUnitsPerTile;
+            entity.position.Y =
+                (float)obj.WorldY / OriginalRuntime.WorldUnitsPerTile;
+            SyncGuardPosition(entity);
+
+            if (movement.AppliedX != 0 || movement.AppliedY != 0)
+                return movement.PositionCommitted
+                    ? OriginalGuardDispatchResult.Moved
+                    : OriginalGuardDispatchResult.MovementBlocked;
+
+            return movement.XBlocked || movement.YBlocked
+                ? OriginalGuardDispatchResult.MovementBlocked
+                : OriginalGuardDispatchResult.Waiting;
+        }
+
         public static OriginalGuardDispatchResult TickConfirmedAutonomousState(Entity entity)
         {
             if (!bindings.TryGetValue(entity, out var binding) ||
@@ -1106,6 +1216,13 @@ namespace Nitemare3D
                     return result;
                 }
 
+                case OriginalGuardState.Periodic14:
+                    return TickState14Bridge(
+                        entity,
+                        binding,
+                        ref guard,
+                        ref obj);
+
                 case OriginalGuardState.Pain15:
                     return OriginalGuardDispatcher.TickPainReaction(
                         ref guard, ref obj);
@@ -1208,6 +1325,7 @@ namespace Nitemare3D
                 case OriginalGuardState.RecoverMove11:
                 case OriginalGuardState.WaitAnimation12:
                 case OriginalGuardState.Transition13:
+                case OriginalGuardState.Periodic14:
                 case OriginalGuardState.Pain15:
                     return true;
 
