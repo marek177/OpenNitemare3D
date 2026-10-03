@@ -194,6 +194,10 @@ namespace Nitemare3D
         // also replenish HP/ammo while this protection flag is active.
         public static bool PlayerDamageSuppressed4BE5 { get; set; }
 
+        // FUN_33D6/3B7C mode 4: player-death red palette fade.
+        static byte[] playerDeathBasePalette;
+        public static byte PlayerDeathRedFadeStep { get; private set; }
+
         // Compatibility surface kept for callers written before the 51A6 closure.
         public static bool GuardAttackClass16FullDamageOverride
         {
@@ -447,6 +451,8 @@ namespace Nitemare3D
             PlayerDeathLatch46AC = false;
             PlayerDeathSource4C1A = 0;
             PlayerDamageSuppressed4BE5 = false;
+            playerDeathBasePalette = null;
+            PlayerDeathRedFadeStep = 0;
         }
 
         public static bool TryMapPortGuardClass(GuardType type, out byte objectClass)
@@ -1216,6 +1222,45 @@ namespace Nitemare3D
         }
 
         /// <summary>
+        /// Portable one-retrace step of FUN_33D6 mode 4. The original loops
+        /// steps 1..49 and waits for VGA vertical retrace (FUN_3AC2) between
+        /// palette applications. Only the red component is moved toward 255.
+        /// </summary>
+        public static bool TickPlayerDeathRedFade()
+        {
+            if (GameplayState46B4 != 3 ||
+                playerDeathBasePalette == null ||
+                playerDeathBasePalette.Length < 768 ||
+                GameWindow.pal == null ||
+                GameWindow.pal.Length < 768)
+            {
+                return false;
+            }
+
+            if (PlayerDeathRedFadeStep >= 49)
+                return true;
+
+            PlayerDeathRedFadeStep++;
+            int step = PlayerDeathRedFadeStep;
+
+            for (int color = 0; color < 256; color++)
+            {
+                int offset = color * 3;
+                int red = playerDeathBasePalette[offset];
+                int faded =
+                    red + ((255 - red) * step) / 50;
+
+                GameWindow.pal[offset] = (byte)faded;
+                GameWindow.pal[offset + 1] =
+                    playerDeathBasePalette[offset + 1];
+                GameWindow.pal[offset + 2] =
+                    playerDeathBasePalette[offset + 2];
+            }
+
+            return PlayerDeathRedFadeStep >= 49;
+        }
+
+        /// <summary>
         /// Exact health/death commit tail of FUN_1010_8C0A after A1EA produced
         /// the byte-sized GUARD damage amount. Returns whether gameplay state is
         /// the original death state 2 after the commit.
@@ -1247,6 +1292,11 @@ namespace Nitemare3D
                 PlayerDeathLatch46AC = true;
                 PlayerDeathSource4C1A =
                     guard.ObjectSlot;
+                playerDeathBasePalette =
+                    GameWindow.pal != null
+                        ? (byte[])GameWindow.pal.Clone()
+                        : null;
+                PlayerDeathRedFadeStep = 0;
 
                 // FUN_80EA.
                 guard.State =
