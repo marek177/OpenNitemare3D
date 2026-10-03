@@ -1697,6 +1697,67 @@ namespace Nitemare3D
         /// If the shared processing gate is set or perception fails, state 7 remains.
         /// Successful perception with strategy 3 enters state 0x13; otherwise state 2.
         /// </summary>
+        /// <summary>
+        /// Recovered FUN_1010_7920 state-08 wall-center helper.
+        /// It only acts when the OBJECT is centered in its 64-unit tile.
+        /// Wall class 0x41 selects an octant from its raw-ID variant.
+        /// Wall class 0x42 either selects a variant/octant, sends variant 8 to
+        /// state 3, or when movement is already active clears movement, enters
+        /// state 3 and reverses the facing by 180 degrees.
+        /// </summary>
+        public static OriginalGuardDispatchResult ApplyState08WallTurn(
+            ref OriginalGuardRecord guard,
+            ref OriginalObjectRecord obj,
+            byte wallClass,
+            byte wallVariant)
+        {
+            if (guard.State != (byte)OriginalGuardState.Move08)
+                return OriginalGuardDispatchResult.NotHandled;
+
+            if ((obj.WorldX & 0x3F) != OriginalRuntime.TileCenterOffset ||
+                (obj.WorldY & 0x3F) != OriginalRuntime.TileCenterOffset)
+            {
+                return OriginalGuardDispatchResult.Waiting;
+            }
+
+            if (wallClass == 0x41)
+            {
+                guard.Octant = (byte)(wallVariant & 7);
+                GetDirectionalStep(
+                    guard.Octant,
+                    guard.Strategy,
+                    out guard.MoveX,
+                    out guard.MoveY);
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            if (wallClass != 0x42)
+                return OriginalGuardDispatchResult.Waiting;
+
+            if (guard.MoveX == 0 && guard.MoveY == 0)
+            {
+                if (wallVariant == 8)
+                {
+                    guard.State = (byte)OriginalGuardState.Detection03;
+                    return OriginalGuardDispatchResult.Transitioned;
+                }
+
+                guard.Octant = (byte)(wallVariant & 7);
+                GetDirectionalStep(
+                    guard.Octant,
+                    guard.Strategy,
+                    out guard.MoveX,
+                    out guard.MoveY);
+                return OriginalGuardDispatchResult.Transitioned;
+            }
+
+            guard.MoveX = 0;
+            guard.MoveY = 0;
+            guard.State = (byte)OriginalGuardState.Detection03;
+            guard.Octant = (byte)((guard.Octant + 4) & 7);
+            return OriginalGuardDispatchResult.Transitioned;
+        }
+
         public static OriginalGuardDispatchResult ResolveState07Perception(
             ref OriginalGuardRecord guard,
             bool processingGateSet,
