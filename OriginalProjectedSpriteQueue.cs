@@ -117,6 +117,46 @@ namespace Nitemare3D
             return (ushort)value;
         }
 
+        public static uint SpriteSourceStep16_16(
+            int frameHeight,
+            int projectedTop,
+            int projectedBottom)
+        {
+            int screenHeight =
+                projectedBottom -
+                projectedTop +
+                1;
+
+            if (frameHeight <= 0 ||
+                screenHeight <= 0)
+            {
+                return 0;
+            }
+
+            return (uint)(
+                ((ulong)frameHeight << 16) /
+                (ulong)screenHeight);
+        }
+
+        public static int SpriteSourceCoordinate(
+            int screenCoordinate,
+            int projectedStart,
+            uint sourceStep16_16)
+        {
+            if (screenCoordinate <= projectedStart)
+                return 0;
+
+            ulong delta =
+                (ulong)(
+                    screenCoordinate -
+                    projectedStart);
+
+            return (int)(
+                (delta *
+                 sourceStep16_16) >>
+                16);
+        }
+
         public static bool PassesThreeColumnWallGate(
             ushort[] wallVisibilityQ4,
             int left,
