@@ -89,3 +89,30 @@ n3d_fire_result N3D_RE_TryBeginPlayerFire(uint8_t projectile_sequence_base)
     result.ammo_after = *ammo;
     return result;
 }
+
+
+n3d_weapon_jam_event_result N3D_RE_ApplyWeaponJamEvent(uint8_t event_id)
+{
+    n3d_weapon_jam_event_result result = {0};
+
+    if(event_id == N3D_WEAPON_JAM_ENABLE_EVENT)
+    {
+        n3d_player.weapon_jam = 1;
+        result.handled = 1;
+        result.jammed = 1;
+        result.sound_id = N3D_WEAPON_JAM_SOUND_ID;
+        return result;
+    }
+
+    if(event_id == N3D_WEAPON_JAM_DISABLE_EVENT)
+    {
+        n3d_player.weapon_jam = 0;
+        result.handled = 1;
+        result.jammed = 0;
+        result.sound_id = N3D_WEAPON_JAM_SOUND_ID;
+        return result;
+    }
+
+    result.jammed = n3d_player.weapon_jam;
+    return result;
+}
