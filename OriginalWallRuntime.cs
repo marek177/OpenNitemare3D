@@ -520,6 +520,66 @@ namespace Nitemare3D
                 controller.State != old;
         }
 
+        /// <summary>
+        /// Win16 menu commands 0x1E/0x1F: "Open remote doors" /
+        /// "Close remote doors". Only classes 0x3B/0x3C whose VEC +0x01
+        /// (TextureOffset in the recovered VEC model) matches the current
+        /// area selector are affected.
+        ///
+        /// Open accepts controller states 1/3 (closed/closing) and FUN_188A
+        /// moves them to state 2 (opening). Close accepts states 0/2
+        /// (open/opening) and moves them to state 3 (closing).
+        /// </summary>
+        public int ApplyRemoteDoorCommand(
+            byte areaSelector,
+            bool open)
+        {
+            int changed = 0;
+
+            foreach (PairedWall controller in paired)
+            {
+                if (controller.First == null)
+                    continue;
+
+                byte wallClass = controller.First.RenderClass;
+                if (wallClass !=
+                        (byte)OriginalWallSemanticClass.DoorVerticalRemote &&
+                    wallClass !=
+                        (byte)OriginalWallSemanticClass.DoorHorizontalRemote)
+                {
+                    continue;
+                }
+
+                byte controllerArea =
+                    unchecked((byte)controller.First.TextureOffset);
+
+                if (controllerArea != areaSelector)
+                    continue;
+
+                short state = controller.State;
+                bool eligible = open
+                    ? state == 1 || state == 3
+                    : state == 0 || state == 2;
+
+                if (!eligible)
+                    continue;
+
+                // FUN_1018_27DE sets controller +0x14 before calling FUN_188A.
+                controller.Latch = 1;
+
+                if (TogglePairedWall(
+                        controller.CellX,
+                        controller.CellY,
+                        0,
+                        true))
+                {
+                    changed++;
+                }
+            }
+
+            return changed;
+        }
+
         public bool ForceState(
             int x,
             int y,
