@@ -363,11 +363,8 @@ namespace Nitemare3D
                     // projection path, not from a global off-screen timer.
                     // Projectile animation has its own 8-slot updater and is
                     // excluded by the projection-source branch.
-                    if (projectionSource == null)
-                    {
-                        OriginalRuntimeState.TickBoundWorldObjectPresentation(
-                            runtimeEntity);
-                    }
+                    OriginalRuntimeState.TickBoundWorldObjectPresentation(
+                        runtimeEntity);
                 }
             }
         }
