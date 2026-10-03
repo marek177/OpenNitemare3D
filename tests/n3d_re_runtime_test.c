@@ -4441,6 +4441,22 @@ int main(void)
         assert(attack_damage.stored_byte == 200);
     }
 
+    /* Class-0x16 GUARD->player full-damage gate runtime override. */
+    {
+        N3D_RE_ResetGuardAttackRuntime();
+        assert(!N3D_RE_GuardAttackClass16FullDamageGate(1));
+        assert(!N3D_RE_GuardAttackClass16FullDamageGate(2));
+        assert(N3D_RE_GuardAttackClass16FullDamageGate(3));
+
+        N3D_RE_SetGuardAttackClass16FullDamageOverride(1);
+        assert(N3D_RE_GuardAttackClass16FullDamageGate(1));
+        assert(N3D_RE_GuardAttackClass16FullDamageGate(2));
+
+        N3D_RE_ResetRuntime();
+        assert(!N3D_RE_GuardAttackClass16FullDamageGate(1));
+        assert(N3D_RE_GuardAttackClass16FullDamageGate(3));
+    }
+
     puts("C-rewrite recovered runtime self-test: PASS");
     return 0;
 }

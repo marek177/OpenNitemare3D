@@ -7,6 +7,7 @@
 #include "n3d_re_wall_explosion.h"
 #include "n3d_re_object_defs.h"
 #include "n3d_re_timing.h"
+#include "n3d_re_combat.h"
 #include <string.h>
 
 n3d_map_cell n3d_map[N3D_MAP_WIDTH * N3D_MAP_HEIGHT];
@@ -31,6 +32,7 @@ void N3D_RE_ResetRuntime(void)
     N3D_RE_ResetExplodingWalls();
     N3D_RE_ResetObjectDefinitions();
     N3D_RE_ResetGuardLogicClock();
+    N3D_RE_ResetGuardAttackRuntime();
     n3d_object_count = 0;
     n3d_guard_count = 0;
 }

@@ -1,5 +1,24 @@
 #include "n3d_re_combat.h"
 
+uint8_t n3d_guard_attack_class16_full_damage_override;
+
+void N3D_RE_ResetGuardAttackRuntime(void)
+{
+    n3d_guard_attack_class16_full_damage_override = 0;
+}
+
+void N3D_RE_SetGuardAttackClass16FullDamageOverride(int enabled)
+{
+    n3d_guard_attack_class16_full_damage_override =
+        enabled ? 1 : 0;
+}
+
+int N3D_RE_GuardAttackClass16FullDamageGate(uint8_t episode)
+{
+    return episode == 3 ||
+           n3d_guard_attack_class16_full_damage_override != 0;
+}
+
 int N3D_RE_ScalePlayerDamageByDifficulty(int damage, uint8_t difficulty)
 {
     switch(difficulty)

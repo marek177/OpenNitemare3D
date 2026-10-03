@@ -12,6 +12,12 @@
 #define N3D_HAMERSTEIN_GATE_REQUIRED 3
 #define N3D_HAMERSTEIN_BASE_DAMAGE 3
 
+extern uint8_t n3d_guard_attack_class16_full_damage_override;
+
+void N3D_RE_ResetGuardAttackRuntime(void);
+void N3D_RE_SetGuardAttackClass16FullDamageOverride(int enabled);
+int N3D_RE_GuardAttackClass16FullDamageGate(uint8_t episode);
+
 typedef enum n3d_guard_hit_result
 {
     N3D_GUARD_HIT_NO_DAMAGE,
