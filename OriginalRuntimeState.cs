@@ -66,9 +66,18 @@ namespace Nitemare3D
         // disable it explicitly for A/B comparison against the legacy port AI.
         public static bool AutonomousGuardRuntimeEnabled { get; set; } = true;
 
-        // DAT_1048_4BE7 shared processing gate. No port-side producer is known
-        // yet, so the default remains false; exposing it preserves the branch.
-        public static bool GuardProcessingGate { get; set; }
+        // DAT_1048_4BE7. Win16 menu/config command 0x24 reads/writes this byte,
+        // status serialization emits the letter 'I', and GUARD states 07/08 skip
+        // perception while it is nonzero. Treat it as the original player
+        // invisibility flag.
+        public static bool PlayerInvisible { get; set; }
+
+        // Compatibility alias for code written before the 4BE7 semantic closure.
+        public static bool GuardProcessingGate
+        {
+            get => PlayerInvisible;
+            set => PlayerInvisible = value;
+        }
 
         // DAT_1048_51A5. FUN_0EF6 initializes it to 1 and the Win16 UI can
         // toggle it. Keep the neutral address-backed name until the UI label is
@@ -160,7 +169,7 @@ namespace Nitemare3D
             SlowLogicTickDue = false;
             GuardLogicTickDue = false;
             ProjectileLogicTickDue = false;
-            GuardProcessingGate = false;
+            PlayerInvisible = false;
             CurrentRenderGeneration = 0;
         }
 
