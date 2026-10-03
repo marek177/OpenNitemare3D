@@ -18,6 +18,7 @@ namespace Nitemare3D
         public static List<OriginalRendererCore.Vec> originalVectors =
             new List<OriginalRendererCore.Vec>();
         public static OriginalWallRuntime originalWalls;
+        public static OriginalImgWallRuntime originalWallImages;
 
         static void SpawnMapObject(int id, int x, int y)
         {
@@ -1222,6 +1223,146 @@ namespace Nitemare3D
             return true;
         }
 
+        public static bool TryBeginOriginalExplodingWall(
+            int x,
+            int y,
+            uint nowMs)
+        {
+            if (originalMap == null ||
+                originalWallImages == null ||
+                originalVectors == null ||
+                x < 0 || y < 0 ||
+                x >= OriginalRuntime.MapWidth ||
+                y >= OriginalRuntime.MapHeight)
+            {
+                return false;
+            }
+
+            byte sourceClass = originalMap.WallClassAt(x, y);
+            if (sourceClass != 0x2E &&
+                sourceClass != 0x2F)
+            {
+                return false;
+            }
+
+            byte explosionCache = 0;
+            if (sourceClass == 0x2E)
+            {
+                byte explosionWallId =
+                    originalMap.FindWallIdByClass(0x2D, 0);
+
+                if (!originalWallImages.TryGetCacheIndexForWallId(
+                        explosionWallId,
+                        out explosionCache))
+                {
+                    return false;
+                }
+            }
+
+            bool found = false;
+
+            foreach (OriginalRendererCore.Vec vec
+                in originalVectors)
+            {
+                if (vec.SourceTileX != x ||
+                    vec.SourceTileY != y ||
+                    (vec.RenderClass != sourceClass &&
+                     vec.RenderClass != 0x2D))
+                {
+                    continue;
+                }
+
+                // FUN_9B64:
+                // class 0x2E ('.') -> frame 0, class 0x2D, generic
+                // exploding-wall sequence selector.
+                // class 0x2F ('/') -> frame 1, class 0x2D, retain the
+                // existing sequence selector.
+                if (sourceClass == 0x2E)
+                {
+                    vec.AnimationFrame = 0;
+                    vec.TextureSet = explosionCache;
+                }
+                else
+                {
+                    vec.AnimationFrame = 1;
+                }
+
+                vec.RenderClass = 0x2D;
+
+                var cache =
+                    originalWallImages.CacheFor(vec);
+
+                vec.RuntimeTimer =
+                    unchecked(nowMs + cache.IntervalMs);
+
+                found = true;
+            }
+
+            if (found)
+                SoundEffect.PlayOriginalEvent(0x29);
+
+            return found;
+        }
+
+        static void SyncLegacyTilesFromOriginalMap()
+        {
+            if (originalMap == null)
+                return;
+
+            for (int y = 0; y < OriginalRuntime.MapHeight; y++)
+            {
+                for (int x = 0; x < OriginalRuntime.MapWidth; x++)
+                {
+                    if (originalMap.WallId[x, y] != 0)
+                        continue;
+
+                    Tile tile = tilemap[x, y];
+                    if (tile == null)
+                        continue;
+
+                    tile.obstacle = false;
+                    tile.textureID = -1;
+                }
+            }
+        }
+
+        public static void UpdateOriginalExplodingWallVisibleAt(
+            int x,
+            int y,
+            uint nowMs)
+        {
+            if (originalMap == null ||
+                originalWallImages == null ||
+                originalVectors == null)
+            {
+                return;
+            }
+
+            foreach (OriginalRendererCore.Vec vec
+                in originalVectors)
+            {
+                if (vec.SourceTileX != x ||
+                    vec.SourceTileY != y ||
+                    vec.RenderClass != 0x2D)
+                {
+                    continue;
+                }
+
+                originalWallImages.UpdateAfterVisibleSpan(
+                    vec,
+                    nowMs,
+                    null,
+                    completed =>
+                    {
+                        originalWallImages.CompleteExplodingWall(
+                            completed,
+                            originalMap,
+                            originalVectors);
+                        SyncLegacyTilesFromOriginalMap();
+                    });
+            }
+        }
+
         public static void LoadMap(int id, int episode)
         {
             OriginalRuntimeState.Reset();
@@ -1267,6 +1408,13 @@ namespace Nitemare3D
                     var tile = tilemap[x, y];
                     return tile != null ? tile.textureID : -1;
                 });
+
+            // 4C8A wall-side IMG cache: deduplicate by wall frame-stream
+            // offset and write the byte cache selector into each VEC.
+            originalWallImages = new OriginalImgWallRuntime(
+                "data/IMG." + episode,
+                originalVectors);
+
             originalWalls = new OriginalWallRuntime(
                 originalMap,
                 originalVectors);
