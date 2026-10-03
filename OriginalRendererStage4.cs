@@ -148,9 +148,48 @@ namespace Nitemare3D
             trig =
                 OriginalRuntimeState.ExactTrigQ10;
 
-            visibility =
-                OriginalVisibilityOctants.Load(
-                    visibilityPath);
+            if (File.Exists(visibilityPath))
+            {
+                visibility =
+                    OriginalVisibilityOctants.Load(
+                        visibilityPath);
+            }
+            else
+            {
+                string[] exeCandidates =
+                {
+                    "data/NITE3W.EXE",
+                    "NITE3W.EXE",
+                    "data/NITE3W-10.EXE",
+                    "NITE3W-10.EXE"
+                };
+
+                visibility = null;
+
+                foreach (string exePath in exeCandidates)
+                {
+                    if (!File.Exists(exePath))
+                        continue;
+
+                    visibility =
+                        OriginalVisibilityOctants.LoadFromNite3w110Exe(
+                            exePath);
+                    break;
+                }
+
+                if (visibility == null)
+                {
+                    if (explicitlyRequested)
+                    {
+                        throw new FileNotFoundException(
+                            "Exact Nitemare3D visibility-octant table is required.",
+                            visibilityPath);
+                    }
+
+                    Enabled = false;
+                    return;
+                }
+            }
 
             Console.WriteLine(
                 "Original N3D renderer Stage 4 enabled.");
