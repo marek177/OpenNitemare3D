@@ -18,6 +18,7 @@ namespace Nitemare3D
             TestImgResourceLoader();
             TestOriginalMapTables();
             TestOriginalWallRuntime();
+            TestOriginalRandom();
             TestDamageMatrix();
             TestGuardSounds();
             TestGuardToPlayerDamage();
@@ -365,6 +366,30 @@ namespace Nitemare3D
             Assert(walls.SetLatchedPassable(1, 1) &&
                    door.State == 4,
                 "paired-wall state 4 latched/passable mismatch.");
+        }
+
+        static void TestOriginalRandom()
+        {
+            OriginalRandom.ResetToOriginalSeed();
+
+            ushort[] expected =
+            {
+                41, 18467, 6334, 26500, 19169,
+                15724, 11478, 29358, 26962, 24464
+            };
+
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert(OriginalRandom.Next() == expected[i],
+                    "Win16 CRT rand sequence mismatch at " + i);
+            }
+
+            OriginalRandom.SetSeed(1);
+            Assert(OriginalRandom.Seed == 1 &&
+                   OriginalRandom.Next() == 41,
+                "srand(1) compatibility mismatch.");
+
+            OriginalRandom.ResetToOriginalSeed();
         }
 
         static void TestDamageMatrix()
