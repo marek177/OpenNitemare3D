@@ -103,27 +103,8 @@ void P_PlayerThink()
 
     P_PlayerHandleInput();
 
-    /*
-     * Exact 9806 base parameters. Right Shift doubles both; Left Shift is
-     * processed afterwards and therefore wins by forcing both values to one.
-     */
-    uint16_t movement_substeps =
-        n3d_timing.movement_substeps;
-    int turn_degrees =
-        n3d_timing.turn_degrees;
-
-    if(N3D_RE_HasInput(N3D_INPUT_FAST))
-    {
-        movement_substeps =
-            (uint16_t)(movement_substeps * 2u);
-        turn_degrees *= 2;
-    }
-
-    if(N3D_RE_HasInput(N3D_INPUT_FINE))
-    {
-        movement_substeps = 1;
-        turn_degrees = 1;
-    }
+    const n3d_control_steps control =
+        N3D_RE_ControlStepsForInput(n3d_player.input_mask);
 
     /*
      * Exact 9806 processing order:
@@ -132,15 +113,15 @@ void P_PlayerThink()
     if(N3D_RE_HasInput(N3D_INPUT_FORWARD))
     {
         P_MoveAtAngle(
-            n3d_player.angle_degrees,
-            movement_substeps);
+            N3D_RE_ForwardAngle(n3d_player.angle_degrees),
+            control.movement_substeps);
     }
 
     if(N3D_RE_HasInput(N3D_INPUT_BACKWARD))
     {
         P_MoveAtAngle(
-            n3d_player.angle_degrees + 180,
-            movement_substeps);
+            N3D_RE_BackwardAngle(n3d_player.angle_degrees),
+            control.movement_substeps);
     }
 
     if(N3D_RE_HasInput(N3D_INPUT_TURN_A))
@@ -148,12 +129,15 @@ void P_PlayerThink()
         if(N3D_RE_HasInput(N3D_INPUT_STRAFE))
         {
             P_MoveAtAngle(
-                n3d_player.angle_degrees + 270,
-                movement_substeps);
+                N3D_RE_StrafeLeftAngle(
+                    n3d_player.angle_degrees),
+                control.movement_substeps);
         }
         else
         {
-            N3D_RE_TurnPlayer(-turn_degrees);
+            N3D_RE_TurnPlayer(
+                N3D_RE_LeftTurnDelta(
+                    n3d_player.input_mask));
         }
     }
 
@@ -162,12 +146,15 @@ void P_PlayerThink()
         if(N3D_RE_HasInput(N3D_INPUT_STRAFE))
         {
             P_MoveAtAngle(
-                n3d_player.angle_degrees + 90,
-                movement_substeps);
+                N3D_RE_StrafeRightAngle(
+                    n3d_player.angle_degrees),
+                control.movement_substeps);
         }
         else
         {
-            N3D_RE_TurnPlayer(turn_degrees);
+            N3D_RE_TurnPlayer(
+                N3D_RE_RightTurnDelta(
+                    n3d_player.input_mask));
         }
     }
 
