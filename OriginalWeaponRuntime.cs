@@ -20,9 +20,9 @@ namespace Nitemare3D
         // DAT_4BE5 / DOS 4151. Ordinary ammo consumption is bypassed while set.
         public bool Omnipotent { get; set; }
 
-        // DAT_4C2E is a separately recovered scripted weapon lock/jam latch.
-        // Its producer is not yet wired here, but the shot-acceptance layer can
-        // already preserve the original separation from the cadence gate.
+        // DAT_4C2E is the scripted weapon lock/jam latch. FUN_BFD8 produces it
+        // from E1M9 wall classes 0x47/0x48; WorldCollision routes those wall
+        // probes through OriginalRuntimeState.ApplyWeaponJamScriptTouchBFD8.
         public bool Jammed { get; set; }
 
         public void ResetNewGame()
