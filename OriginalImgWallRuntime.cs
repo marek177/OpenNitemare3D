@@ -393,6 +393,44 @@ namespace Nitemare3D
             return true;
         }
 
+        public void BeginExplodingWall(
+            OriginalRendererCore.Vec vec,
+            byte sourceClass,
+            byte explosionCacheIndex,
+            uint nowMs)
+        {
+            if (vec == null)
+                throw new ArgumentNullException(nameof(vec));
+
+            if (sourceClass == 0x2E)
+            {
+                // FUN_9B64 '.' branch.
+                vec.AnimationFrame = 0;
+                vec.TextureSet = explosionCacheIndex;
+            }
+            else if (sourceClass == 0x2F)
+            {
+                // FUN_9B64 '/' branch keeps the existing sequence selector.
+                vec.AnimationFrame = 1;
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(sourceClass),
+                    "Exploding-wall source class must be 0x2E or 0x2F.");
+            }
+
+            vec.RenderClass = 0x2D;
+
+            SequenceCache cache =
+                CacheFor(vec);
+
+            vec.RuntimeTimer =
+                unchecked(
+                    nowMs +
+                    cache.IntervalMs);
+        }
+
         /// <summary>
         /// FUN_1010_65A6 called after rendering a visible wall span.
         ///
