@@ -15,7 +15,8 @@ namespace Nitemare3D
         {
             TestRecordSizes();
             TestObjectDefinitionCatalog();
-            TestImgDefinitionLoader();
+            TestImgResourceLoader();
+            TestOriginalMapTables();
             TestDamageMatrix();
             TestGuardSounds();
             TestGuardToPlayerDamage();
@@ -191,6 +192,92 @@ namespace Nitemare3D
                    catalog.TryGetHeader(definitionId, out var registered) &&
                    registered.State03Sequence == 0x0320,
                 "synthetic IMG definition registration mismatch.");
+        }
+
+        static void TestOriginalMapTables()
+        {
+            byte[] map = new byte[
+                OriginalMapTables.HeaderBytes +
+                OriginalMapTables.LevelBytes];
+
+            map[0] = 1; // one level
+            map[1] = 0;
+
+            // Raw wall ids -> translated runtime classes.
+            map[0x0002 + 5] = 0x01; // hard wall
+            map[0x0002 + 6] = 0x31; // dynamic door family
+            map[0x0002 + 7] = 0x00; // empty
+
+            // Raw object ids -> translated runtime classes.
+            map[0x0102 + 9] = 0x08; // blocking object
+            map[0x0102 + 10] = 0x2A; // blocking family + LOS exception
+            map[0x0102 + 11] = 0x00;
+
+            int level = OriginalMapTables.HeaderBytes;
+
+            // (0,0) hard wall + empty object
+            map[level + 0] = 5;
+            map[level + 1] = 11;
+
+            // (1,0) dynamic door + empty object
+            map[level + 2] = 6;
+            map[level + 3] = 11;
+
+            // (2,0) empty wall + blocking object
+            map[level + 4] = 7;
+            map[level + 5] = 9;
+
+            // (3,0) empty wall + class-2A LOS exception
+            map[level + 6] = 7;
+            map[level + 7] = 10;
+
+            var tables = OriginalMapTables.Parse(map, 0);
+
+            Assert(tables.LevelCount == 1 &&
+                   tables.WallId[0, 0] == 5 &&
+                   tables.ObjectId[2, 0] == 9,
+                "MAP header/raw cell parse mismatch.");
+
+            Assert(tables.WallClassAt(0, 0) == 0x01 &&
+                   (tables.WallPropertyAt(0, 0) &
+                    OriginalMapTables.WallHardBlock) != 0,
+                "MAP wall class/property translation mismatch.");
+
+            Assert((tables.WallPropertyAt(1, 0) &
+                    OriginalMapTables.WallDynamicDoor) != 0,
+                "MAP dynamic-door property mismatch.");
+
+            Assert((tables.ObjectPropertyAt(2, 0) &
+                    OriginalMapTables.ObjectBlocksMovementOrLos) != 0,
+                "MAP blocking-object property mismatch.");
+
+            Assert((tables.ObjectPropertyAt(3, 0) &
+                    OriginalMapTables.ObjectLosPassThroughException) != 0,
+                "MAP class-2A LOS exception property mismatch.");
+
+            Assert(tables.IsPerceptionIntermediateBlocked(
+                       0, 0, false, (x, y) => true),
+                "hard wall must block D50A perception.");
+
+            Assert(tables.IsPerceptionIntermediateBlocked(
+                       1, 0, false, (x, y) => false),
+                "closed dynamic door must block D50A perception.");
+
+            Assert(!tables.IsPerceptionIntermediateBlocked(
+                       1, 0, false, (x, y) => true),
+                "open dynamic door must allow D50A perception.");
+
+            Assert(tables.IsPerceptionIntermediateBlocked(
+                       2, 0, true, (x, y) => true),
+                "secondary object blocker must block D50A perception.");
+
+            Assert(!tables.IsPerceptionIntermediateBlocked(
+                       3, 0, true, (x, y) => true),
+                "class-2A object must use D50A LOS pass-through exception.");
+
+            Assert(!tables.IsPerceptionIntermediateBlocked(
+                       2, 0, false, (x, y) => true),
+                "secondary-cell disabled mode must ignore object blocker.");
         }
 
         static void TestDamageMatrix()
