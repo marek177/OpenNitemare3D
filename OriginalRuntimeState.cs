@@ -92,8 +92,25 @@ namespace Nitemare3D
 
         public static bool RegisterGuard(Entity entity, GuardType type, byte mapObjectId = 0)
         {
-            byte objectClass;
-            if (!OriginalGuardProfiles.TryClassFromMapObjectId(
+            byte objectClass = 0;
+            byte variant = 0;
+            bool hasMapSemantics = false;
+
+            if (mapObjectId != 0 && Level.originalMap != null)
+            {
+                byte translatedClass = Level.originalMap.ObjectClass[mapObjectId];
+                if (translatedClass != 0 &&
+                    Level.originalMap.TryGetObjectClassAndVariant(
+                        mapObjectId,
+                        out objectClass,
+                        out variant))
+                {
+                    hasMapSemantics = true;
+                }
+            }
+
+            if (!hasMapSemantics &&
+                !OriginalGuardProfiles.TryClassFromMapObjectId(
                     Game.episode, mapObjectId, out objectClass) &&
                 !TryMapPortGuardClass(type, out objectClass))
             {
@@ -110,8 +127,12 @@ namespace Nitemare3D
 
             ref var obj = ref Objects[objectSlot];
             obj.MapObjectId = mapObjectId;
-            obj.Flags = (byte)(RecoveredMechanics.ObjectRuntimePresent |
-                                RecoveredMechanics.ObjectCreatesGuard);
+            obj.Variant = variant;
+            obj.Flags = hasMapSemantics
+                ? Level.originalMap.ObjectProperty[mapObjectId]
+                : (byte)(RecoveredMechanics.ObjectRuntimePresent |
+                         RecoveredMechanics.ObjectBlocksMovement |
+                         RecoveredMechanics.ObjectCreatesGuard);
             obj.ObjectClass = objectClass;
             obj.GuardIndex = (byte)guardSlot;
 
@@ -132,6 +153,23 @@ namespace Nitemare3D
             // FUN_1010_7594 later selects proximity (0) vs perception (1/2)
             // from the same byte during attack eligibility checks.
             guard.TransitionControl = profile.PerceptionMode;
+
+            if (hasMapSemantics)
+            {
+                int tileX = obj.WorldX >> 6;
+                int tileY = obj.WorldY >> 6;
+                byte wallClass =
+                    tileX >= 0 && tileY >= 0 &&
+                    tileX < OriginalRuntime.MapWidth &&
+                    tileY < OriginalRuntime.MapHeight
+                    ? Level.originalMap.WallClassAt(tileX, tileY)
+                    : (byte)0;
+
+                OriginalGuardProfiles.ApplySpawnVariantAndCell(
+                    ref guard,
+                    variant,
+                    wallClass);
+            }
 
             bindings[entity] = new Binding
             {
