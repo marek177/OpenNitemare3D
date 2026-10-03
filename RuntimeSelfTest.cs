@@ -114,6 +114,7 @@ namespace Nitemare3D
                 OriginalGuardState.LethalPlayerContact0B,
                 OriginalGuardState.Shared0C,
                 OriginalGuardState.Shared0D,
+                OriginalGuardState.RecoverMove11,
                 OriginalGuardState.WaitAnimation12,
                 OriginalGuardState.Transition13,
                 OriginalGuardState.Pain15
@@ -131,7 +132,6 @@ namespace Nitemare3D
                 OriginalGuardState.Conditional0E,
                 OriginalGuardState.Timed0F,
                 OriginalGuardState.Timed10,
-                OriginalGuardState.RecoverMove11,
                 OriginalGuardState.Periodic14
             };
 
