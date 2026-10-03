@@ -57,6 +57,7 @@ typedef struct n3d_player_runtime
     int16_t tile_x;
     int16_t tile_y;
     uint16_t map_cell_offset;
+    uint8_t area_id; /* DAT_1048_4C1C persistent class-0x44 AREA id */
 
     uint8_t health;
     uint16_t game_state;
@@ -96,6 +97,7 @@ void N3D_RE_ResetPlayer(void);
 void N3D_RE_SetPlayerAngle(int degrees);
 void N3D_RE_TurnPlayer(int signed_degrees);
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y);
+int N3D_RE_UpdatePlayerAreaFromCurrentCell(void);
 uint8_t N3D_RE_ClampPlayerHealthForHud(void);
 void N3D_RE_ClampPlayerResourcesForHud(void);
 int N3D_RE_ApplyFixedHealthPickup(uint8_t amount);

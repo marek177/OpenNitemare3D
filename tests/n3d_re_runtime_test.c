@@ -346,31 +346,122 @@ int main(void)
     s13 = N3D_RE_StepState13(0, 1);
     assert(s13.clear_strategy_and_enter_state2);
 
-    uint8_t selector = 0;
-    assert(N3D_RE_DoorSelectorFromWallId(0x70, &selector) && selector == 0);
-    assert(N3D_RE_DoorSelectorFromWallId(0x77, &selector) && selector == 7);
-    assert(!N3D_RE_DoorSelectorFromWallId(0x78, &selector));
-    assert(N3D_RE_DoorSelectorFromWallId(0xAD, &selector) && selector == 61);
-    assert(N3D_RE_DoorSelectorFromWallId(0xAE, &selector) && selector == 62);
+    /*
+     * Guard wake cache is AREA-based, not DOOR-based. Class-0x44 variants
+     * use rawWallId-firstRawId semantics and persist off AREA marker cells.
+     */
+    n3d_wall_mapping_known[10] = 1;
+    n3d_wall_property_known[10] = 1;
+    n3d_wall_mapped_type[10] = 0x44;
+    n3d_wall_property_resolved[10] =
+        N3D_RE_WallPropertiesForMappedType(0x44);
 
+    n3d_wall_mapping_known[11] = 1;
+    n3d_wall_property_known[11] = 1;
+    n3d_wall_mapped_type[11] = 0x44;
+    n3d_wall_property_resolved[11] =
+        N3D_RE_WallPropertiesForMappedType(0x44);
+
+    n3d_wall_mapping_known[15] = 1;
+    n3d_wall_property_known[15] = 1;
+    n3d_wall_mapped_type[15] = 0x44;
+    n3d_wall_property_resolved[15] =
+        N3D_RE_WallPropertiesForMappedType(0x44);
+
+    uint8_t area_id = 0xFF;
+    assert(N3D_RE_AreaIdFromWallId(10, &area_id) && area_id == 0);
+    assert(N3D_RE_AreaIdFromWallId(11, &area_id) && area_id == 1);
+    assert(N3D_RE_AreaIdFromWallId(15, &area_id) && area_id == 5);
+    assert(!N3D_RE_AreaIdFromWallId(9, &area_id));
+
+    /* Player DAT_4C1C initializes to zero and persists off AREA markers. */
     N3D_RE_ResetRuntime();
+    n3d_map[1 * N3D_MAP_WIDTH + 1].wall = 15;
+    N3D_RE_InitPlayerAtTile(1, 1);
+    assert(n3d_player.area_id == 5);
+
+    n3d_map[1 * N3D_MAP_WIDTH + 2].wall = 0;
+    uint8_t area_event = 0;
+    assert(N3D_RE_CommitPlayerWorldPosition(
+        2 * N3D_WORLD_UNITS_PER_TILE + N3D_TILE_CENTER_OFFSET,
+        1 * N3D_WORLD_UNITS_PER_TILE + N3D_TILE_CENTER_OFFSET,
+        &area_event));
+    assert(n3d_player.area_id == 5);
+
+    /* GUARD+0x0E initializes FF, adopts AREA id on class-44 cells, and persists. */
+    N3D_RE_ResetRuntime();
+    n3d_map[1 * N3D_MAP_WIDTH + 1].wall = 15;
+    n3d_map[2 * N3D_MAP_WIDTH + 2].wall = 15;
+    n3d_map[3 * N3D_MAP_WIDTH + 3].wall = 15;
+
     assert(N3D_RE_RegisterGuardFromMap(128, 1, 1));
     assert(N3D_RE_RegisterGuardFromMap(132, 2, 2));
-    n3d_guards[0].definition_id = 5;
-    n3d_guards[1].definition_id = 5;
+    assert(N3D_RE_RegisterGuardFromMap(136, 3, 3));
+    assert(n3d_guards[0].area_id == 5);
+    assert(n3d_guards[1].area_id == 5);
+    assert(n3d_guards[2].area_id == 5);
+
+    n3d_guards[0].state = N3D_GUARD_STATE_07;
+    n3d_guards[1].state = N3D_GUARD_STATE_08;
+    n3d_guards[2].state = N3D_GUARD_STATE_07;
+    n3d_guards[0].strategy = 0;
+    n3d_guards[1].strategy = 0;
+    n3d_guards[2].strategy = 1;
+
+    uint32_t rng_state = 1;
+    assert(N3D_RE_WakeGuardsWithRng(0, &rng_state) == 0);
+    assert(n3d_guard_wake_cache[0] == 0);
+
+    int woke = N3D_RE_WakeGuardsWithRng(5, &rng_state);
+    assert(woke == 2);
+    assert(n3d_guards[0].state == N3D_GUARD_STATE_01);
+    assert(n3d_guards[1].state == N3D_GUARD_STATE_01);
+    assert(n3d_guards[0].timer == 1); /* CRT rand seed1: 41 % 8 */
+    assert(n3d_guards[1].timer == 3); /* next: 18467 % 8 */
+    assert(n3d_guards[2].state == N3D_GUARD_STATE_07);
+    assert(N3D_RE_WakeGuardsWithRng(5, &rng_state) == 0);
+
+    n3d_objects[n3d_guards[0].object_slot].world_x =
+        4 * N3D_WORLD_UNITS_PER_TILE + N3D_TILE_CENTER_OFFSET;
+    n3d_objects[n3d_guards[0].object_slot].world_y =
+        4 * N3D_WORLD_UNITS_PER_TILE + N3D_TILE_CENTER_OFFSET;
+
+    n3d_map[4 * N3D_MAP_WIDTH + 4].wall = 0;
+    assert(!N3D_RE_UpdateGuardAreaForSlot(0));
+    assert(n3d_guards[0].area_id == 5);
+
+    n3d_map[4 * N3D_MAP_WIDTH + 4].wall = 11;
+    assert(N3D_RE_UpdateGuardAreaForSlot(0));
+    assert(n3d_guards[0].area_id == 1);
+
+    /*
+     * Successful FIRE uses the player's persistent AREA id and shared original
+     * CRT RNG. Hitscan avoids a trig-table dependency in this isolated test.
+     */
+    N3D_RE_ClearGuardWakeCache();
+    N3D_RE_ResetOriginalRng();
+
+    n3d_guards[0].area_id = 5;
+    n3d_guards[1].area_id = 5;
     n3d_guards[0].state = N3D_GUARD_STATE_07;
     n3d_guards[1].state = N3D_GUARD_STATE_08;
     n3d_guards[0].strategy = 0;
     n3d_guards[1].strategy = 0;
 
-    uint32_t rng_state = 1;
-    int woke = N3D_RE_WakeGuards(5, &rng_state);
-    assert(woke == 2);
+    N3D_RE_ResetPlayer();
+    n3d_player.area_id = 5;
+    n3d_player.active_weapon = N3D_WEAPON_SILVER_PISTOL;
+    n3d_player.silver_ammo = 5;
+
+    n3d_fire_result area_fire =
+        N3D_RE_TryBeginPlayerFire(20);
+    assert(area_fire.kind == N3D_FIRE_HITSCAN_READY);
+    assert(area_fire.guards_woken == 2);
+    assert(n3d_player.silver_ammo == 4);
     assert(n3d_guards[0].state == N3D_GUARD_STATE_01);
     assert(n3d_guards[1].state == N3D_GUARD_STATE_01);
-    assert(n3d_guards[0].timer >= 0 && n3d_guards[0].timer <= 7);
-    assert(n3d_guards[1].timer >= 0 && n3d_guards[1].timer <= 7);
-    assert(N3D_RE_WakeGuards(5, &rng_state) == 0);
+    assert(n3d_guards[0].timer == 1);
+    assert(n3d_guards[1].timer == 3);
 
     for(unsigned i = 0; i < 256; ++i)
     {

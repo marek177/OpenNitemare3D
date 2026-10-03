@@ -25,6 +25,7 @@ typedef struct n3d_fire_result
     uint8_t ammo_after;
     int8_t projectile_slot;
     uint8_t ammo_consumed;
+    uint8_t guards_woken;
 } n3d_fire_result;
 
 typedef struct n3d_weapon_jam_event_result

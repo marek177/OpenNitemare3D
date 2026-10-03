@@ -184,10 +184,13 @@ int N3D_RE_InstantiateMapObject(
             N3D_RE_GuardInitialProfile(object_class);
 
         guard->object_slot = slot;
+        guard->area_id = N3D_GUARD_AREA_UNSET;
         guard->strategy = profile.strategy;
         guard->state = profile.state;
         guard->next_state = profile.next_state;
         guard->strength = 0xFF;
+
+        N3D_RE_UpdateGuardAreaForSlot(guard_slot);
     }
 
     if(object_class == N3D_PUSH_MAPPED_OBJECT_TYPE)

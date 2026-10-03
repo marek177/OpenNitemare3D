@@ -26,6 +26,8 @@ void G_HandleRecoveredGuardThinking()
     {
         n3d_guard_record* guard = &n3d_guards[i];
 
+        N3D_RE_UpdateGuardAreaForSlot(i);
+
         switch(guard->state)
         {
             case N3D_GUARD_STATE_01:

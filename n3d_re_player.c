@@ -1,5 +1,6 @@
 #include "n3d_re_player.h"
 #include "n3d_re_trig.h"
+#include "n3d_re_definitions.h"
 
 #include <string.h>
 
@@ -31,6 +32,31 @@ void N3D_RE_TurnPlayer(int signed_degrees)
         (int)n3d_player.angle_degrees + signed_degrees);
 }
 
+int N3D_RE_UpdatePlayerAreaFromCurrentCell(void)
+{
+    if(n3d_player.tile_x < 0 || n3d_player.tile_y < 0 ||
+       n3d_player.tile_x >= N3D_MAP_WIDTH ||
+       n3d_player.tile_y >= N3D_MAP_HEIGHT)
+        return 0;
+
+    const n3d_map_cell* cell =
+        N3D_RE_MapCell(
+            (uint8_t)n3d_player.tile_x,
+            (uint8_t)n3d_player.tile_y);
+    if(!cell)
+        return 0;
+
+    uint8_t area_id = 0;
+    if(!N3D_RE_AreaIdFromWallId(cell->wall, &area_id))
+    {
+        /* FUN_247A/8A20 preserves the previous AREA id off marker cells. */
+        return 0;
+    }
+
+    n3d_player.area_id = area_id;
+    return 1;
+}
+
 void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y)
 {
     N3D_RE_ResetPlayer();
@@ -43,6 +69,8 @@ void N3D_RE_InitPlayerAtTile(uint8_t tile_x, uint8_t tile_y)
         (int16_t)(tile_y * N3D_WORLD_UNITS_PER_TILE + N3D_TILE_CENTER_OFFSET);
     n3d_player.map_cell_offset =
         (uint16_t)((tile_y * N3D_MAP_WIDTH + tile_x) * N3D_MAP_CELL_BYTES);
+
+    N3D_RE_UpdatePlayerAreaFromCurrentCell();
 }
 
 uint8_t N3D_RE_ClampPlayerHealthForHud(void)
@@ -160,6 +188,7 @@ int N3D_RE_CommitPlayerWorldPosition(
     n3d_player.tile_x = (int16_t)post.tile_x;
     n3d_player.tile_y = (int16_t)post.tile_y;
     n3d_player.map_cell_offset = post.map_byte_offset;
+    N3D_RE_UpdatePlayerAreaFromCurrentCell();
 
     if (event_id)
         *event_id = post.entered_tile_event;

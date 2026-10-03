@@ -1,6 +1,7 @@
 #include "n3d_re_weapon.h"
 
 #include "n3d_re_projectile.h"
+#include "n3d_re_guard.h"
 
 n3d_fire_result N3D_RE_TryBeginPlayerFire(uint8_t projectile_sequence_base)
 {
@@ -87,6 +88,14 @@ n3d_fire_result N3D_RE_TryBeginPlayerFire(uint8_t projectile_sequence_base)
     }
 
     result.ammo_after = *ammo;
+
+    /*
+     * FUN_7664 is reached after a successful shot/noise action. Its selector
+     * is DAT_4C1C: the player's persistent class-0x44 AREA id.
+     */
+    result.guards_woken =
+        (uint8_t)N3D_RE_WakeGuards(n3d_player.area_id);
+
     return result;
 }
 

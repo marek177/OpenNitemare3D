@@ -96,7 +96,7 @@ static void N3D_RE_DecodeGuard(
     dst->state = src[0x0B];
     dst->next_state = src[0x0C];
     dst->saved_map_object = src[0x0D];
-    dst->definition_id = src[0x0E];
+    dst->area_id = src[0x0E];
     dst->control = src[0x0F];
     dst->strength = src[0x10];
     dst->octant = src[0x11];
@@ -122,7 +122,7 @@ static void N3D_RE_EncodeGuard(
     dst[0x0B] = src->state;
     dst[0x0C] = src->next_state;
     dst[0x0D] = src->saved_map_object;
-    dst[0x0E] = src->definition_id;
+    dst[0x0E] = src->area_id;
     dst[0x0F] = src->control;
     dst[0x10] = src->strength;
     dst[0x11] = src->octant;

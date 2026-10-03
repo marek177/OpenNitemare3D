@@ -75,7 +75,7 @@ typedef struct n3d_guard_record
     uint8_t state;             /* +0B */
     uint8_t next_state;        /* +0C */
     uint8_t saved_map_object;  /* +0D */
-    uint8_t definition_id;     /* +0E partial semantic */
+    uint8_t area_id;           /* +0E persistent class-0x44 AREA id; starts FF */
     uint8_t control;           /* +0F partial semantic */
     uint8_t strength;          /* +10 */
     uint8_t octant;            /* +11 */

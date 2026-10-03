@@ -1,8 +1,12 @@
 #include "n3d_re_guard.h"
 
+#include "n3d_re_collision.h"
+#include "n3d_re_definitions.h"
+
 #include <string.h>
 
 uint8_t n3d_guard_wake_cache[N3D_GUARD_WAKE_CACHE_SIZE];
+uint32_t n3d_original_rng_state = 1u;
 
 uint16_t N3D_RE_RngNext(uint32_t* state)
 {
@@ -11,6 +15,16 @@ uint16_t N3D_RE_RngNext(uint32_t* state)
 
     *state = (*state * 0x343FDu) + 0x269EC3u;
     return (uint16_t)((*state >> 16) & 0x7FFFu);
+}
+
+void N3D_RE_ResetOriginalRng(void)
+{
+    n3d_original_rng_state = 1u;
+}
+
+uint16_t N3D_RE_RngNextGlobal(void)
+{
+    return N3D_RE_RngNext(&n3d_original_rng_state);
 }
 
 n3d_guard_move_vector N3D_RE_GuardDirectionalStep(uint8_t facing, uint8_t strategy)
@@ -149,53 +163,80 @@ void N3D_RE_ClearGuardWakeCache(void)
     memset(n3d_guard_wake_cache, 0, sizeof(n3d_guard_wake_cache));
 }
 
-int N3D_RE_DoorSelectorFromWallId(uint8_t wall_id, uint8_t* selector)
+int N3D_RE_UpdateGuardAreaForSlot(uint16_t guard_slot)
 {
-    if (!selector)
+    if(guard_slot >= n3d_guard_count)
         return 0;
 
-    const int is_door =
-        (wall_id >= 0x70 && wall_id <= 0x77) ||
-        (wall_id >= 0x79 && wall_id <= 0x80) ||
-        (wall_id >= 0x82 && wall_id <= 0x83) ||
-        (wall_id >= 0xA3 && wall_id <= 0xA6) ||
-        (wall_id >= 0xAD && wall_id <= 0xAE);
-
-    if (!is_door)
+    n3d_guard_record* guard = &n3d_guards[guard_slot];
+    if(guard->object_slot >= n3d_object_count)
         return 0;
 
-    *selector = (uint8_t)(wall_id - 0x70);
+    const n3d_object_record* object =
+        &n3d_objects[guard->object_slot];
+
+    const int tile_x =
+        (int)N3D_RE_WorldToTile(object->world_x);
+    const int tile_y =
+        (int)N3D_RE_WorldToTile(object->world_y);
+
+    if(tile_x < 0 || tile_y < 0 ||
+       tile_x >= N3D_MAP_WIDTH || tile_y >= N3D_MAP_HEIGHT)
+        return 0;
+
+    const n3d_map_cell* cell =
+        N3D_RE_MapCell((uint8_t)tile_x, (uint8_t)tile_y);
+    if(!cell)
+        return 0;
+
+    uint8_t area_id = 0;
+    if(!N3D_RE_AreaIdFromWallId(cell->wall, &area_id))
+    {
+        /* Original preserves the previous AREA id off class-0x44 markers. */
+        return 0;
+    }
+
+    guard->area_id = area_id;
     return 1;
 }
 
-int N3D_RE_WakeGuards(uint8_t selector, uint32_t* rng_state)
+int N3D_RE_WakeGuardsWithRng(uint8_t area_id, uint32_t* rng_state)
 {
-    if (selector == 0 || selector >= N3D_GUARD_WAKE_CACHE_SIZE)
+    if(area_id == 0 || area_id >= N3D_GUARD_WAKE_CACHE_SIZE)
         return 0;
 
-    if (n3d_guard_wake_cache[selector])
+    if(n3d_guard_wake_cache[area_id])
         return 0;
 
-    n3d_guard_wake_cache[selector] = 1;
+    /* FUN_7664 marks the AREA before scanning the GUARD pool. */
+    n3d_guard_wake_cache[area_id] = 1;
 
     int woke = 0;
-    for (uint16_t i = 0; i < n3d_guard_count; ++i)
+    for(uint16_t i = 0; i < n3d_guard_count; ++i)
     {
         n3d_guard_record* guard = &n3d_guards[i];
 
-        if (guard->strategy != 0 ||
-            guard->definition_id != selector ||
-            (guard->state != N3D_GUARD_STATE_07 &&
-             guard->state != N3D_GUARD_STATE_08))
+        if(guard->strategy != 0 ||
+           guard->area_id != area_id ||
+           (guard->state != N3D_GUARD_STATE_07 &&
+            guard->state != N3D_GUARD_STATE_08))
         {
             continue;
         }
 
-        const uint16_t random_value = N3D_RE_RngNext(rng_state);
+        const uint16_t random_value =
+            N3D_RE_RngNext(rng_state);
         guard->timer = (int16_t)(random_value % 8);
         guard->state = N3D_GUARD_STATE_01;
         ++woke;
     }
 
     return woke;
+}
+
+int N3D_RE_WakeGuards(uint8_t area_id)
+{
+    return N3D_RE_WakeGuardsWithRng(
+        area_id,
+        &n3d_original_rng_state);
 }
