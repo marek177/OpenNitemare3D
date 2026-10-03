@@ -47,54 +47,31 @@ namespace Nitemare3D
                 "GUARD record must be 26 bytes.");
             Assert(Marshal.SizeOf<OriginalProjectileRecord>() == 42,
                 "projectile record must be 42 bytes.");
-            Assert(Marshal.SizeOf<OriginalObjectDefinitionRecord>() ==
-                   OriginalRuntime.ObjectDefinitionBytes,
-                "object-definition record must be 0x5A bytes.");
         }
 
         static void TestObjectDefinitionCatalog()
         {
-            byte[] blockA = new byte[OriginalRuntime.ObjectDefinitionBytes];
-            blockA[0x34] = 0x12;
-            blockA[0x35] = 0x04;
-            blockA[0x36] = 0x20;
-            blockA[0x37] = 0x03;
-            blockA[0x38] = 0x30;
-            blockA[0x39] = 0x02;
-            blockA[0x3A] = 0x2C;
-            blockA[0x3B] = 0x02;
-            blockA[0x48] = 0x55;
-            blockA[0x49] = 0x01;
-            blockA[0x4A] = 0x40;
-            blockA[0x4B] = 0x04;
-            blockA[0x58] = 0x66;
-            blockA[0x59] = 0x02;
-            blockA[0x02] = 48;
+            byte[] header = new byte[OriginalRuntime.ObjectResourceHeaderBytes];
+            header[2] = 6;
+            Assert(OriginalObjectDefinitionCatalog.DecodeEntryCountFromHeader(
+                       header, 0) == 6,
+                "FUN_4B86 header +2 entry-count decode mismatch.");
 
-            var parsed = OriginalObjectDefinitionCatalog.Parse(blockA, 0);
-            Assert(parsed.FrameCount == 48 &&
-                   parsed.AlertSequence == 0x0412 &&
-                   parsed.AttackSequence == 0x0320 &&
-                   parsed.RecoverySequence == 0x0230,
-                "object-definition packed sequence offsets mismatch.");
-            Assert(parsed.TryGetReactionSequence(0, out ushort reaction0) &&
-                   reaction0 == 0x022C &&
-                   parsed.TryGetReactionSequence(7, out ushort reaction7) &&
-                   reaction7 == 0x0155,
-                "object-definition reaction sequence table mismatch.");
-            Assert(parsed.TryGetDeathSequence(0, out ushort death0) &&
-                   death0 == 0x0440 &&
-                   parsed.TryGetDeathSequence(7, out ushort death7) &&
-                   death7 == 0x0266,
-                "object-definition death sequence table mismatch.");
+            byte[] tableA = new byte[6 * OriginalRuntime.ObjectResourceEntryBytes];
+            tableA[0x34] = 0x12;
+            tableA[0x35] = 0x04;
+            tableA[0x36] = 0x20;
+            tableA[0x37] = 0x03;
+            tableA[0x38] = 0x30;
+            tableA[0x39] = 0x02;
 
             var catalog = new OriginalObjectDefinitionCatalog();
-            Assert(catalog.TryGetOrAdd(0x12345678, blockA, out byte first) &&
+            Assert(catalog.TryGetOrAdd(0x12345678, tableA, out byte first) &&
                    first == 0 &&
                    catalog.Count == 1,
-                "first object-definition allocation mismatch.");
+                "first object resource-table allocation mismatch.");
 
-            byte[] changedSameKey = (byte[])blockA.Clone();
+            byte[] changedSameKey = (byte[])tableA.Clone();
             changedSameKey[0x34] = 0xFF;
             Assert(catalog.TryGetOrAdd(
                        0x12345678, changedSameKey, out byte duplicate) &&
@@ -102,95 +79,31 @@ namespace Nitemare3D
                    catalog.Count == 1,
                 "equal source key must deduplicate to original definition id.");
 
-            byte[] blockB = (byte[])blockA.Clone();
-            blockB[0x34] = 0x44;
-            Assert(catalog.TryGetOrAdd(0x87654321, blockB, out byte second) &&
+            byte[] tableB = (byte[])tableA.Clone();
+            tableB[0x34] = 0x44;
+            Assert(catalog.TryGetOrAdd(0x87654321, tableB, out byte second) &&
                    second == 1 &&
                    catalog.Count == 2,
                 "new source key must allocate the next definition id.");
 
-            Assert(catalog.TryGetSequence(
+            Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.Active02, out ushort seq02) &&
                    seq02 == 0x0412,
-                "state 02 object-definition sequence lookup mismatch.");
-            Assert(catalog.TryGetSequence(
+                "state 02 resource-word lookup mismatch.");
+            Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.Detection03, out ushort seq03) &&
                    seq03 == 0x0320,
-                "state 03 object-definition sequence lookup mismatch.");
-            Assert(catalog.TryGetSequence(
+                "state 03 resource-word lookup mismatch.");
+            Assert(catalog.TryGetGuardStateWord(
                        first, OriginalGuardState.DetectionAttack04, out ushort seq04) &&
                    seq04 == 0x0230,
-                "state 04 object-definition sequence lookup mismatch.");
-        }
+                "state 04 resource-word lookup mismatch.");
 
-        static void TestImgDefinitionLoader()
-        {
-            byte[] img = new byte[OriginalRuntime.ImgFirstFrameStreamOffset + 0x1000];
-
-            // Two directional object IDs share one frame-stream/source key, exactly
-            // like the four direction variants in the original IMG files.
-            uint sharedOffset = (uint)(OriginalRuntime.ImgFirstFrameStreamOffset + 0x100);
-            int dir80 = OriginalRuntime.ImgObjectDirectoryOffset + 0x80 * 4;
-            int dir81 = OriginalRuntime.ImgObjectDirectoryOffset + 0x81 * 4;
-            img[dir80 + 0] = (byte)sharedOffset;
-            img[dir80 + 1] = (byte)(sharedOffset >> 8);
-            img[dir80 + 2] = (byte)(sharedOffset >> 16);
-            img[dir80 + 3] = (byte)(sharedOffset >> 24);
-            img[dir81 + 0] = img[dir80 + 0];
-            img[dir81 + 1] = img[dir80 + 1];
-            img[dir81 + 2] = img[dir80 + 2];
-            img[dir81 + 3] = img[dir80 + 3];
-
-            int definition80 =
-                OriginalRuntime.ImgObjectDefinitionBankOffset +
-                0x80 * OriginalRuntime.ObjectDefinitionBytes;
-            int definition81 =
-                OriginalRuntime.ImgObjectDefinitionBankOffset +
-                0x81 * OriginalRuntime.ObjectDefinitionBytes;
-
-            img[definition80 + 0x02] = 12;
-            img[definition80 + 0x34] = 0x04;
-            img[definition80 + 0x35] = 0x02;
-            img[definition80 + 0x36] = 0x00;
-            img[definition80 + 0x37] = 0x02;
-            img[definition80 + 0x38] = 0x00;
-            img[definition80 + 0x39] = 0x02;
-            img[definition80 + 0x3A] = 0x04;
-            img[definition80 + 0x3B] = 0x02;
-            img[definition80 + 0x4A] = 0x08;
-            img[definition80 + 0x4B] = 0x04;
-
-            Array.Copy(
-                img,
-                definition80,
-                img,
-                definition81,
-                OriginalRuntime.ObjectDefinitionBytes);
-
-            Assert(OriginalImgDefinitionLoader.TryReadObjectDefinition(
-                       img, 0x80, out uint sourceKey, out var definition) &&
-                   sourceKey == sharedOffset &&
-                   definition.FrameCount == 12 &&
-                   definition.AlertSequence == 0x0204 &&
-                   definition.AttackSequence == 0x0200 &&
-                   definition.RecoverySequence == 0x0200 &&
-                   definition.ReactionSequence0 == 0x0204 &&
-                   definition.DeathSequence0 == 0x0408,
-                "IMG object-definition bank parse mismatch.");
-
-            var catalog = new OriginalObjectDefinitionCatalog();
-            Assert(OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
-                       img, 0x80, catalog, out byte first) &&
-                   first == 0 &&
-                   OriginalImgDefinitionLoader.TryRegisterObjectDefinition(
-                       img, 0x81, catalog, out byte duplicate) &&
-                   duplicate == 0 &&
-                   catalog.Count == 1,
-                "IMG shared directory key must deduplicate definition ids.");
-
-            Assert(!OriginalImgDefinitionLoader.TryReadObjectDefinition(
-                       img, 0x00, out _, out _),
-                "zero IMG object directory entry must not create a definition.");
+            Assert(!catalog.TryGetOrAdd(
+                       0x11111111,
+                       new byte[OriginalRuntime.ObjectResourceEntryBytes + 1],
+                       out _),
+                "resource tables must be a multiple of the 10-byte entry size.");
         }
 
         static void TestDamageMatrix()
