@@ -32,6 +32,7 @@ namespace Nitemare3D
             TestGuardGridTrace();
             TestGuardLosCellFlags();
             TestCellFlagGenerators();
+            TestOriginalSoundEventMapping();
             TestProjectileRuntime();
             TestDelayState();
             TestState13Movement();
@@ -1177,6 +1178,18 @@ namespace Nitemare3D
                 "secondary class 2F must set 0x01/0x04.");
             Assert(OriginalGuardDispatcher.BuildSecondaryCellFlags(0x3D) == 0x05,
                 "secondary class 3D must set 0x01/0x04.");
+        }
+
+        static void TestOriginalSoundEventMapping()
+        {
+            Assert(SoundEffect.OriginalEventToPhysicalSlot(0) == 32,
+                "original sound event 0 must map to physical SND slot 32.");
+            Assert(SoundEffect.OriginalEventToPhysicalSlot(2) == 34,
+                "original sound event 2 must map to first loaded SFX slot 34.");
+            Assert(SoundEffect.OriginalEventToPhysicalSlot(35) == 67,
+                "Bat death event 35 must map to physical SND slot 67.");
+            Assert(SoundEffect.OriginalEventToPhysicalSlot(78) == 110,
+                "highest recovered Win16 event 78 must map to slot 110.");
         }
 
         static void TestProjectileRuntime()
