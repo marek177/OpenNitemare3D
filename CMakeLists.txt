@@ -13,6 +13,14 @@ add_executable(OpenNitemare3D
     src/main.cpp
     src/core/Engine.cpp
     src/render/Renderer.cpp
+
+    src/formats/BinaryIO.cpp
+    src/formats/DatArchive.cpp
+    src/formats/DefinitionTable.cpp
+    src/formats/DemoFile.cpp
+    src/formats/MapArchive.cpp
+    src/formats/Pcx8.cpp
+    src/formats/ImgArchive.cpp
 )
 
 target_include_directories(OpenNitemare3D
