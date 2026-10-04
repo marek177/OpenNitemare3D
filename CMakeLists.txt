@@ -33,3 +33,19 @@ if(MSVC)
 else()
     target_compile_options(OpenNitemare3D PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+
+include(CTest)
+
+if(BUILD_TESTING)
+    foreach(test_name
+        object_runtime_facts_test
+        guard_facts_test
+        guard_save_block_test
+        runtime_layout_test
+    )
+        add_executable(${test_name} tests/${test_name}.cpp)
+        target_include_directories(${test_name} PRIVATE src)
+        add_test(NAME ${test_name} COMMAND ${test_name})
+    endforeach()
+endif()
