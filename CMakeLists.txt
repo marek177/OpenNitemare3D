@@ -43,6 +43,9 @@ if(BUILD_TESTING)
         guard_facts_test
         guard_save_block_test
         runtime_layout_test
+        player_reconstruction_test
+        projectile_runtime_test
+        projectile_save_block_test
     )
         add_executable(${test_name} tests/${test_name}.cpp)
         target_include_directories(${test_name} PRIVATE src)
