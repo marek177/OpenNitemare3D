@@ -47,6 +47,7 @@ if(BUILD_TESTING)
         projectile_runtime_test
         projectile_save_block_test
         binary_parity_test
+        dos_action_mask_test
     )
         add_executable(${test_name} tests/${test_name}.cpp)
         target_include_directories(${test_name} PRIVATE src)
