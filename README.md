@@ -1,5 +1,8 @@
 # OpenNitemare3D
 
+**22–24 Oct 2026 implementation bridge:** [raw-byte snapshot/first-diff utilities, strict indexed+DAC acceptance gate and CTest](docs/OCT22_24_2026_IMPLEMENTATION_BRIDGE.md). These are generic byte-level tools, not yet a verified per-version USER.SAV decoder. [Research/evidence atlas](https://github.com/marek177/Nitemare3d-reversed/blob/main/docs/RE_CONSOLIDATION_20261022_24_SK.md).
+
+
 Clean-room reconstruction of **Nitemare 3D**.
 
 This repository was intentionally recreated from scratch. The previous OpenNitemare3D codebase is not used as the implementation base.
