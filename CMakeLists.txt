@@ -46,6 +46,7 @@ if(BUILD_TESTING)
         player_reconstruction_test
         projectile_runtime_test
         projectile_save_block_test
+        binary_parity_test
     )
         add_executable(${test_name} tests/${test_name}.cpp)
         target_include_directories(${test_name} PRIVATE src)
