@@ -1,5 +1,7 @@
 # OpenNitemare3D
 
+**3 Nov 2026 tools:** [framebuffer + DAC first-diff CLI and strict capture protocol](docs/NOV03_2026_FRAME_DIFF_AND_PARITY_PROTOCOL.md). Isolated synthetic Python tests are automated in CI; no original-versus-remake capture is claimed.
+
 **22–24 Oct 2026 implementation bridge:** [raw-byte snapshot/first-diff utilities, strict indexed+DAC acceptance gate and CTest](docs/OCT22_24_2026_IMPLEMENTATION_BRIDGE.md). These are generic byte-level tools, not yet a verified per-version USER.SAV decoder. [Research/evidence atlas](https://github.com/marek177/Nitemare3d-reversed/blob/main/docs/RE_CONSOLIDATION_20261022_24_SK.md).
 
 
