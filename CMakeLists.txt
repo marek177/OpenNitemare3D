@@ -48,9 +48,13 @@ if(BUILD_TESTING)
         projectile_save_block_test
         binary_parity_test
         dos_action_mask_test
+        demo_eof_regression_test
     )
         add_executable(${test_name} tests/${test_name}.cpp)
         target_include_directories(${test_name} PRIVATE src)
+        if(test_name STREQUAL "demo_eof_regression_test")
+            target_sources(${test_name} PRIVATE src/formats/DemoFile.cpp src/formats/BinaryIO.cpp)
+        endif()
         add_test(NAME ${test_name} COMMAND ${test_name})
     endforeach()
 endif()
