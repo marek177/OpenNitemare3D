@@ -1,0 +1,22 @@
+name: N3D framebuffer and DAC audit tests
+on:
+  push:
+    paths:
+      - 'tools/n3d_frame_diff.py'
+      - 'tests/test_n3d_frame_diff.py'
+      - '.github/workflows/n3d-python-frame-audit.yml'
+  pull_request:
+    paths:
+      - 'tools/n3d_frame_diff.py'
+      - 'tests/test_n3d_frame_diff.py'
+      - '.github/workflows/n3d-python-frame-audit.yml'
+jobs:
+  frame-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run synthetic frame comparator tests
+        run: python3 -m unittest discover -s tests -p 'test_n3d_frame_diff.py' -v
